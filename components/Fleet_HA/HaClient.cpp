@@ -66,7 +66,7 @@ bool HaClient::begin(ConnectivityManager *conn, EntityRegistry *reg) {
     // other allocation rather than appearing later as unexplained
     // fragmentation. 8 KB is a real amount of internal RAM on the S3 boards and
     // it should be visible at the moment it is taken, not discovered.
-    // In PSRAM, and bigger, where the board has it (2.10e: history - see
+    // In PSRAM, and bigger, where the board has it (history - see
     // HaDefaults.h); 8 KB of internal RAM otherwise.
     _rxCap = d.RX_BUFFER_PSRAM_BYTES;
     _rx    = (char *)heap_caps_malloc(_rxCap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);

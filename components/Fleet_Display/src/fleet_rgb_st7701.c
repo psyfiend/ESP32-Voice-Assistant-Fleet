@@ -1,5 +1,5 @@
 // fleet_rgb_st7701 - the ST7701 driver (RGB half) as fleet_rgb_panel_new()
-// sees it. WS_S3_4B (2.9 step 4). Reached through BSP_PANEL_DRIVER = ST7701
+// sees it. WS_S3_4B. Reached through BSP_PANEL_DRIVER = ST7701
 // on an RGB board; see the fleet_rgb_driver_t comment in fleet_rgb_panel.h.
 //
 // The chip's commands go over its own 3-wire SPI (9-bit, a D/C bit before

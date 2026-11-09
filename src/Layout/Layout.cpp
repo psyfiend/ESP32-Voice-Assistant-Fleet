@@ -1,5 +1,4 @@
-// Layout (2.12 P5): the dashboard's flow placement, moved from CardPage.cpp as it was - see
-// include/Layout/Layout.h. Tested off the board in host-tests/test/test_layout.
+// Layout: the dashboard's flow placement - see include/Layout/Layout.h. Tested off the board in host-tests/test/test_layout.
 #include "Layout/Layout.h"
 
 namespace Layout {
@@ -40,7 +39,7 @@ bool FlowEngine::placeOne(const Container &cn, const Item &p, uint8_t i, Place &
     if (mX > pX)      mX = pX;
     if (mY > pY)      mY = pY;
 
-    // --- Explicit placement, and the validator ROADMAP Q3b asked for -------
+    // --- Explicit placement, and its validator (D-4) -----------------------
     //
     // An invalid pin is REPORTED and then flowed, rather than dropped. The item
     // is still the one the author asked for; only its coordinate was wrong, and
@@ -63,8 +62,7 @@ bool FlowEngine::placeOne(const Container &cn, const Item &p, uint8_t i, Place &
     //
     // First free position wins, and at that position the WIDEST span that fits
     // wins. That ordering is deliberate: an item that fits at its minimum beside
-    // its neighbour beats one sitting alone on a new row at full width, which is
-    // the rule 2.4's cursor arithmetic encoded and this keeps.
+    // its neighbour beats one sitting alone on a new row at full width.
     for (uint8_t r = 0; r + mY <= cn.rows; r++) {
         for (uint8_t cc = 0; cc + mX <= cn.cols; cc++) {
             for (uint8_t sx = pX; sx >= mX; sx--) {
@@ -99,12 +97,11 @@ uint8_t FlowEngine::place(const Container &cn, const Item *items, uint8_t n, Pla
 
         // PINNED ITEMS ARE PLACED FIRST, in two passes.
         //
-        // The serial from WS_P4_5 showed "pin 2,2 rejected (out of bounds or
-        // occupied) - flowing": the coordinate was perfectly valid and had
-        // already been taken by a card that flowed into it first. A pin is a
-        // STRONGER statement than flow - the author named that spot - so flow
-        // must not be allowed to consume it. One pass for the pinned, then one
-        // for everything else.
+        // A pin is a STRONGER statement than flow - the author named that spot
+        // - so flow must not be allowed to consume it: a valid pin would
+        // otherwise be reported as rejected because a card that flowed into
+        // the spot first had taken it. One pass for the pinned, then one for
+        // everything else.
         bool ok = true;
         for (uint8_t pass = 0; pass < 2 && ok; pass++) {
             for (uint8_t i = 0; i < n; i++) {

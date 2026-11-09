@@ -17,14 +17,15 @@
 //   hostname  = fleet-ws-p4-7b-98d510      (hyphens - DNS safe)
 //   deviceId  = fleet_ws_p4_7b_98d510      (underscores - MQTT / HA)
 //
-// See GitHub issue #38 and docs/ROADMAP.md Q5.
+// See GitHub issue #38 and DECISIONS C2.
 // ---------------------------------------------------------------------------
 
 namespace DeviceIdentity {
 
 // Append the MAC suffix to the USER-FACING names (hostname, AP SSID)?
-// Default true. Call before first use - ConnectivityManager applies the stored
-// setting during begin().
+// True until configure() is called. ConnectivityManager::begin() calls it with
+// the stored setting, or WiFiDefaults.APPEND_MAC_SUFFIX (false) when none is stored,
+// so call it before first use of the names.
 //
 // IMPORTANT ASYMMETRY: this deliberately does NOT affect deviceId(). Hostname
 // and AP SSID are cosmetic - a collision there is a nuisance you notice

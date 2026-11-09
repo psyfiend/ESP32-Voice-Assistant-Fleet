@@ -7,8 +7,8 @@
 namespace {
 
 // Borrowed, not owned. Set by begin(); the touch callback reaches hardware
-// through this rather than through lv_display_get_user_data(), which used to
-// hand back a GUIManager* and put the screen-content class on the render path.
+// through this rather than through lv_display_get_user_data(), which keeps the
+// screen-content class off the render path.
 TouchManager   *s_touch   = nullptr;
 
 lv_display_t *s_disp      = nullptr;
@@ -43,15 +43,14 @@ void lv_log_print(lv_log_level_t level, const char *buf) {
     //
     // LV_ASSERT_HANDLER is `while(1);` (see docs/LESSONS.md), and both
     // LV_USE_ASSERT_NULL and LV_USE_ASSERT_MALLOC are on - so an allocation
-    // failure logs and then hangs the board forever. Six of eight boards are
+    // failure logs and then hangs the board forever. Six of the nine boards are
     // ARDUINO_USB_CDC_ON_BOOT=1, where Serial is a buffered USB endpoint:
     // without this, that final message is still sitting in the buffer when the
     // CPU stops, and the board looks like it froze in silence for no reason.
     //
-    // That silence is exactly what made the 2026-09-18 CYD_S3_3248 Dump Config
-    // freeze look causeless. Guarded on `if (Serial)` for the same reason as
-    // the one in SystemReport::line(): on a CDC board, flushing with no host
-    // attached waits for a host that will never drain it.
+    // Guarded on `if (Serial)` for the same reason as the one in
+    // SystemReport::line(): on a CDC board, flushing with no host attached
+    // waits for a host that will never drain it.
     if (Serial) Serial.flush();
 }
 #endif
@@ -84,21 +83,18 @@ bool begin(BoardDisplay &display, TouchManager &touch) {
     // CLICKABLE (lv_display.c:159-172). Drag anything on the top layer (the
     // Touch Points panel is draggable) and LVGL also tries to SCROLL: the
     // panel cannot, so the scroll passes up to its parent, the layer, which
-    // can. The layer then scrolls, carrying every child with it. Measured on
-    // both dev boards, 2026-09-26: top layer scrolled (0,-144) on WS_P4_5 and
-    // (-33,-236) on CYD_S3_3248, the toast's own alignment exactly right and
-    // the toast visibly "attached" to the panel. It only happened when the
-    // layer had room to scroll in the drag's direction, which is why it looked
-    // random. An overlay is a sheet of glass over the screen; it has nothing
-    // to scroll to.
+    // can. The layer then scrolls, carrying every child with it, so a toast
+    // looks "attached" to the dragged panel. It happens only when the layer
+    // has room to scroll in the drag's direction, which makes it look random.
+    // An overlay is a sheet of glass over the screen; it has nothing to scroll
+    // to.
     lv_obj_remove_flag(lv_display_get_layer_top(s_disp), LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(lv_display_get_layer_sys(s_disp), LV_OBJ_FLAG_SCROLLABLE);
 
     // --= DPI Awareness =--
     // LVGL uses this for lv_dpx() and its own default sizing, so it wants the
-    // panel's REAL density, not a blanket figure. This used to be a flat 150
-    // on the three -D HIGH_DPI_DISPLAY boards and LVGL's own default (130)
-    // everywhere else - wrong by up to 96 PPI on WS_P4_5.
+    // panel's REAL density (bspPixelDensity()), not a blanket figure; the
+    // fleet spans 165-294 PPI.
     {
         const uint16_t ppi = bspPixelDensity();
         if (ppi) {

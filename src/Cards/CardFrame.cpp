@@ -1,5 +1,5 @@
-// Card - the active frames (2.8 rounds 4-7). Split from Card.cpp, which was
-// already past the structure check's 1,000 lines; the class is one, its edge's
+// Card - the active frames (D-30 to D-33). Split from Card.cpp to keep both
+// files under the structure check's 1,000 lines; the class is one, its edge's
 // "on" states are here. See Card::activeFrame() in include/Cards/Card.h.
 #include "Cards/Card.h"
 #include "UI/UITokens.h"
@@ -9,24 +9,24 @@
 #include <string.h>
 
 // ---------------------------------------------------------------------------
-// THE ACTIVE FRAMES (owner, 2.8 rounds 4-7): "on" shown on the card's edge in
-// place of a fill, and LIT - "a little lit up colour inside the border",
-// "something to make the cards pop"; the futuristic HMI frames and Cyberpunk
-// 2077's cursor brackets as the reference, not full cyber-UI.
+// THE ACTIVE FRAMES (D-30 to D-33): "on" shown on the card's edge in place of
+// a fill, and LIT - a little lit colour inside the border, so the card pops;
+// the reference is the futuristic HMI frame and Cyberpunk 2077's cursor
+// brackets, not full cyber-UI.
 //   BRACKET  heavy top and bottom bars, thin sides, light falling inward from
 //            the bars
 //   CORNER   a frame with the top-right and bottom-left corners cut away at
 //            45 degrees (clear of the corner icon, top-left), light inward
-//            from every edge - the DEFAULT since round 6
-// DRAWN, never set as the card's border: a border is part of the layout, and
-// round 4's thick bracket pushed the hero down. The light goes behind the
-// card's contents (DRAW_MAIN_END), so text over it is never tinted; the bars,
-// the frame and the cuts on top of them (DRAW_POST).
+//            from every edge - the DEFAULT
+// DRAWN, never set as the card's border: a border is part of the layout, and a
+// thick one would push the hero down. The light goes behind the card's
+// contents (DRAW_MAIN_END), so text over it is never tinted; the bars, the
+// frame and the cuts on top of them (DRAW_POST).
 //
-// ON A LIGHT SCHEME THEY GO DARKER (round 6): brighter than the card is what
-// makes them glow on the dark schemes, and on Linen's cream it was "not nearly
-// as standout obvious". The edge is ACTIVE_INK % of the way to the scheme's
-// text, the light half that; 0 on the dark schemes, which are as they were.
+// ON A LIGHT SCHEME THEY GO DARKER: brighter than the card is what makes them
+// glow on the dark schemes, and on Linen's cream it would not stand out. The
+// edge is ACTIVE_INK % of the way to the scheme's text, the light half that;
+// 0 on the dark schemes.
 // ---------------------------------------------------------------------------
 namespace {
 
@@ -77,13 +77,12 @@ void tri(lv_layer_t *layer, const lv_point_t &p1, const lv_point_t &p2, const lv
 }
 
 // ---------------------------------------------------------------------------
-// THE CUT CORNERS, PAINTED (round 7). LVGL shadows a rounded rectangle only,
-// so where the corner cut takes a corner away, the card's shadow has to be
-// made again around the cut - and round 6's pieces (triangles of the page's
-// ground, strips of shadow along the cut) met the card's own shadow at two
-// visible points, "they don't blend well with the change in angle" (owner),
-// and cost ~13 ms a lit card on a page change, all of it the CPU drawing
-// triangles and diagonal lines over their whole bounding boxes.
+// THE CUT CORNERS, PAINTED. LVGL shadows a rounded rectangle only, so where
+// the corner cut takes a corner away, the card's shadow has to be made again
+// around the cut. Pieces (triangles of the page's ground, strips of shadow
+// along the cut) meet the card's own shadow at visible points and cost the CPU
+// a lot of time drawing triangles and diagonal lines over their whole
+// bounding boxes.
 //
 // So each cut corner is ONE IMAGE, painted once and kept: the page's ground
 // where the card is not, darkened by the shadow the cut card would cast, and
@@ -95,8 +94,7 @@ void tri(lv_layer_t *layer, const lv_point_t &p1, const lv_point_t &p2, const lv
 // value: no seam. Drawn in two pieces (drawCuts()): under the card's contents
 // what lies past the card (DRAW_MAIN_END), over them the cut's own square
 // (DRAW_POST). Measured on the P4_5, Linen, a page change: the whole corner
-// cut ~8 ms a lit card (round 6: 13.4) - the light bands 4, the cuts 2, their
-// two lines about 2.
+// cut ~8 ms a lit card - the light bands 4, the cuts 2, their two lines about 2.
 // ---------------------------------------------------------------------------
 
 // LVGL's shadow at each distance `d` out from the edge of a rectangle, from
@@ -414,7 +412,7 @@ void Card::frameDrawCb(lv_event_t *e) {
     const bool corner = card->_frame == CardFrame::FRAME_CORNER;
     const int32_t cut = lv_area_get_height(&a) * m.CUT_PCT / 100;
     const bool shadow = corner && cardShadow(card->_surface);
-    // A mini tile is cut to its cluster's surface (2.11 round 11, K116).
+    // A mini tile is cut to its cluster's surface (K116).
     const uint32_t ground = card->mini() ? UI::pal().SURFACE : UI::pal().GROUND;
 
     if (lv_event_get_code(e) == LV_EVENT_DRAW_MAIN_END) {

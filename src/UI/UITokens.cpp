@@ -1,24 +1,24 @@
 #include "UI/UITokens.h"
+#include "Settings.h"   // Card margins (K167): UI Tweaks' choice
 #include <Arduino.h>
+#include <string.h>
 
 // ---------------------------------------------------------------------------
 // Schemes
 //
-// Values come from the design bench sessions, 2026-09-10. The owner signed off
-// four configurations; what they disagreed about was accent and per-board grid
-// density, and what they agreed about is everything below.
+// Values come from the design bench sessions: four configurations the owner
+// signed off, which differed only in accent and per-board grid density.
 // ---------------------------------------------------------------------------
 
 // Shared across every scheme: state colours and sensor tints are content, not
 // decoration, so they do not change when the scheme does. A warning is amber
 // whether the dashboard is dark or light.
 //
-// EXCEPT "ON" (ST_ACTIVE), since 2026-10-01. The owner, on Linen: the orange
-// that fills a light or door that is on reads wrong on sand, and "there may
-// be a more suitable color to depict active states in Linen". It is still the
-// same MEANING on every scheme - a filled card with a lit disc - so the state
-// never rests on colour alone (cards.md section 0); only the paint differs.
-// Each scheme now sets it just before this block.
+// EXCEPT "ON" (ST_ACTIVE). The orange that marks a light or door that is on
+// reads wrong on Linen's sand, so each scheme sets it just before this block.
+// It is still the same MEANING on every scheme - a lit card with a lit disc - so
+// the state never rests on colour alone (cards.md section 0); only the paint
+// differs.
 #define ST_ACTIVE_ORANGE  0xF0A63C          // the dark schemes, unchanged
 #define FLEET_STATE_AND_TINTS               \
     .ST_IDLE    = 0x64748B,                 \
@@ -38,10 +38,10 @@
 #define TINT_LIGHTING_DARK  0xFFE3A3
 #define TINT_LIGHTING_LIGHT 0xC98A12
 
-// The popup's dim, the same near-black on every scheme (Card Popup Mock v3).
+// The popup's dim, the same near-black on every scheme.
 #define SCRIM_DARK 0x05080C
 
-// The header's status glyphs (2.8 round 3, D-27): the dark schemes take the
+// The header's status glyphs (D-27): the dark schemes take the
 // "Fleet Status Glyphs" mock's softer set (34D399 in place of 00FF00); Linen
 // its own darker set, every one at least ~3:1 on its sand bar.
 #define SIG_DARK                                                       \
@@ -51,44 +51,26 @@
     .SIG_STRONG = 0x1B7A3A, .SIG_GOOD = 0x2F8F4E, .SIG_WEAK = 0x9A6412, \
     .SIG_BAD = 0xB4321F, .SIG_BUSY = 0x1D5FD6, .SIG_OFF = 0x8A8076, .SIG_LINK = 0x6B4FC8
 
-// THREE SCHEMES, pruned on glass 2026-09-23: Fleet, Midnight, Linen.
+// THREE SCHEMES: Fleet, Midnight, Linen.
 //
-// Slate went because it differed from Midnight only in its accent ("slate is
-// purplish, midnight is blue"). Paper went because Linen replaced it. Frost
-// went because it lost to Linen - "I might have thought Frost would look good
-// but when I saw it it's definitely not for me". All three are in git history.
+// Slate differed from Midnight only in its accent. Paper's amber accent was not
+// dark enough to read as text on a light surface, and Linen replaced it. Frost
+// lost to Linen on glass. All three are in git history.
 
-// LINEN - the light scheme. A candidate from 2026-09-22 that won against Paper
-// and Frost: a sand ground, cream cards, dark brown text, and a copper accent
-// dark enough to read as text on a light surface - which Paper's amber was
-// not (the owner's complaint about the device name and the panel titles).
+// LINEN - the light scheme: a sand ground, cream cards, dark brown text, and a
+// copper accent dark enough to read as text on a light surface. The ground is a
+// deep sand and the card a hair darker than cream, so that more than the shadow
+// separates a card from the page.
 //
-// Round two, 2026-10-01 (design interview §1, artifact "Linen Fill and Header
-// Glyphs"): the DARKER sand ground the owner picked as "C" (was DDD5C8), and
-// the card "a hair darker" (was F8F4EC) - only the shadow used to separate a
-// cream card from a pale ground. And "on" is OLIVE rather than signal orange.
+// "On" (ST_ACTIVE) is D47F45, between burnt amber and terracotta. A very light
+// colour (butter, F1D27E) does not work on a light scheme. D47F45 is only 2.6:1
+// against the card, so the active frame's edge, darkened (ACTIVE_INK), carries
+// it; the frames' shapes say "on" as well. Burnt amber D98A3A, terracotta CF7350
+// and copper B8662E are the alternatives; /popup?active=RRGGBB tries any colour
+// without a build.
 //
-// Butter (F1D27E) was tried first and lasted one look on glass: "looks like
-// piss lol" - a very light colour does not work on an already light scheme.
-// The owner's second pick, as an executive decision, 2026-10-01: olive. Burnt
-// amber D98A3A and terracotta CF7350 were close seconds; those two and copper
-// B8662E (dark enough to turn the ink white) are to be choices for the user
-// once settings exist (4.1).
-//
-// The panels disagree with the screenshots: on WS_P4_5 the glass looked much
-// lighter and warmer than /screenshot of the same frame. Judge these on glass
-// (#82 is the 7B's cool cast; the P4_5 may need the same look).
-//
-// 2.8 round 6, 2026-10-17: COPPER, for the owner to judge on glass with the
-// active frames - "olive ... looks ok at best", and the frames need something
-// "more striking and contrasting, but that also fits with the rest of the
-// scheme". Against the card: olive 2.4:1, burnt amber 2.4, terracotta 2.9,
-// copper 3.7. Copper is the accent's hue (A8561C, lighter), so "on" and
-// "chosen" share it on Linen; the frames' shapes now say "on" as well.
-// /popup?active=RRGGBB tries the others without a build.
-//
-// THE OWNER'S PICK, on glass the same day: D47F45, between burnt amber and
-// terracotta (2.6:1 on the card - the frame's edge, darkened, carries it).
+// The panels disagree with the screenshots: on WS_P4_5 the glass looks lighter
+// and warmer than /screenshot of the same frame. Judge colours on glass.
 const UIPalette UI_PAL_LINEN = {
     .name        = "Linen",
     .GROUND      = 0xCFC4B2,
@@ -98,16 +80,15 @@ const UIPalette UI_PAL_LINEN = {
     .TEXT_DIM    = 0x6E6459,
     .ACCENT      = 0xA8561C,   // copper
     .BORDER      = 0,
-    .ST_ACTIVE   = 0xD47F45,   // the owner's pick, round 6 (olive 9AA35A before)
+    .ST_ACTIVE   = 0xD47F45,   // the owner's pick, between burnt amber and terracotta
     FLEET_STATE_AND_TINTS,
     .TINT_LIGHTING = TINT_LIGHTING_LIGHT,
     .SCRIM       = SCRIM_DARK,
     SIG_LINEN,
 };
 
-// Today's shipped UI, read out of UIToolkit.cpp and Panel_Header.cpp rather
-// than eyeballed. Kept so the new system can be compared against the old one on
-// the same glass instead of from memory.
+// The original UI's colours, read out of UIToolkit.cpp and Panel_Header.cpp.
+// Kept so a scheme can be compared against them on the same glass.
 const UIPalette UI_PAL_FLEET = {
     .name        = "Fleet",
     .GROUND      = 0x101010,
@@ -124,8 +105,8 @@ const UIPalette UI_PAL_FLEET = {
     SIG_DARK,
 };
 
-// The owner's verdict after seeing the dark schemes on glass: the former
-// Slate's ground, Fleet's blue. The DEFAULT since 2026-09-23.
+// Slate's ground with Fleet's blue. The default scheme (GUIManager sets it at
+// boot).
 const UIPalette UI_PAL_MIDNIGHT = {
     .name        = "Midnight",
     .GROUND      = 0x1A1F27,
@@ -151,37 +132,26 @@ const UIPalette UI_PAL_MIDNIGHT = {
 #undef SCRIM_DARK
 
 // Dark schemes take a hairline border because a dark card on a dark ground
-// needs an edge; light schemes lean on the shadow instead. That difference was
-// the only thing separating the owner's light and dark configs.
-//
-// NO CARD SHADOW HAS EVER BEEN VISIBLE, until 2026-09-23. Both metric sets
-// asked for SHADOW = 8, and Card clipped it away: the styled surface sits in a
-// transparent wrapper exactly its own size, and a parent clips its children.
-// The owner put his finger on it from the other end - Linen "looks too flat" -
-// and the fix is one flag on that wrapper (Card::build()). The dark schemes are
-// set to SHADOW 0 so they look exactly as they always have; only the light
-// scheme, where a shadow is what separates a card from the page, gets one.
+// needs an edge; light schemes lean on the shadow instead. The dark schemes
+// have SHADOW 0; only the light scheme, where a shadow is what separates a card
+// from the page, has one. It shows because Card's wrapper lets its child's
+// shadow overflow (the styled surface sits in a transparent wrapper exactly its
+// own size, and a parent clips its children).
 const UIMetrics UI_MET_DARK  = {
     .RADIUS = 10, .PAD = 5, .BORDER_W = 1, .BORDER_OPA_PCT = 40, .SHADOW = 0, .HEADER_H = 14,
     .SHADOW_Y = 0, .SHADOW_OPA = 0,
     .ACTIVE_RING = 3, .ACTIVE_EDGE = 2, .BRACKET_W = 6, .GLOW_DEPTH = 18, .GLOW_OPA = 115, .CUT_PCT = 24,
     .ACTIVE_INK = 0, .HALO_PCT = 25
 };
-// Linen's. A 2 px border, darker than the old hairline (the owner: "make it a
-// bit darker and increase by 1 or 2px", knobs included - the drawer's buttons
-// take BORDER_W through UI::paint()), and a mild DROP shadow - "in HA for most
-// of my custom dashboards I shamelessly use a mild drop shadow".
+// Linen's. A 2 px border, darker than the dark schemes' hairline (the drawer's
+// buttons take BORDER_W through UI::paint()), and a mild DROP shadow: a short
+// blur, a small drop and a firm edge - a wide blur reads as fuzz rather than
+// depth.
 //
-// Round four, from the owner's close-up of the shadow he means: TIGHTER and
-// DARKER, not wider. A short blur, a small drop, a firm edge - the first try
-// (12 px blur at 30%) read as fuzz rather than depth. Border darker again
-// ("a bit darker than it is or expand it 1 more pixel" - darker was chosen).
-//
-// 2.8 round 6, the active frames: on the dark schemes they glow; on Linen they
-// were "not nearly as standout obvious", every card already having a shadow
-// against the floor. So here they go DARKER and stronger: the edge a third of
-// the way to the text, the light inward stronger (the owner: "go in the
-// opposite direction and have the encroaching brackets be darker").
+// The active frames: on the dark schemes they glow; on Linen every card already
+// has a shadow against the floor, so a glow does not stand out. Here they go
+// DARKER and stronger: the edge 35 % of the way to the text, the light inward
+// stronger (GLOW_OPA 150).
 const UIMetrics UI_MET_LIGHT = {
     .RADIUS = 12, .PAD = 5, .BORDER_W = 2, .BORDER_OPA_PCT = 34, .SHADOW = 6, .HEADER_H = 14,
     .SHADOW_Y = 3, .SHADOW_OPA = 140,
@@ -189,11 +159,9 @@ const UIMetrics UI_MET_LIGHT = {
     .ACTIVE_INK = 35, .HALO_PCT = 25
 };
 
-// The card window's shape and spacing, in millimetres (2.12 P2, the header's
-// section 2b says what each is for). Every value is the one its literal had
-// at v0.2.12, so naming them changed nothing on glass; the near neighbours
-// (1.4 / 1.5 beside 1.6, 2.2 beside 2.4, the two 1.6 radii) are the owner's
-// to merge - docs/design/tokens.md section 7.
+// The card window's shape and spacing, in millimetres (the header's section 2b
+// says what each is for). Near neighbours (the two 1.6 radii, for one) are kept
+// apart until the owner merges them - docs/design/tokens.md section 7.
 const UIShape UI_SHAPE = {
     .R_CONTROL = 1.6f, .R_PANEL = 1.6f, .R_WINDOW = 2.4f, .R_CHIP = 3.0f,
     .S1 = 0.6f, .S2 = 0.8f, .S3 = 1.0f, .S4 = 1.2f, .S5 = 1.6f,
@@ -201,23 +169,23 @@ const UIShape UI_SHAPE = {
     .LINE_HAIR = 0.2f, .LINE_MID = 0.3f, .LINE_HEAVY = 0.4f, .LINE_PLOT = 0.45f,
     .DASH = 0.6f, .RING_W = 0.4f, .RING_PAD = 0.3f, .TRACK_PILL = 0.2f, .TRACK_TAB = 0.4f,
     .H_CONTROL = 6.0f, .H_CHIP = 6.0f, .H_ROW = 7.2f, .H_BAR = 0.17f, .H_TABS = 6.0f,
-    .W_SIDE_MIN = 6.0f, .W_WINDOW_MAX = 100.0f, .W_ROWS_MAX = 70.0f, .W_DIALOG_MAX = 90.0f,
+    .W_SIDE_MIN = 6.0f, .W_WINDOW_MAX = 100.0f, .W_ROWS_MAX = 70.0f, .W_DIALOG_MAX = 90.0f, .W_NARROW = 100.0f, .W_TWO_COL = 80.0f,
     .W_DIALOG_BTN = 24.0f, .SWATCH = 6.5f, .CARET_W = 2.4f, .CARET_H = 1.0f,
     .SLOP_SELECTOR = 1.0f, .SLOP_KNOB = 1.2f, .SLOP_HOLD = 4.0f,
     .P_GAP = 4.0f, .P_STACK_GAP = 3.0f, .P_GRIP_INSET = 1.4f, .P_GRIP_H = 0.5f, .P_GRIP_MIN = 5.0f,
     .P_MARK_H = 2.6f, .P_MARK_LINE = 0.35f, .P_SCENE_H = 9.0f, .P_SCENE_GAP = 1.4f, .P_SCENE_PAD = 2.4f,
     .C_HDR_H = 5.2f, .C_PAD = 1.1f, .C_TILE_GAP = 0.8f, .C_SWATCH_W = 1.1f, .C_SWATCH_H = 2.4f,
     .C_VALUE_GAP = 1.3f, .C_TILE_MIN = 7.5f, .C_TILE_FOOT = 1.5f, .C_TILE_TALL = 1.1f, .C_TILE_FOOT_AT = 18.0f,
+    .C_TILE_MAX_W = 25.0f, .C_TILE_MAX_H = 20.0f, .C_TILE_WIDE = 2.0f,
     .HALO = 5.0f, .LINE_FADE = 2.5f,
     .KEY_H = 7.0f, .KEY_GAP = 1.0f,
 };
 
-// The page header's slots (2.8). GLYPH, DOT_*, SLOT_GAP and LINE are the
-// values the bar had before it had slots; the frames are the "2+" chip of the
-// header-glyph mock (#19), the shade stronger than the first try because the
-// owner expected it to fade on glass. EDGE + SLOT_PAD put the first thing in
-// each side where round 2's mock drew it (24 px from the P4_5's edge); two
-// slots' pads and SPACE part neighbours as the status glyphs are parted.
+// The page header's slots. GLYPH, DOT_*, SLOT_GAP and LINE are the bar's own
+// sizes; FRAME_MIX is the shade of a framed glyph's square, strong enough not to
+// fade on glass. EDGE + SLOT_PAD put the first thing in each side where the mock
+// draws it (24 px from the P4_5's edge); two slots' pads and SPACE part
+// neighbours as the status glyphs are parted.
 const UIHeader UI_HEADER = {
     .GLYPH = 26, .FRAME = 28, .FRAME_R = 7, .FRAME_MIX = 14,
     .SLOT_GAP = 8, .SLOT_PAD = 6, .EDGE = 8, .SPACE = 2, .CLEAR = 12,
@@ -231,32 +199,26 @@ const UIHeader UI_HEADER = {
 // ---------------------------------------------------------------------------
 namespace {
 
-// Fleet, not Slate: the port onto tokens should be invisible on glass, so the
-// default has to be today's colours. Switching the default to Slate or Paper is
-// a one-line change once the new look has been seen on a board.
+// The active scheme starts as Fleet; GUIManager sets Midnight, the default, at
+// boot, and UI Tweaks' saved choice after it.
 UIPalette s_pal = UI_PAL_FLEET;
 UIMetrics s_met = UI_MET_DARK;
 
-// TARGET_CARD_W IS PER BOARD, and it has to be.
+// TARGET_CARD_W IS PER BOARD.
 //
-// It decides how many COLUMNS fit, and the answer is not transferable: the
-// same logical width that gives WS_P4_7B the 6 columns the owner chose gives
-// WS_P4_5 only 4, because the 7B is 1024 logical px wide and the P4_5 is
-// 1280/1.73 = 740. One fleet-wide number cannot serve both, and the attempt
-// cost a session - moving the default 130 -> 135 for the 7B's benefit quietly
-// knocked the P4_5 from 5 columns to 4, and at 4 columns nothing on it was
-// readable.
+// It decides how many COLUMNS fit, and the answer does not transfer: the same
+// logical width that gives WS_P4_7B 6 columns gives WS_P4_5 only 4, because the
+// 7B is 1024 logical px wide and the P4_5 is 1280/1.73 = 740. One fleet-wide
+// number cannot serve both; at 4 columns nothing on the P4_5 is readable.
 //
-// Chosen on the glass, per board, by the owner turning the knob:
+// Chosen on the glass, per board:
 //
 //   WS_P4_7B   1024 x 600 @ 170 PPI   135 -> 6 columns
 //   WS_P4_5    1280 x 800 @ 294 PPI   130 -> 5 columns
 //
-// NOTE THE DIRECTION, because it is easy to get backwards and I did: a LARGER
-// target means FEWER columns, since it is the width each card is trying to be.
-// 148 was picked for the P4_5 on the reasoning that it wanted bigger cards
-// than the 7B; what it actually did was drop it from 5 columns to 4. That
-// board needs <= 132 for five, and 130 is the value already proven on glass.
+// A LARGER target means FEWER columns, since it is the width each card is
+// trying to be. The P4_5 needs <= 132 for five columns; 130 is the value
+// proven on glass.
 //
 // Every other board keeps the fleet default until someone has looked at it.
 // This is the ConnectivityDefaults.h pattern - one shared default, overridden
@@ -270,8 +232,8 @@ UIMetrics s_met = UI_MET_DARK;
     #define FLEET_TARGET_CARD_W 135
 #endif
 
-// ASPECT_PCT is a CEILING on card height as a percentage of card width, not a
-// target shape - see UITokens.h. It no longer picks the row count.
+// ASPECT_PCT is a CEILING on card height as a percentage of card width - see
+// UITokens.h. The row count comes from the page's cards.
 UIGrid    s_grid = { .TARGET_CARD_W = FLEET_TARGET_CARD_W, .COLS_OVERRIDE = 0,
                      .ASPECT_PCT = 130, .GAP = 12, .INSET = 14,
                      .cols = 1, .rows = 1, .cellW = 0, .cellH = 0 };
@@ -333,12 +295,10 @@ namespace UI {
 
 void begin(int32_t viewportW, int32_t viewportH) {
     setViewport(viewportW, viewportH);
-    // Columns and the scale only. The ROW count printed here used to be
-    // taken seriously and is not the page's answer - CardPage decides rows
-    // from how many cards it has, against the host it is actually given,
-    // which is the screen minus the header and the deck rather than the
-    // whole panel. Printing a row count here read as a decision and caused
-    // real confusion ("why does it say 4x1?").
+    // Columns and the scale only. A row count printed here would not be the
+    // page's answer: CardPage decides rows from how many cards it has, against
+    // the host it is actually given, which is the screen minus the header and
+    // the deck rather than the whole panel.
     Serial.printf("[UI] Scheme \"%s\" | %u cols of %u px | scale %.2fx (%u PPI)\n",
                   s_pal.name, (unsigned)s_grid.cols, (unsigned)s_grid.cellW,
                   (double)bspUiScale(), (unsigned)bspPixelDensity());
@@ -362,12 +322,9 @@ const UIType &type() {
     // happen. One branch, once.
     //
     // The sizes come from include/UI/UITypeScale.h, which scripts/
-    // gen_type_scale.py derives from THIS BOARD's pixel density. They used to
-    // be four hardcoded faces shared by all eight boards, and that was the one
-    // place the "derive from density" rule of tokens.md had not reached - so
-    // WS_P4_5 at 294 PPI drew its smallest text at 1.04 mm while CYD_S3_3248
-    // at 165 PPI drew the same token at 1.85 mm. The better panel was the
-    // harder one to read. Flashed and caught by eye, not by arithmetic.
+    // gen_type_scale.py derives from THIS BOARD's pixel density, so a token
+    // draws at the same physical size on every panel (the "derive from
+    // density" rule of tokens.md).
     static UIType t = {
         .VALUE   = FLEET_FONT_VALUE,
         .VALUE_SM = FLEET_FONT_VALUE_SM,
@@ -383,7 +340,7 @@ const UIType &type() {
         // cost recorded in docs/design/tokens.md. Point it somewhere larger
         // when a fullscreen card actually needs one.
         .HERO    = FLEET_FONT_VALUE,
-        // The roomy hero (2.11 round 9): on the 7" boards a tile or card with
+        // The roomy hero: on the 7" boards a tile or card with
         // room for it draws its glyph 1.5 x ICON - fleet_icons_46, the face the
         // 4B already uses as ICON (6.9 mm here; ~119 KB of flash on these two
         // boards). Elsewhere ICON itself, which costs nothing.
@@ -396,7 +353,7 @@ const UIType &type() {
     return t;
 }
 
-// --- Shared paints. #64 - see the header. -----------------------------------
+// --- Shared paints - see the header. -----------------------------------------
 static lv_style_t s_paint[(int)UIPaint::PAINT_COUNT];
 static bool       s_paintReady = false;
 
@@ -421,9 +378,8 @@ static void refreshPaints() {
     const lv_color_t bd = border();
 
     // Border WIDTH as well as colour, from the scheme's metrics: Linen's 2 px
-    // edge is meant for the drawer's buttons and the deck panels too (the
-    // owner, 2026-09-23), and a width set locally on each widget would not
-    // follow a scheme change.
+    // edge is meant for the drawer's buttons and the deck panels too, and a
+    // width set locally on each widget would not follow a scheme change.
     lv_style_set_bg_color    (st(UIPaint::PAINT_SURFACE),     c(s_pal.SURFACE));
     lv_style_set_border_color(st(UIPaint::PAINT_SURFACE),     bd);
     lv_style_set_border_width(st(UIPaint::PAINT_SURFACE),     s_met.BORDER_W);
@@ -432,12 +388,10 @@ static void refreshPaints() {
     lv_style_set_border_width(st(UIPaint::PAINT_SURFACE_ALT), s_met.BORDER_W);
     // AND NO SHADOW. PAINT_SURFACE_ALT dresses the drawer's buttons, and
     // LVGL's default theme gives every button a grey shadow 4 px below it.
-    // Each button sits in a row that clips, so the shadow showed as bottom
-    // corners that "bulge a tiny bit but then something is cutting off 1 or 2
-    // pixel rows", and on the dark schemes as a light "glint" at those
-    // corners - both the owner's, 2026-09-23. A shared style added after the
-    // theme's outranks it, so this one line removes it everywhere the paint
-    // is used.
+    // Each button sits in a row that clips, so the shadow would show as bulging
+    // bottom corners cut off by a pixel row or two, and on the dark schemes as
+    // a light glint at those corners. A shared style added after the theme's
+    // outranks it, so this one line removes it everywhere the paint is used.
     lv_style_set_shadow_width(st(UIPaint::PAINT_SURFACE_ALT), 0);
     lv_style_set_text_color  (st(UIPaint::PAINT_TEXT),        c(s_pal.TEXT));
     lv_style_set_text_color  (st(UIPaint::PAINT_TEXT_DIM),    c(s_pal.TEXT_DIM));
@@ -480,7 +434,7 @@ lv_style_t *paint(UIPaint p) {
 // The largest reach any scheme's shadow has past its object's edge. Linen is
 // the only scheme with one; computing it from the metrics keeps this honest if
 // that changes.
-static int32_t shadowReachPx() {
+int32_t shadowReachPx() {
     const UIMetrics *all[] = { &UI_MET_DARK, &UI_MET_LIGHT };
     int32_t r = 0;
     for (const UIMetrics *m : all) {
@@ -596,8 +550,8 @@ uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b) {
 }
 
 // The scheme's darkest colour, its ground or its text whichever way round the
-// scheme is - pulled the rest of the way to black (2.8 round 4: "absolute black
-// in dark modes"; round 5 warms it into the ink on lit glass, Kit::litInk()).
+// scheme is - pulled the rest of the way to black ("absolute black in dark
+// modes"); Kit::litInk() warms it into the ink on lit glass.
 uint32_t darkest() {
     const uint32_t d = luma(s_pal.GROUND) <= luma(s_pal.TEXT) ? s_pal.GROUND : s_pal.TEXT;
     return blend(d, 0x000000, 60);
@@ -618,10 +572,10 @@ void tameScroll(lv_obj_t *o) {
     lv_obj_set_scrollbar_mode(o, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag      (o, LV_OBJ_FLAG_SCROLL_ELASTIC);
     lv_obj_clear_flag      (o, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
-    // CAUGHT ANYWHERE (owner, #99 test): LVGL hands a touch to the topmost
-    // CLICKABLE object, so on a bare list a swipe from a day's heading or a
-    // gap fell through to the window and nothing scrolled - only one starting
-    // on a row did.
+    // CLICKABLE, so a swipe is caught anywhere in the container: LVGL hands a
+    // touch to the topmost clickable object, so on a bare list a swipe from a
+    // heading or a gap would fall through to the window and nothing would
+    // scroll - only one starting on a row would.
     lv_obj_add_flag        (o, LV_OBJ_FLAG_CLICKABLE);
 }
 
@@ -629,6 +583,19 @@ int32_t minTouch() {
     const uint16_t ppi = bspPixelDensity();
     if (!ppi) return sc(44);          // no density declared — a sane default
     return (int32_t)((ppi * 9) / 25.4f + 0.5f);   // 9 mm
+}
+
+// CARD MARGINS (K167): by name, so the steps can be reordered.
+const char *const MARGIN_NAMES[MARGIN_STEPS] = { "small", "medium", "large", "xlarge" };
+uint16_t marginPct(const char *name) {
+    static const uint16_t PCT[MARGIN_STEPS] = { 50, 100, 150, 200 };
+    if (!name || !name[0]) return 100;
+    for (uint8_t i = 0; i < MARGIN_STEPS; i++) if (!strcmp(name, MARGIN_NAMES[i])) return PCT[i];
+    return 100;
+}
+uint16_t deviceMarginPct() {
+    char v[12];
+    return Settings::system("ui", "margins", v, sizeof(v)) ? marginPct(v) : 100;
 }
 
 } // namespace UI

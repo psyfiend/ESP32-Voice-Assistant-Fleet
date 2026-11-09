@@ -1,4 +1,4 @@
-// The page header's pieces (2.8): the bar, a slot, a glyph's frame. Their looks
+// The page header's pieces: the bar, a slot, a glyph's frame. Their looks
 // are the KS_HDR_* and KS_GLYPH_* roles (KitStyles.cpp); what goes in a slot is
 // Panel_Header's, by its kind (UI/HeaderSlots.h).
 #include "UI/Kit.h"
@@ -10,14 +10,14 @@ lv_obj_t *headerBar(lv_obj_t *parent) {
     lv_obj_t *b = plain(parent);
     add(b, KitStyle::KS_HDR_BAR);
     // The scheme's drop shadow onto the page below; nothing on a scheme
-    // without one (the owner's Linen request, 2026-09-23).
+    // without one.
     lv_obj_add_style(b, UI::paint(UIPaint::PAINT_LIFT), 0);
-    // ...but never across an open panel, which pours out of the bar (round 6);
+    // ...but never across an open panel, which pours out of the bar;
     // and for an open panel its line fades short of the panel's walls and the
     // halo falls on it (D-35). MAIN_END: the last a bar draws outside itself -
     // LVGL 9.5 clips its DRAW_POST to its own area (lv_refr.c, lv_obj_redraw()).
     lv_obj_add_event_cb(b, drawerOverBar, LV_EVENT_DRAW_MAIN_END, nullptr);
-    // ...and the halo of a panel's shape over the bar, after its slots (round 4).
+    // ...and the halo of a panel's shape over the bar, after its slots.
     lv_obj_add_event_cb(b, drawerOverBar, LV_EVENT_DRAW_POST, nullptr);
     lv_obj_set_size(b, lv_pct(100), UIToolkit::systemHeaderFullPx());
     return b;

@@ -7,7 +7,7 @@
 //
 //   design tokens   (here)             what colour is "active", how round, what size
 //   card type rules (Card subclasses)  a light uses state colour, a sensor a tint
-//   card instances  (build sheet, #20) THIS card shows deck_temp, spans 2, row 1
+//   card instances  (build sheet)     THIS card shows deck_temp, spans 2, row 1
 //
 // If tokens carried entity bindings, changing a colour would mean editing card
 // definitions — inverting ROADMAP §4's layering, where the build sheet is the
@@ -56,7 +56,7 @@ struct UIPalette {
     uint32_t TINT_AIR;
     uint32_t TINT_POWER;
 
-    // --- Corner icon tints, by kind of thing. 2.7 round two. ---
+    // --- Corner icon tints, by kind of thing. ---
     // The owner: "if the temp and lux are going to be colored then they all
     // should be". Bulbs yellow-white "like one would picture a light bulb";
     // doors blue. TINT_LIGHTING is per scheme rather than shared, because a
@@ -65,11 +65,11 @@ struct UIPalette {
     uint32_t TINT_PRESENCE; // occupancy, motion, presence
     uint32_t TINT_LIGHTING; // lights, and switches used as lights
 
-    // The dim laid over the page behind a card's popup (2.10a). Dark on every
-    // scheme, Linen included - a light dim reads as fog, not as "behind".
+    // The dim laid over the page behind a modal dialog. Dark on every scheme,
+    // Linen included - a light dim reads as fog, not as "behind".
     // Drawn as a translucent BACKGROUND, never an object opa (LESSONS: layers).
     uint32_t SCRIM;
-    // --- The header's status glyphs (2.8 round 3, D-24, D-27) ---
+    // --- The header's status glyphs (D-24, D-27) ---
     // Their own colours per scheme: the dark schemes' the "Fleet Status Glyphs"
     // mock's softer set, Linen's darker so they read on sand (the Wi-Fi green
     // all but vanished there). Strong / good / weak / bad: Wi-Fi's strength;
@@ -91,33 +91,32 @@ struct UIMetrics {
     uint8_t SHADOW;         // blur width. 0 = none
     uint8_t HEADER_H;       // card header bar — covers the border, edge to edge
     // How far the shadow drops below the card. 0 is a halo; a few pixels is
-    // a DROP shadow, which is what makes a card read as lifted off the page -
-    // the owner's "it looks too flat" on Linen, 2026-09-23.
+    // a DROP shadow, which is what makes a card read as lifted off the page
+    // (Linen looked "too flat" without one).
     uint8_t SHADOW_Y;
     uint8_t SHADOW_OPA;     // 0-255
-    // THE ACTIVE FRAMES (2.8 rounds 4-5, the owner's): what an "on" card draws
-    // on its edge in place of a fill, LIT inward - drawn, never as its border,
-    // so the card's layout never moves (round 4's bracket pushed the hero down).
+    // THE ACTIVE FRAMES: what an "on" card draws on its edge in place of a
+    // fill, LIT inward - drawn, never as its border, so the card's layout never
+    // moves (a border-based bracket pushes the hero down).
     uint8_t ACTIVE_RING;    // 3   the corner cut's frame and its diagonal
     uint8_t ACTIVE_EDGE;    // 2   the bracket's sides
     uint8_t BRACKET_W;      // 6   the bracket's top and bottom bars
     uint8_t GLOW_DEPTH;     // 18  how far the light reaches in from a lit edge
     uint8_t GLOW_OPA;       // 115 its strength at the edge (0-255), fading to nothing (Linen 150)
     uint8_t CUT_PCT;        // 24  the corner cut's chamfer, % of the card's height
-    // ...and the way a light scheme makes them loud (round 6): DARKER, where a
-    // dark one makes them brighter - the frame's edge this % of the way from
+    // ...and the way a light scheme makes them loud: DARKER, where a dark one
+    // makes them brighter - the frame's edge this % of the way from
     // the active colour to the scheme's text, the light inward half that.
     uint8_t ACTIVE_INK;     // 0 (dark schemes), 35 (Linen)
-    // THE HALO'S STRENGTH (D-35, 2.11 round 4): % of black at a window's edge
-    // (and in the shading where a header panel meets the bar) - the owner:
-    // full strength "stops looking like a shadow"; round 5, "I'd say 25% is
-    // good" for the windows. UI Tweaks' slider overrides it per scheme
-    // (Kit::haloStrength()).
+    // THE HALO'S STRENGTH (D-35): % of black at a window's edge (and in the
+    // shading where a header panel meets the bar). At full strength it "stops
+    // looking like a shadow"; 25 % is the owner's choice for the windows. UI
+    // Tweaks' slider overrides it per scheme (Kit::haloStrength()).
     uint8_t HALO_PCT;       // 25, every scheme
 };
 
 // ---------------------------------------------------------------------------
-// 2b. Shape and spacing in MILLIMETRES on glass - the card window's (2.12 P2)
+// 2b. Shape and spacing in MILLIMETRES on glass - the card window's
 // ---------------------------------------------------------------------------
 // The card window sizes what a finger touches and what an eye reads in real
 // millimetres (its mm(), the same derivation as UI::minTouch()), so these are
@@ -125,15 +124,13 @@ struct UIMetrics {
 // group is in "P4_5 millimetres" (the window's pm()): the same SHARE of every
 // window as on the P4_5 (docs/design/card-sheet.md section 15).
 //
-// One set, fleet-wide, read through UI::shape(). Every value is the one the
-// window had before it had a name - 2.12 changed no pixel - so a few values
-// sit close to each other: they are kept apart and listed in
-// docs/design/tokens.md section 7, for the owner to merge or not.
+// One set, fleet-wide, read through UI::shape(). A few values sit close to each
+// other: they are kept apart on purpose and listed in docs/design/tokens.md
+// section 7, for the owner to merge or not.
 struct UIShape {
     // --- Corner radii ---
     float R_CONTROL;    // 1.6  a dropdown and its list, a checkbox's box, a row's button; a
                         //      dialog's buttons; the control deck and its selector, squared
-                        //      (#97: R_CONTROL 1.2 and R_BUTTON 1.6 merged - tokens.md 7)
     float R_PANEL;      // 1.6  a folder panel: its pane, its tab, the curve where they meet
     float R_WINDOW;     // 2.4  the window
     float R_CHIP;       // 3.0  a span chip - half its height, so a pill
@@ -148,7 +145,7 @@ struct UIShape {
     float S5;           // 1.6  under the header row; the header row's gaps; the chart's gutters; a
                         //      label and its pill; swatches; a dropdown's sides; a panel's first
                         //      and last row; Members' rows, their padding and gaps; a fact list's
-                        //      rows, and the gap between its two columns (#97: half of S8's)
+                        //      rows, and the gap between its two columns (half of S8's)
     float S6;           // 2.0  the window clear of the system header and the tabs; the break before
                         //      the deck's modes; activity's two columns
     float S7;           // 2.4  a panel's sides; a row button's sides; a span chip's sides; a
@@ -156,14 +153,10 @@ struct UIShape {
     float S8;           // 3.0  a time label's elbow room
     float S9;           // 4.0  a panel row's words and its control; a dialog's padding
     float S10;          // 5.0  activity's and a fact list's sides
-    // The four that sat off the scale - S_MEMBERS 1.4, S_GUTTER 1.5, S_CHIP_SIDE 2.2,
-    // S_ROW_MIN 0.55 - were merged into their nearest steps (#97, tokens.md 7).
-
     // --- Lines ---
     float LINE_HAIR;    // 0.2  borders: a dropdown, its list, a swatch, a row button
     float LINE_MID;     // 0.3  a checkbox's box; the finger's line on the chart; a lit span chip's
-                        //      border, a dialog button's; the chart's min/max lines (LINE_FINE
-                        //      0.25 merged in, #97)
+                        //      border, a dialog button's; the chart's min/max lines
     float LINE_HEAVY;   // 0.4  the dialog's border
     float LINE_PLOT;    // 0.45 the chart's line; a panel's carets
     float DASH;         // 0.6  a dotted line's dash, and its gap
@@ -175,14 +168,16 @@ struct UIShape {
     // --- Heights and widths ---
     float H_CONTROL;    // 6.0  a dropdown, a checkbox's box, a row's button
     float H_CHIP;       // 6.0  a span chip, and the top line's middle that holds them
-    float H_ROW;        // 7.2  a panel's row; activity's "Show more" (H_MORE 7.0 merged in, #97)
-    float H_BAR;        // 0.17 the auto-close bar: 2 px at 294 and 255 PPI, 1 px at 170 (#97; was 0.5)
+    float H_ROW;        // 7.2  a panel's row; activity's "Show more"
+    float H_BAR;        // 0.17 the auto-close bar: 2 px at 294 and 255 PPI, 1 px at 170
     float H_TABS;       // 6.0  kept under the window for the panels' tabs
     float W_SIDE_MIN;   // 6.0  the least gap between the window and the screen's side
     float W_WINDOW_MAX; // 100  the widest a window gets (a hand's span)
     float W_ROWS_MAX;   // 70   activity's rows at most
     float W_DIALOG_MAX; // 90   a dialog at most
-    float W_DIALOG_BTN; // 24   a dialog's buttons, at most: narrower, they share the row (#96)
+    float W_NARROW;     // 100  a window narrower is narrow: Edit cards' column and the group view's drop-down take a larger share
+    float W_TWO_COL;    // 80   a list at least this wide shows two columns of rows (Edit cards, the HA picker)
+    float W_DIALOG_BTN; // 24   a dialog's buttons, at most: narrower, they share the row
     float SWATCH;       // 6.5  a colour swatch; the least height of a scene button
     float CARET_W;      // 2.4  a panel's caret
     float CARET_H;      // 1.0
@@ -204,7 +199,7 @@ struct UIShape {
     float P_SCENE_GAP;  // 1.4  between scene buttons
     float P_SCENE_PAD;  // 2.4  a scene button's sides
 
-    // --- A cluster (2.11, K89, K100-K103): a group card shown as a block of its
+    // --- A cluster (K89, K100-K103): a group card shown as a block of its
     // members, in real millimetres on every board (the "2.11 Clusters" mock's) ---
     float C_HDR_H;      // 5.2  its header row - one line (K100)
     float C_PAD;        // 1.1  inside its frame, round the tiles; the header's sides
@@ -215,25 +210,29 @@ struct UIShape {
     float C_TILE_MIN;   // 7.5  the least a mini tile is each way - "tight" (K103); a cluster
                         //      whose tiles would be smaller takes more cells
     float C_TILE_FOOT;  // 1.5  a mini tile's hero and label kept this far off its top and foot,
-                        //      clear of its active frame (2.11 round 12)
+                        //      clear of its active frame
     float C_TILE_TALL;  // 1.1  A RATIO: a mini tile drawn no taller than this times its width,
-                        //      centred in its slot (round 12: "Desk is much taller than it is wider")
+                        //      centred in its slot, so a tile stays near-square
     float C_TILE_FOOT_AT; // 18.0 a tile this tall or taller keeps the whole C_TILE_FOOT; a shorter
-                        //      one keeps it in step with its height, for its disc (round 13: the 4B's)
+                        //      one keeps it in step with its height, for its disc
+    float C_TILE_MAX_W; // 25.0 THE BIGGEST A TILE IS, in the group view (K159): about the P4_5's
+    float C_TILE_MAX_H; // 20.0 Table card (24.7 x 19.7) and the 1060's solo cards (25.8 x 19.8); the
+                        //      spare room goes round the tiles
+    float C_TILE_WIDE;  // 2.0  A RATIO: a group view tile no wider than this times its height (K159)
 
     // --- Panels and windows float over the page (D-35, the "Panel Edges" mock) ---
     float HALO;         // 5.0  the halo round a header slot's panel and every window: black at
                         //      their edge, clear this far out
     float LINE_FADE;    // 2.5  the bar's accent line fading out before an open panel's walls
 
-    // --- The on-screen keyboard (2.11, K95): Kit::keyboard() ---
+    // --- The on-screen keyboard (K95): Kit::keyboard() ---
     float KEY_H;        // 7.0  a key's height - a phone's, under the touch minimum: four rows
                         //      of 9 mm took 62 % of the P4_5's height, leaving the field no room
     float KEY_GAP;      // 1.0  between keys, and round them
 };
 
 // ---------------------------------------------------------------------------
-// 2c. The page header's slots, in LOGICAL pixels (2.8, #19)
+// 2c. The page header's slots, in LOGICAL pixels
 // ---------------------------------------------------------------------------
 // The header is sc(UIToolkit::SYSTEM_HEADER_FULL_H) tall on every board, so what
 // sits in it is sized in the same logical pixels: pass these to UI::sc(). One
@@ -245,7 +244,7 @@ struct UIHeader {
     uint8_t FRAME_MIX;     // 14  the rounded square's shade: % of TEXT over the bar
     uint8_t SLOT_GAP;      //  8  between the things in one slot
     uint8_t SLOT_PAD;      //  6  a slot's sides (its tap area and its open tab reach this far)
-    // The three places (2.8 round 2, Layout/HeaderPlan.h)
+    // The three places (Layout/HeaderPlan.h)
     uint8_t EDGE;          //  8  from each end of the bar to its side's first slot
     uint8_t SPACE;         //  2  between two slots in one place (their pads make the rest)
     uint8_t CLEAR;         // 12  at least this between a side and the middle; closer, the lowest keep gives way
@@ -255,10 +254,10 @@ struct UIHeader {
     uint8_t DOT_GAP;       //  5  between dots
     uint8_t MARK;          // 12  the error mark beside a slot's dashes
     uint8_t LINE;          //  2  the bar's accent line - and the outline of an open slot and its panel (D-23)
-    uint8_t JOIN_R;        //  6  a cove or flare: the rounded corner where that outline meets the line
-    // A slot's drawer - the system panel's shape, which it was before it had a name
+    uint8_t JOIN_R;        //  6  a cove: the rounded corner where that outline meets the line
+    // A slot's drawer - the system panel's shape
     uint16_t DRAWER_W;     // 260 a slot's panel at most (the status slot's is the system panel)
-    uint8_t DRAWER_R;      // 15  its bottom corners
+    uint8_t DRAWER_R;      // 15  its corners
     uint8_t DRAWER_PAD;    // 10  inside it
     uint8_t DRAWER_GAP;    //  8  between its rows
     uint8_t DRAWER_LINE;   //  2  its edge
@@ -293,12 +292,12 @@ struct UIGrid {
     uint8_t  COLS_OVERRIDE;
     // The TALLEST a card may be, as a percentage of its own width.
     //
-    // CHANGED AT 2.5. It used to be a target shape that decided the ROW COUNT,
-    // and that was the bug behind "hiding the deck made the cards smaller":
-    // more height bought another empty row instead of taller cards. The row
-    // count now comes from how many cards there are (CardPage::rowsWanted()),
-    // and this only stops a page with three cards on it from making each one
-    // as tall as the screen. Above the cap the grid leaves slack at the bottom.
+    // It is a cap, not a target shape that decides the row count: a target
+    // would buy another empty row instead of taller cards when the screen
+    // grows. The row count comes from how many cards there are
+    // (CardPage::rowsWanted()), and this only stops a page with three cards on
+    // it from making each one as tall as the screen. Above the cap the grid
+    // leaves slack at the bottom.
     uint8_t  ASPECT_PCT;
     uint8_t  GAP;
     uint8_t  INSET;         // cluster inset from the screen edge
@@ -318,32 +317,30 @@ struct UIGrid {
 // because the linker drops unreferenced font objects; REFERENCING one is what
 // costs.
 //
-// HOW MUCH, corrected at 2.7. "~96 KB per face" was measured on ONE large,
-// full-ASCII Montserrat and was then applied to every face for months. From the
-// P4 builds' object files: a generated digits-only VALUE face is 6-10 KB, an
-// MDI icon face 10-73 KB by size, Montserrat 14-24 is 14-29 KB. Still a budget;
-// a much smaller one. See docs/design/cards.md section 13.
+// HOW MUCH, measured from the P4 builds' object files: a generated digits-only
+// VALUE face is 6-10 KB, an MDI icon face 10-73 KB by size, Montserrat 14-24 is
+// 14-29 KB. See docs/design/cards.md section 13.
 struct UIType {
     const lv_font_t *VALUE;   // the number on a measure card. DIGITS ONLY on
                               // dense boards - it is a generated subset, and
                               // it has no letters and no LV_SYMBOL range
     const lv_font_t *VALUE_SM;// the number on a CRAMPED card, ~3/4 of VALUE.
-                              // Always the digits-only subset. #62, 2.7
+                              // Always the digits-only subset.
     const lv_font_t *UNIT;    // the unit beside a value, deliberately smaller
     const lv_font_t *NAME;    // card name
     const lv_font_t *TAG;     // header bar, status row
     const lv_font_t *HEADER;  // the page header's words: TAG's face, but on the
-                              // P4_5 (26, matching the 4B's in mm; 2.8 round 4)
+                              // P4_5 (26, matching the 4B's in mm)
     // The two icon faces. Material Design Icons, generated as an 84-glyph
     // subset per board - NOT Montserrat, and not interchangeable with it:
     // MDI codepoints sit in the private use area, so these faces can draw
     // nothing but icons and every other face can draw none of them.
     const lv_font_t *ICON;    // the disc glyph on a state card
     const lv_font_t *ICON_MD; // between the two: the corner on a LARGE card,
-                              // the hero on a CRAMPED one. 2.7
+                              // the hero on a CRAMPED one.
     const lv_font_t *ICON_SM; // the corner icon on an ordinary card
     const lv_font_t *HERO;    // oversized, for a fullscreen card
-    // THE ROOMY HERO (2.11 round 9): a state card's or a tile's glyph where its
+    // THE ROOMY HERO: a state card's or a tile's glyph where its
     // room holds the larger disc - ICON's 4.5 mm looked tiny in the 1060's 27 mm
     // tiles. 1.5 x ICON on the 7" boards (an existing face: no new font), ICON
     // elsewhere (no cost). UITokens.cpp says which.
@@ -353,19 +350,19 @@ struct UIType {
 // ---------------------------------------------------------------------------
 // Built-in schemes
 // ---------------------------------------------------------------------------
-// Three, pruned on glass 2026-09-23. See UITokens.cpp.
-extern const UIPalette UI_PAL_FLEET;    // the original shipped UI
+// Three. See UITokens.cpp.
+extern const UIPalette UI_PAL_FLEET;    // the original UI's colours
 extern const UIPalette UI_PAL_MIDNIGHT; // dark, the default
 extern const UIPalette UI_PAL_LINEN;    // light
 
 extern const UIMetrics UI_MET_DARK;   // 1px lighten @40% border, no shadow needed
 extern const UIMetrics UI_MET_LIGHT;  // no border, leans on the shadow
 
-extern const UIShape UI_SHAPE;        // the card window's shape and spacing (2.12)
-extern const UIHeader UI_HEADER;      // the page header's slots (2.8)
+extern const UIShape UI_SHAPE;        // the card window's shape and spacing
+extern const UIHeader UI_HEADER;      // the page header's slots
 
 // Colour roles for UI::paint() - shared styles that repaint themselves on a
-// scheme change. #64; the full story is at UI::paint() below.
+// scheme change; the full story is at UI::paint() below.
 enum class UIPaint : uint8_t {
     PAINT_SURFACE = 0,   // bg SURFACE, border UI::border()     - panels
     PAINT_SURFACE_ALT,   // bg SURFACE_ALT, border UI::border() - buttons
@@ -377,7 +374,7 @@ enum class UIPaint : uint8_t {
     // chrome that should sit above the page like the cards do: toast, header,
     // drawer, deck panels, card tags. LIFT_SM is a smaller one for buttons.
     // Both are nothing at all on a scheme whose metrics have SHADOW 0, which
-    // today is every scheme but Linen. The owner, 2026-09-23.
+    // today is every scheme but Linen.
     PAINT_LIFT,
     PAINT_LIFT_SM,
     PAINT_COUNT
@@ -409,19 +406,19 @@ void setScheme(const UIPalette &p, const UIMetrics &m);
 // The next scheme in the knob's order - Fleet, Midnight, Linen - with its
 // metrics. Every scheme button calls this; the order lives in UITokens.cpp.
 void cycleScheme();
-// The active scheme as a position in that order, and back. Pages remember
-// their own scheme since 2.6 (the owner: colour is per page), and an index is
-// what a page can hold without knowing what a scheme is.
+// The active scheme as a position in that order, and back. A page holds its
+// scheme as an index, which needs no knowledge of what a scheme is (the scheme
+// is device-wide, so every page holds the same one).
 uint8_t schemeIndex();
 void    setSchemeIndex(uint8_t i);
 void setAccent(uint32_t hex);
 // The active colour ("on") in place of the scheme's, until the scheme changes;
-// 0 puts the scheme's own back. For trying colours on glass (round 6,
-// /popup?active=) - the caller restyles the cards.
+// 0 puts the scheme's own back. For trying colours on glass
+// (/popup?active=) - the caller restyles the cards.
 void setActiveColour(uint32_t hex);
 void setTargetCardWidth(uint16_t logicalPx);
 
-// The OTHER grid knob, and the one that was missing.
+// The OTHER grid knob.
 //
 // TARGET_CARD_W decides how many COLUMNS fit; ASPECT_PCT decides how many
 // ROWS, by suggesting a height for the column width that came out. Neither
@@ -441,7 +438,7 @@ void onSchemeChanged(void (*cb)());
 
 // Called whenever the shared paints are brought up to date (a scheme or accent
 // change), before LVGL is told every style changed: a layer above the tokens
-// that keeps shared styles of its own - the component kit (2.12) - refreshes
+// that keeps shared styles of its own - the component kit - refreshes
 // them here. Up to four; a second registration of the same function is ignored.
 void onRepaint(void (*cb)());
 
@@ -470,20 +467,18 @@ uint32_t contrastOf(uint32_t bg, uint32_t a, uint32_t b);
 // The scheme's darkest colour, near black (the ink on lit glass, warmed).
 uint32_t darkest();
 
-// --- Shared paints: chrome that repaints itself on a scheme change. #64 -----
+// --- Shared paints: chrome that repaints itself on a scheme change -----------
 //
 // Cards re-read UI::pal() in their own restyle(), and CardBinder calls it on
 // every card when the scheme changes. The CHROME around them - deck panels,
-// the system drawer, their buttons - set a local colour once at build time and
-// had no restyle at all, so they kept the old scheme until something rebuilt
-// them. The owner saw it switching Fleet to Slate.
+// the system drawer, their buttons - would set a local colour once at build
+// time and keep the old scheme until something rebuilt it.
 //
 // Rather than give every panel a restyle() that has to remember each widget
 // it coloured, these are SHARED lv_style_t objects, one per role. A widget
 // adds the style instead of setting a colour; a scheme change updates the
 // style in place and tells LVGL, and every widget using it repaints. One
-// place decides what a scheme change repaints - the same consolidation that
-// fixed the drawer offset in 2.6.
+// place decides what a scheme change repaints.
 //
 // A LOCAL style property beats a shared style in LVGL, so a widget painted
 // this way must not also call lv_obj_set_style_*_color for the same property.
@@ -495,14 +490,17 @@ lv_style_t *paint(UIPaint p);
 // LVGL clips children to their parent. LV_OBJ_FLAG_OVERFLOW_VISIBLE relaxes
 // that - but only to the parent's coords PLUS THE PARENT'S OWN ext_draw_size
 // (lv_refr.c, lv_obj_redraw), and a plain container's is zero. That is why the
-// card shadow showed only inside the rounded corners until the wrapper
-// declared a margin. This does both halves, with a margin sized from the
+// card shadow would show only inside the rounded corners without a margin on
+// the wrapper. This does both halves, with a margin sized from the
 // largest shadow any scheme draws - a fixed number, so a scheme change never
 // leaves a container with a margin computed for the previous one.
 void unclipShadows(lv_obj_t *container);
+// That margin: the largest reach any scheme's shadow has past its object's edge
+// (a bare sheet lets its client's shadow out only while bare - KitSheet).
+int32_t shadowReachPx();
 
 // Silences the `lv_part_t | lv_state_t` deprecation warning that would
-// otherwise be reproduced in every card type. Issue #13 asked for this.
+// otherwise be reproduced in every card type.
 inline lv_style_selector_t part(lv_part_t p, lv_state_t s = LV_STATE_DEFAULT) {
     return (lv_style_selector_t)p | (lv_style_selector_t)s;
 }
@@ -523,5 +521,14 @@ void tameScroll(lv_obj_t *o);
 // from real density, so it is 60 px at 170 PPI and 104 px at 294 PPI rather
 // than a number someone guessed per board.
 int32_t minTouch();
+
+// CARD MARGINS (K167): the gap between neighbours as a share of
+// its token - "small" 50, "medium" (or nothing) 100, "large" 150, "xlarge" 200
+// percent. UI Tweaks' (system.ui.margins) for the page and every group view; a
+// group's own ("margins") for its group view.
+constexpr uint8_t MARGIN_STEPS = 4;
+extern const char *const MARGIN_NAMES[MARGIN_STEPS];   // "small", "medium", "large", "xlarge"
+uint16_t marginPct(const char *name);
+uint16_t deviceMarginPct();   // UI Tweaks' choice, as a percentage
 
 } // namespace UI

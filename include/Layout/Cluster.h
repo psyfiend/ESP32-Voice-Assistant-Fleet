@@ -1,6 +1,6 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// CLUSTER ARITHMETIC (2.11 round 1, DECISIONS K89, K92, K103) - a cluster is a
+// CLUSTER ARITHMETIC (DECISIONS K89, K92, K103) - a cluster is a
 // group card shown as a block of its members on the page: one border, a header
 // row, and the members as MINI TILES inside (no border of their own). Plain
 // arithmetic like the rest of Layout - no LVGL, Arduino or ESP-IDF - so it is
@@ -9,20 +9,20 @@
 //
 // Two questions, both in pixels:
 //   - how the tiles share the room inside a cluster (tileGrid), and
-//   - how many cells a cluster asks the page for (clusterSpan) - until the
-//     arranger (#78, K105) decides shapes, the page's flow engine places the
-//     cluster at the span this gives.
+//   - how many cells a cluster asks the page for (clusterSpan, used by
+//     CardPage when it makes a group card; the arranger, K105, decides the
+//     shapes of a page's blocks).
 // ---------------------------------------------------------------------------
 #include <stdint.h>
 
 namespace Layout {
 
 // Columns x rows for n tiles in a w x h box, `gap` between them, and the size
-// each tile gets. The rule is the "2.11 Clusters" mock's: the biggest touch
+// each tile gets. The rule: the biggest touch
 // target first (a tile's shorter side), then the squarest tile, then the fewest
 // empty places. A short last row is not left ragged: its tiles share the row's
-// whole width (lastW). `cols`, when given, is the arranger's choice (its tc,
-// 2.11 v8): that many across, as long as each tile gets room.
+// whole width (lastW). `cols`, when given, is the arranger's choice (its tc):
+// that many across, as long as each tile gets room.
 struct TileGrid {
     uint8_t cols = 1, rows = 1;
     int32_t tileW = 0, tileH = 0;   // every tile but a short last row's
@@ -33,6 +33,20 @@ TileGrid tileGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, uint8_t cols = 0
 // Where tile i (0-based, reading order) stands in a grid laid out by tileGrid,
 // from the box's top-left corner.
 void tileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t &x, int32_t &y, int32_t &w);
+
+// THE GROUP VIEW'S TILES (K159): every tile the same size - a short
+// last row's too, centred under the rest - and never bigger than a tile may be:
+// maxW x maxH, no taller than `tall` times its width, no wider than `wide` times
+// its height (0: no limit). The grid is the one whose tiles come out biggest within
+// those limits, then the one with the fewest empty places, then the one shaped most
+// like the box; the spare room goes round it.
+struct TileCap {
+    int32_t maxW = 0, maxH = 0;
+    float   tall = 0.f, wide = 0.f;
+};
+TileGrid cappedGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, const TileCap &cap);
+// Where tile i stands in a cappedGrid, the grid centred in the w x h box, from its top-left.
+void cappedTileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t w, int32_t h, int32_t &x, int32_t &y);
 
 // The page's cells and a cluster's own frame, in pixels.
 struct ClusterGeom {

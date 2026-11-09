@@ -30,12 +30,12 @@
 // CONNECTIVITY_DEFAULT_WIFI below only when NVS has never been configured
 // (fresh flash, or after a factory reset). Deliberately NOT part of
 // Fleet_BSP.h - these are deployment settings, not hardware-wiring facts.
-// See docs/ROADMAP.md's Connectivity sections for the full design.
+// The four modes are DECISIONS C1.
 // -----------------------------------------------------------------------
 
 struct WiFiDefaults {
     // --- Behaviour ---
-    ConnMode    MODE;                   // see ConnectivityTypes.h (ROADMAP Q1)
+    ConnMode    MODE;                   // see ConnectivityTypes.h (DECISIONS C1)
 
     // --- Station mode ---
     const char *STA_SSID;
@@ -71,14 +71,13 @@ struct WiFiDefaults {
     // The fault these exist for: a board sits in STA_CONNECTED holding an IP,
     // WiFi.status() keeps saying WL_CONNECTED, WiFi.RSSI() keeps handing back
     // the value it read at association, and nothing on the LAN can reach the
-    // board. Observed on WS_P4_5 (~3-4 h), WS_P4_4B (~5-6 h) and WS_P4_7B.
-    // Every one of those boards ran its UI perfectly throughout, so nothing
-    // the device asked ITSELF could have detected it.
+    // board. Seen on WS_P4_5, WS_P4_4B and WS_P4_7B after several hours.
+    // The UI kept running throughout, so nothing the device asked ITSELF
+    // could detect it.
 
-    // How often to re-read RSSI while associated. Before this existed, RSSI
-    // was captured once in the GOT_IP handler and never again - the header
-    // glyph's "full bars for six hours" was not a stale cache, it was a value
-    // nobody ever asked for a second time. Cheap: one call, no allocation.
+    // How often to re-read RSSI while associated, so the header glyph tracks
+    // the real signal rather than the value read at association. Cheap: one
+    // call, no allocation.
     uint32_t    RSSI_POLL_MS;
     // Past this age a reading is not reported as signal strength at all. It
     // only goes stale if the poll itself stops succeeding, which is a signal
@@ -145,10 +144,7 @@ struct TimeDefaults {
 // as the BSP structs - see CLAUDE.md).
 static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     // STA with AP fallback: join the network, and raise our own AP only when
-    // that fails. This is the intended default and always was; it had been left
-    // on STA_PLUS_AP after the APSTA feasibility spike (issue #5) and never set
-    // back, which meant every board stood up an access point on every boot for
-    // no reason.
+    // that fails. STA_PLUS_AP would stand up an access point on every boot.
     .MODE                   = ConnMode::STA_WITH_AP_FALLBACK,
 
     .STA_SSID               = LOCAL_STA_SSID,
@@ -157,7 +153,7 @@ static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     .STA_RETRY_COUNT        = 3,
 
     .HOSTNAME               = "",   // derive per-device
-    .APPEND_MAC_SUFFIX      = false, // unique names out of the box
+    .APPEND_MAC_SUFFIX      = false, // no suffix unless NVS says otherwise
 
     .AP_SSID                = "",   // derive per-device
     .AP_PASSWORD            = "",   // derive per-device
@@ -166,9 +162,9 @@ static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     .AP_IDLE_TIMEOUT_MIN    = 10,
 
     // --- Link liveness (issue #49) ---
-    // Sized against the observed fault, not against a guess: the boards died
-    // 3-6 hours in and stayed dead until rebooted, so detection measured in
-    // minutes is ample and false positives are the thing worth avoiding.
+    // Sized against the fault: affected boards stay unreachable for hours until
+    // rebooted, so detection measured in minutes is ample and false positives
+    // are the thing worth avoiding.
     // While LINK_SUSPECT the probe interval is divided (see the manager), so
     // conviction takes ~90 s from the first missed probe rather than 4 min.
     .RSSI_POLL_MS           = 10000,
@@ -188,9 +184,8 @@ static const WiFiDefaults CONNECTIVITY_DEFAULT_WIFI = {
     .RECOVERY_STEP_MS       = 30000,
 
 // CYD_S3_3248W535 has a documented history of resetting when the radio first
-// transmits (see docs/HARDWARE_STATUS.md), and it reappeared during AP-fallback
-// testing on 2026-09-04 - resets on the first STA attempt and when the AP comes
-// up. Capping TX power reduces the current spike when the PA keys up, which is
+// transmits (see docs/HARDWARE_STATUS.md): on the first STA attempt and when
+// the AP comes up. Capping TX power reduces the current spike when the PA keys up, which is
 // the mitigation the ESP32-P4-NINA-Display project applies for exactly this
 // symptom ("keeps the radio's current bursts from sagging the board rail").
 //

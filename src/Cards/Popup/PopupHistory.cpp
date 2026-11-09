@@ -1,20 +1,20 @@
-// History (2.12 P1, split from CardPopup.cpp): whose it is, what is asked and kept, the top
+// History: whose it is, what is asked and kept, the top
 // line, drawing what has come, and the taps on it. The chart and activity have files of their own.
 #include "PopupState.h"
 
 namespace popup {
 
 // ---------------------------------------------------------------------------
-// HISTORY (2.10e, card-sheet section 18). What the view shows follows the
+// HISTORY (card-sheet section 18). What the view shows follows the
 // entity: a NUMBER gets a chart over a span picked right on the view (24 / 12 /
-// 6 / 1 h - owner: quick to switch), with now, min and max; anything that turns
+// 6 / 1 h), with now, min and max; anything that turns
 // ON AND OFF gets its ACTIVITY - each change, newest first, with what caused it
 // (a person, an automation, another entity), 10 rows then "Show more", a tap on
 // a row for its details. The left panel is CHART or ACTIVITY to match.
 //
-// HA entities only, tonight's scope (owner, 2026-10-11): the board's own and
-// MQTT entities keep a local log later. A group defined in HA is ITS OWN
-// entity here, as in HA (owner): its members' histories are reached through
+// HA entities only: the board's own and MQTT entities have no history yet.
+// A group defined in HA is ITS OWN
+// entity here, as in HA: its members' histories are reached through
 // Members, from each member's own window.
 //
 // HaHistory does the asking, on the loop task, and its answer is parsed on the
@@ -68,7 +68,7 @@ bool histIsChart(const Entity *e) {
            (e->value.type == ValueType::FLOAT || e->value.type == ValueType::INT);
 }
 
-// The subject changed (another card, a member): its choices start afresh. True
+// When the subject changes (another card, a member) its choices start afresh. True
 // when they did - the left panel then shows the new subject's.
 bool histSync() {
     const Entity *e = histSubject();
@@ -76,7 +76,7 @@ bool histSync() {
     s_hv = HistView{};
     s_hv.e = e;
     s_hv.chart = histIsChart(e);
-    // What the owner chose for this card last time (H3).
+    // What was chosen for this card last time.
     s_hv.span     = histLoad("hist_span", HIST_SPAN_NAME, HIST_SPANS, 0);
     s_hv.period   = histLoad("act_span", HIST_PERIOD_NAME, HIST_PERIODS, 0);
     s_hv.legend   = histLoad("hist_legend", HIST_LEGEND_NAME, 4, LEGEND_BOTH);
@@ -151,8 +151,8 @@ void histAsk() {
 
 // --- The chart -------------------------------------------------------------
 
-// The span buttons: the chart's four spans, or activity's two (owner, round
-// 2). THE CONTROL DECK'S SELECTOR, COMPACT (owner, 2026-10-14; #92): the same
+// The span buttons: the chart's four spans, or activity's two.
+// THE CONTROL DECK'S SELECTOR, COMPACT: the same
 // eye candy as the light's controls, a span chip's height, so the chart and
 // the log keep their room. `room`: the most width it may take (0, any).
 lv_obj_t *histChips(lv_obj_t *parent, int32_t room) {
@@ -168,9 +168,9 @@ lv_obj_t *histChips(lv_obj_t *parent, int32_t room) {
     return s_hv.spanSel.obj;
 }
 
-// THE SELECTOR KEEPS ITS SIZE (owner, T9, 2026-10-14). The chart's corners
-// set its room, and they are not drawn while the next span loads - it widened
-// there and narrowed again when the answer came. So the room only ever
+// THE SELECTOR KEEPS ITS SIZE. The chart's corners set its room, and they are
+// not drawn while the next span loads, so the selector must not widen there and
+// narrow again when the answer comes. The room only ever
 // narrows while the view shows one subject (a wider Min / Max narrows it once),
 // and a new subject or Show min/max starts it afresh.
 int32_t histChipRoom(int32_t topW, int32_t leftW, int32_t rightW) {
@@ -193,7 +193,7 @@ int32_t histChipRoomBefore(lv_obj_t *row) {
     return histChipRoom(lv_obj_get_width(row), leftW, textW(buf, f));
 }
 
-// THE TOP LINE (owner, rounds 5 and 6), one shape for the chart and activity,
+// THE TOP LINE, one shape for the chart and activity,
 // loading or drawn, so nothing moves when the answer arrives: the span chips
 // or "Showing: ..." in the middle; on the chart, Min / Max in the left corner
 // and Now in the right. History's stage REACHES UP INTO THE HEADER ROW's empty
@@ -206,7 +206,7 @@ int32_t histChipRoomBefore(lv_obj_t *row) {
 //
 // Not LV_OBJ_FLAG_OVERFLOW_VISIBLE: LVGL draws in strips and skips a child
 // whose parent is outside the strip, and never hit-tests outside the parent -
-// the first try was cut off at the stage's top.
+// the child would be cut off at the stage's top.
 
 // How far the stage reaches up into the header row.
 int32_t histLift() {
@@ -228,8 +228,8 @@ lv_obj_t *histTopRow(lv_obj_t *body) {
 // A corner of the top line: out of the buttons' way, in the middle of the rest.
 void histCorner(lv_obj_t *o, lv_align_t where) { lv_obj_align(o, where, 0, histLift() / 2); }
 
-// The span in words (owner, round 4) where the chips were when they are
-// hidden. A TAP STEPS THE SPAN (owner, rounds 5 and 6): 24 -> 12 -> 6 -> 1 hour
+// The span in words where the chips were when they are
+// hidden. A TAP STEPS THE SPAN: 24 -> 12 -> 6 -> 1 hour
 // on the chart, 24 hours <-> 7 days on activity, round again, as the chips do.
 void histShowingCb(lv_event_t *ev);
 void histShowing(lv_obj_t *row) {

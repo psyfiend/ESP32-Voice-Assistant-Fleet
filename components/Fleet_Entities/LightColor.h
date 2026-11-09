@@ -7,9 +7,9 @@
 #include "Entity.h"
 
 // ---------------------------------------------------------------------------
-// A light's colour as a screen colour, and colour temperature as a hue. 2.10b.
+// A light's colour as a screen colour, and colour temperature as a hue.
 //
-// Header-only and dependency-free, like the rest of this library (ROADMAP Q9).
+// Header-only and dependency-free, like the rest of this library (DECISIONS A6).
 // Used by VirtualProvider (which plays a light, and must report rgb the way HA
 // does - rgb_color for every colour mode), by a group's commands (HA turns a
 // colour temperature into a hue for a member that has no temperature), and by

@@ -1,19 +1,14 @@
-# The card popup — long press, milestones 2.10 / 2.11
+# The card window - a long press on any card
 
-**Status, 2026-10-06: 2.10a (the frame) and 2.10b (the light controls) are BUILT and merged -
-§14 and §15 say what they are, and win over everything above them.** §1-13 are the design and
-the interview answers that led there, kept for the reasoning; where they disagree with §14-15
-(the grow, the dim, the P4_5-shaped window), they are history. Decisions, one line each:
-`docs/DECISIONS.md` K3-K16. Next: 2.10c-e (§9).
+**What the card window is, how it behaves and how its settings are kept.** Built. Decisions in
+`docs/DECISIONS.md`: K3-K29, K31-K43, K49-K50, K52-K64, K70, K79. The code is `src/Cards/CardPopup.cpp`
+and `src/Cards/Popup/` (one file per concern, sharing `PopupState.h`); the frame is the Sheet
+(`components.md` §3). What groups add to it: `group-cards.md` and `ha-cards.md`.
 
-The original status - **design, 2026-09-27, owner and Claude**: draft 1 (a bottom sheet) was
-replaced the same morning by the owner's brain dump, with HA's own dialogs as the reference
-(light, switch, switch history, temperature graph). Sources: ROADMAP 2.10 (#65), 2.11 (#66), 2.8;
-`context-panels.md` (mechanism A = invoked by a card, B = declared by a page); `pages.md` (linked
-pages, one-deep back); `cards.md`. Open decisions are marked **D1..D7** and collected in §10, each
-with a recommendation.
+Section numbers are cited from `DECISIONS.md` and from code comments, so they are kept: §1-§13 are
+the rules of the window, §14-§18 its parts in detail.
 
-### Words for the window's parts (owner, 2026-10-07)
+### Words for the window's parts
 
 | Word | Means |
 |---|---|
@@ -21,679 +16,370 @@ with a recommendation.
 | **title** | the text at the top centre: what the window or view is ("Desk"), with the view it came from in front ("Desk > Members") - the **breadcrumbs**; its first part is a link up |
 | **chips** | the round navigation buttons in the corners: X, back, chart, members, clapperboard |
 | **hero** | the view's main content: on the controls, the slider (or toggle) with its label, value and swatches; on Members, the list |
-| **control deck** | the bar of **switches** under or beside the hero - Power \| Brightness, Temperature, Colour. It says which modes the light supports and which one the slider is set to |
+| **control deck** | the bar of **switches** under or beside the hero - Power \| Brightness, Temperature, Color. It says which modes the light supports and which one the slider is set to |
 | **switch** | one of the control deck's options |
 | **selector** | how the chosen switch is shown - a metal face over the chosen switch, its icon in the accent |
 | **SETTINGS panel** | the folder-tab panel that rises from the bottom of the screen, in the right half |
-| **CHART panel** | its neighbour in the left half, up only while History shows (a demo for now) |
+| **left panel** | its neighbour in the left half, per view: CHART, ACTIVITY, SCENES, GROUP |
+| **card label**, **entity label** | the colored name on a card, and the words under its hero (K42) |
 
-Older sections and the code say "deck" for the SETTINGS panel (`s.deck`, `deckFill()`, "The settings
-deck") and "chips" for its choice buttons (`deckChip()`); from 2.10c, "deck" in conversation means the
-control deck. The code's `s.hero` is the slider or toggle alone. Code names change when the code is
-next reworked, not before.
+The code's `s.hero` is the slider or toggle alone; `s.deck` and `deckFill()` are the SETTINGS panel,
+`deckChip()` its choice buttons.
 
 ---
 
-## 1. Presentation: a centred window over a dimmed page (owner's instinct, agreed)
+## 1. Presentation
 
-- **Centred, bordered, rounded**, like HA. Width by screen: ~70% on the landscape panels (P4_5,
-  7B, 4B square), almost full-screen on the CYD's 320x480 portrait, always with a margin so the
-  page underneath still reads as "underneath".
-- **The dim is a translucent FILL** (`bg_opa` on a full-screen scrim), never an object `opa`: an
-  `opa` below COVER forces a full-screen LAYER out of `lv_mem` - the allocation that froze P4_5
-  (LESSONS). Showing the dim costs one full-screen redraw (P4_5 ~85 ms, 4B ~52 ms), once.
-- **"Grow out of the card" - yes, but grow the FRAME, not the contents (D1).** Scaling a live widget
-  tree per frame needs a transform layer the size of the window: out of `lv_mem`, same freeze. What
-  looks the same and is cheap: an empty rounded rectangle animates from the card's bounds to the
-  window's bounds (~200 ms), then the contents appear in it. Cost per frame is about a deck-panel
-  swap's (measured: P4_5 ~32 ms, 4B ~17 ms). If it looks mean on the P4_5, it becomes a pop.
-- **Draft 1's bottom sheet is dropped.** The owner is right that it competes with the deck, and on
-  landscape screens a centred window reads better.
+- A **centered, bordered, rounded** window over the page, on LVGL's top layer above the header and
+  the system drawer; the page under it keeps updating.
+- **It appears complete at once and closes at once** (K4): no grow, no dim, no leap. A fade or a
+  grow redraws the whole screen each frame (a dim as a translucent object forces a full-screen
+  layer out of `lv_mem`, which froze the P4_5). The held card is pressed in with an accent border
+  while its window is open. Windows carry a painted halo instead of a dim (`components.md`, halo).
+- **Size** (K11): up to 2:1 and never wider than 100 mm (`W_WINDOW_MAX`), with a side gap of at least
+  6 mm or 8% of the screen (P4_5 93 x 47 mm, 7" 100 x 75 mm, 4B ~60 mm). Hiding the system header
+  makes the window taller, never wider. The hero (the toggle or slider, 30 mm on the P4_5) is the
+  same share of the window on every board (`pm()`, "P4_5 millimeters"); touch targets and text are
+  real millimeters. Portrait boards are not yet fitted.
+- **Nothing moves within one window** (K11). The column beside the slider or toggle is as wide as
+  that light's selector (for a group, everything its members can do, paused or not) or a fixed
+  allowance for its words, whichever is wider, and as tall as the hero: the label line at the top
+  (the PAUSED pill beside it), the selector level with the hero's bottom. The row is centered.
 
-## 2. The window's anatomy - one frame for every kind
+## 2. The window's anatomy
 
-```
- +---------------------------------------------------------------+
- |  Office > Motion                                        [X]   |   breadcrumb (area > device)
- |  Office Left                                      [ (o) ]     |   name  +  PRIMARY CONTROL
- |  [ Control ]  [ History ]  [ Settings ]                       |   tabs: big segmented row
- |---------------------------------------------------------------|
- |                                                               |
- |                    body of the selected tab                   |
- |                                                               |
- +---------------------------------------------------------------+
-```
-
-- **Tabs are a segmented row across the top, every segment >= `UI::minTouch()` (9 mm).** The
-  owner's objection to HA's corner icons is right for a wall screen; three segments fit even on the
-  CYD (3 x ~100 px against a 58 px minimum there).
-- **Settings is a TAB, not a deck panel (D2).** The deck belongs to the page, which is dimmed and
-  behind the window; putting part of the window's UI there splits one thing across two layers,
-  and the deck is hidden by default on most boards. The Settings tab reuses the drawer's
-  knob-row look, so it still *feels* like the knobs the owner has in mind.
-- **The primary control lives in the header, for every controllable kind.** A light or switch
-  shows its toggle at the top right on every tab. That is the consistency rule, and it answers the
-  owner's switch question (§3): no giant toggle needed, and the control is always in the same place.
+- **Header row**: X top left on the controls (any other view has the back arrow there); the title at
+  the top center; the corner icons at the right (the chart, and Members and Scenes where the card
+  has them).
+- **The corner icons are tabs**: History, Members and Scenes are views of their own; their icons
+  stay on every view they belong to, the one showing is lit as a chosen selector button is, and a
+  tap on a lit one goes back to the controls. History is the group's from the group's views, a
+  member's from that member's own ("Office lamp > History"). Scenes shows on the light's controls
+  and its scenes only, and only for a light with scenes (not while the window works through a
+  group's members, as a scene would reach the paused one).
+- **Back is hard-linked** (K20, K169): the X is on the controls only; every other view has the back
+  arrow, and it always goes to the same place: History, Members, Scenes -> the controls; a member
+  -> Members; a member's History -> that member. A window opened straight onto History goes back to
+  where it was opened from. The title's first part is a link up ("Desk >" goes to Desk's controls
+  from any view below it).
+- **The title gives way in steps** (K29): centered when "Area > Name" fits between ends of equal
+  width; else it takes the room beside the X, left of center; else the name alone (the back arrow
+  still goes up). It is sized before the view is built, because a dotted label laid out at the last
+  view's width rewrites its own text.
+- **Views**: the controls, History, Members, a member's own, Scenes, Entity properties, Card UI,
+  Visibility, and the group views (`ha-cards.md` §3).
+- **Closing** (K9): the X, a tap outside, a drag down that starts on the header row (so it never
+  fights the tall slider), or the idle timeout (60 s unless set otherwise, K79).
+- **Panels** (K5, K25, K28, K50): SETTINGS always takes the right half; the view's own left panel is
+  its mirror image, built by the same folder builder, its tab a millimeter short of SETTINGS' tab.
+  Each is the window's full width when open and only its tab offset: a folder-tab shape, the pane
+  with its own top edge, the tab rising from it with a curved inner corner. Folded, only the tab
+  shows at the bottom of the screen; open, the pane's bottom edge stays below it. Opening either
+  panel folds the other; a tap in the window folds whichever is open and a tap outside both closes
+  everything. A panel is **as wide as its longest row**, its right edge on the window's, never
+  narrower than its tab and never taller than the window. **Panels are dragged whole, never scrolled
+  inside**: up to show hidden rows (it stays where let go, never past its last row), down to fold
+  (past a third of the way folds, less goes back up); carets at the screen's edges point the way. A
+  folded tab opens by a tap only. A panel opens and folds in 260 ms; a closing window takes an open
+  panel with it at once and slides a peeking tab down. Each panel's holder is only as wide as its tab
+  and pane, so a slide does not redraw the cards under it.
 
 ## 3. What each kind lands on
 
-| Kind | Tabs | Lands on | Body of the landing tab |
-|---|---|---|---|
-| Light (dimmable / colour / temp) | Control, History, Settings | **Control** | HA's layout, turned sideways on landscape: the big vertical slider on the left; on the right the mode row (brightness / colour / temperature), swatches, and effect if any. Portrait (CYD): stacked like HA |
-| Switch, input_boolean | Activity, Settings | **Activity** | the timeline + recent changes (§4). Toggle in the header (D3) |
-| Numeric sensor (temp, lux, power) | Graph, Settings | **Graph** | 24 h line chart, plus now / min / max. An Activity list for a number is noise, so there is none |
-| Binary sensor (motion, door) | Activity, Settings | **Activity** | timeline + recent changes |
-| Virtual / system (uptime, heap, RSSI) | Graph, Settings | **Graph** | from the local sample ring (§4) |
-| Aggregate light (one card, several bulbs) | Control, Members, Settings | **Control** | group brightness like HA's light group; **Members** is a grid of the bulbs (§6) |
-
-## 4. History and activity - where the data comes from (the part easy to overlook)
-
-- **Numeric sensors: HA's long-term statistics** (`recorder/statistics_during_period`, 5-minute
-  means) - exactly what HA's own graph uses ("5-minute aggregated" in the owner's screenshot): 288
-  points a day, a small reply. Raw history for a chatty sensor can be thousands of rows - tens to
-  hundreds of KB of JSON - against an 8 KB websocket receive buffer today.
-- **On/off entities: `history/history_during_period`** with `minimal_response` and
-  `no_attributes`: few rows, since they change rarely. **The Activity list is built from the same
-  reply** - no second request. *(As built in 2.10e: `logbook/get_events` instead, which also says
-  what caused each change, and numbers use history first with statistics as the fallback - §18.)*
-- **Entities HA does not own (virtual, MQTT, system)** have no HA history: the board keeps its own
-  ring of samples in PSRAM (e.g. every 5 min for 24 h), **lost at reboot** - to be said on screen.
-- **Clock.** "8 minutes ago" and axis times need wall-clock time and a time zone (SNTP + TZ). To be
-  confirmed whether the fleet already keeps real time.
-- Replies arrive on the websocket task, which must never touch LVGL (HANDOFF): parked, then drawn on
-  the next `tick()`. Fetched when the tab opens, not before.
-- Colour-blind rule: timeline segments carry their labels ("On"/"Off", as HA does), never colour alone.
-
-## 5. Per-card settings (Settings tab) - and the complications behind them
-
-The owner's list: variant (full / compact / auto), area shown, label (name / state / none), custom
-name, header colour, and area colour for every card in the area. All feasible on the screen; the
-work is underneath:
-
-1. **A card needs a stable identity.** Today a card is "the Nth entry of this page's spec". A
-   setting saved against "card 7" re-points silently the day the spec changes - exactly what
-   HANDOFF forbids. Cards need a stable key (the spec's own, or its primary entity id). **Must
-   exist before the first setting is saved.**
-2. **Persistence means flash writes.** NVS writes briefly stop the flash cache; the esp_lcd panel's
-   interrupt is not built IRAM-safe (`display-stack.md` §6.2), so a save might glitch the panel.
-   Save on closing the window, not per tap, and test it on the glass.
-3. **Who wins: the board or the build sheet?** Until 3.1 the board's saved settings are the only
-   truth. Afterwards they are overrides on the sheet - ROADMAP's authority locks. Settings saved now
-   must be designed to become overrides then, not a rival store.
-4. **Area colour** is per area, not per card: an area table (name -> colour) that any card in the
-   area edits, repainting every card in it (`restyleAll()` exists).
-5. **"Visible"** (HA has it): a hidden card needs a way back - a "hidden cards" list in the drawer.
-   Otherwise a card can be lost to a mis-tap.
-
-## 6. Group and area cards - two different things, as the owner says
-
-**Aggregate card (one card, several bulbs - e.g. the Office card).** Its window has **Members**: a
-grid of the bulbs as borderless tiles, each behaving like a card - tap toggles, long press shows that
-bulb's own controls **in the same window** with a back arrow (the content swaps; windows do not
-stack - one window's worth of `lv_mem` at a time). This keeps everything in one place (D4). The
-owner's alternative, a hidden page, already has a home: `pages.md` designed **linked pages** with
-one-deep back and the title in the header. It fits a **room** better than a light group.
-
-**Area card (ROADMAP 2.11, #66): a multi-cell card holding several entities.** The owner's
-description is 2.11's. Its header of promoted values (the area's temperature and occupancy) is
-**2.8's header slots** - which is why 2.8 comes first. Complications:
-- Each entity inside needs its own touch target >= 9 mm, so a 2x1 area card holds perhaps 4-6.
-- Taps must reach the entity tile, not the card (LESSONS: events do not bubble through a clickable
-  child).
-- **Defining** an area card - which entities, which feed the header - is a build-sheet (3.1) /
-  web-UI (Phase 4) job, not an on-glass one. On the board: long press on the area card's header opens
-  the area's own window (members, area colour, area settings).
-
-> **Owner, 2026-09-27: the deck is not part of the default dashboard view** (a throwback to his
-> first design). Where it may reappear - inside popups and detail views, or on room pages reached by
-> a route rather than a swipe - is an open question (`interview-phase2-3.md` §5). Nothing in this
-> blueprint depends on the deck; device-wide settings live in the system panel at the top.
-
-## 7. Behaviour while the window is open (easy to forget)
-
-- **Modal**: page swipes, edge gestures and the header peek are off; the deck scrim rule applies
-  (CLICKABLE, never HIDDEN).
-- **Live**: it follows the entity (registry dirty set), shows "unavailable" if HA drops it, and holds
-  the **entity**, not the card, since a card can be rebuilt underneath.
-- **Auto-close** after some idle time (D6), so a wall screen does not sit on a dialog all day.
-- **Long press vs swipe**: a finger that moves cancels the long press (it must not start a page
-  swipe *and* open a window); the touch is released before the window is built (LESSONS).
-- **Cost of the page underneath**: cards keep updating beneath the dim, each redraw blending the
-  scrim. Possible later: freeze the dimmed page as a picture while the window is open.
-
-## 8. How it looks - notes, not rules
-
-- The window surface uses the scheme's raised surface (Midnight / Linen), not white.
-- **Keep the window's own shadow small or none**: Linen's shadows were measured +35% drawing time
-  (`display-stack.md` §8.2), and a window-sized one is the most expensive shadow on screen. The dim
-  already separates it.
-- **No `clip_corner`** on the window (a layer, LESSONS); inner objects stay inside the radius.
-- Charts: one line in the accent colour, faint grid, large axis text at our scale; ASCII and `°` only.
-
-## 9. The plan
-
-| Step | What | Where it can be tested |
+| Kind | Lands on | Body |
 |---|---|---|
-| **2.10a** | Window frame: long press, dim, grow-the-frame animation, header + tabs, modal behaviour, Settings tab working in RAM (not saved), pause moved into it | laptop boards, virtual lamps |
-| **2.10b** | Light Control tab (brightness / colour / temperature, swatches) and the header toggle, on the virtual lamps | laptop boards |
-| **2.10c** | HA: light attributes, outbound `light.turn_on` with data | home |
-| **2.10d** | Stable card ids + saving settings (with the flash-glitch test) | anywhere |
-| **2.10e** | Graph / Activity: HA statistics and history, the local ring, clock | home for HA data |
-| 2.8 -> 2.11 | Header slots, then area and aggregate cards with their windows | - |
-| 4.4 | Context panels (mechanism B) - wherever the deck is repurposed, if at all (`interview-phase2-3.md` §5) - built from the same rows | - |
+| Light (dimmable / color / temperature) | the controls | the slider, the selector, swatches (§15, §16) |
+| Switch, on/off light, a light whose source has not said what it can do | the controls | the big toggle |
+| Numeric sensor (temperature, lux, power) | History | a chart (§18); tapping the card opens History |
+| Binary sensor (motion, door) | History | its activity (§18) |
+| Climate | its own view | a thermostat's facts, read-only (`ha-cards.md` §3.7) |
+| Group card (a set of entities) | the controls or Members | `group-cards.md` |
 
-## 10. Decisions
+The window opens on the control and carries no toggle in its header (K6): the hero is the control, and
+Power is in the selector. A card that toggles nothing taps to History (K57).
 
-As drafted on 2026-09-27. How each was finally decided - D1 was reversed on glass - is in
-`docs/DECISIONS.md` K4-K10.
+## 4. Where the window's data comes from
 
-| | Question | Recommendation |
+Light state lives in the entity registry (§15); History is asked of HA when its view opens (§18);
+scenes and group members are learnt from HA (§16). Replies arrive on the websocket task, which never
+touches LVGL: they are parked and drawn on the next `tick()`. The window holds the entity, never the
+card, since a card can be rebuilt under it.
+
+## 5. Per-card settings
+
+A card has its settings in SETTINGS (§11.3, §17), saved by its stable id (K8, K33). Flash writes
+happen when the window closes, never per tap (K34).
+
+## 6. Group cards
+
+A group card's window has **Members** (a list of its members as rows: a tap opens that member's own
+controls in the same window, `Group > member`, so windows never stack, K7) and its settings under the
+GROUP panel. The group model: `group-cards.md`.
+
+## 7. Behavior while the window is open
+
+- **Modal**: page swipes, edge gestures and the header peek are off; a scrim catches taps outside
+  (clickable, never hidden).
+- **Live**: it follows the entity (registry dirty set) and shows "unavailable" if HA drops it.
+- **Long press versus swipe**: a finger that moves cancels the long press, and the touch is released
+  before the window is built. In an open sheet a finger that moves more than 4 mm is never a tap.
+- The cards under it keep updating.
+
+## 8. Look
+
+- The window surface uses the scheme's raised surface; no `clip_corner` (a layer, LESSONS); inner
+  objects stay inside the radius.
+- Charts: one line in the accent color, faint grid, large axis text at our scale; ASCII and the
+  degree sign only.
+
+## 9. Memory
+
+A window with its panels costs ~11-12 KB of LVGL's pool. The panels' rows are built when first
+opened, and only the chosen control is built. LVGL's pool lives in PSRAM (CLAUDE.md), so a window
+costs no internal RAM.
+
+## 10. The decisions that shaped it
+
+| | Question | Settled |
 |---|---|---|
-| **D1** | Grow from the card? | Yes, the frame only; fall back to a pop if it looks poor on P4_5 |
-| **D2** | Settings: tab or deck? | **Tab** (§2) |
-| **D3** | Switch landing | **Activity**, with the toggle in the header |
-| **D4** | Aggregate card: members in the window, or a hidden page? | **In the window**; linked pages for rooms |
-| **D5** | Card settings before the build sheet exists | Saved on the board, keyed by a stable card id, designed to become overrides at 3.1 |
-| **D6** | Auto-close after idle | **60 s** |
-| **D7** | Colour choice | Hue + swatches first (LVGL 9 has no colour wheel); a drawn wheel later if wanted |
+| D1 | Grow from the card? | No: appears complete at once (K4, W6) |
+| D2 | Settings: tab or panel? | Tabs for the entity's own features, panels for settings; SETTINGS always on the right (K5) |
+| D3 | Switch landing | open on the control, no header toggle (K6) |
+| D4 | Members | behind their own icon; a member's controls open in the same window (K7) |
+| D5 | Card settings | saved by stable card id, written on close (K8) |
+| D6 | Close | four ways: X, tap outside, drag down on the header row, auto-close (K9) |
+| D7 | Color | a hue strip plus eight swatches in the Color mode; LVGL has no color wheel (K10) |
 
-## 11. Interview §2 answers (owner, 2026-10-01)
+All cards behave as uniformly as possible so navigation does not change by type (K3): long press
+always opens a window, with the same header, back arrow and panels.
 
-**Reference:** the owner's HA details dialog for the Office light group ("Desk", a Hue group) -
-header with area and name, close / history / settings (gear) / menu icons; "100%" and "22 minutes
-ago"; a big vertical brightness slider; a mode row (power, brightness, colour wheel, colour
-temperature); eight swatches; then each member light as a row with its own slider. This is the
-layout the popup mock follows, turned sideways for landscape.
+## 11. The layout, the taps and the settings model
 
-- **D2 - tabs AND the deck, for different things (refines the recommendation).** The deck "isn't
-  part of the default dashboard" meant there is no reason for it on a standard page; inside a
-  popup, or on a special page (an area page holding one cluster of the room), deck panels can be
-  useful. **Tabs** hold the entity's HA-style features - controls, history, colour, show / hide.
-  **Deck panels** hold settings about the device or dashboard: style / scheme, header colour, an
-  alternate cluster name, renaming entities, which entities feed the card header (temperature
-  etc.) - the things behind HA's gear icon. Claude's notes: the deck then becomes a component a
-  popup or page can carry (interview §5 item 4 - "inside popups" - answered by this); on a 3.5-4"
-  screen a deck panel opened inside a popup covers most of its body, which is acceptable for
-  settings; `lv_mem` for a deck inside a popup is to be measured with the rest of the window (G1).
-- **D5 - RECOMMENDED, accepted.** Saved into the configuration file (LittleFS, the build sheet's
-  shape - `look-and-feel.md` §3.10), keyed by a stable card id, written when the popup closes.
-- **Which kinds first (item 2) - accepted:** lights and switches (2.10a-c), sensors after HA
-  history (2.10e), media / climate / the rest with their card types.
-- **Custom name (item 9) - an on-device keyboard IS wanted, as an option.** "Less than ideal but
-  should be available for those that want it." The web UI remains the comfortable way. Plus a
-  **label choice: HA device name / custom name / status (state) / no label.** (Today's label modes
-  are name / state / none - this adds "custom".) Claude's notes on the keyboard: LVGL's keyboard
-  widget costs some `lv_mem` only while it is open; the panels draw ASCII plus the degree sign
-  only, so a name typed with other characters would show boxes - the keyboard should offer ASCII.
-- **Mock for the next batch:** artifact **Card Popup Mock** (https://claude.ai/artifact/Lt6NmxMYLc7xrWzaomEqDm)
-  - grow vs pop (D1), a switch landing on Activity (D3), group members in the window with
-  long-press-to-drill-in (D4), X / tap outside / drag down plus an auto-close timer (D6), hue strip
-  plus swatches and a colour-temperature strip (D7), the gear opening a settings deck inside the
-  window (D2). **Found while building it (Claude):** the P4_5 is ~110 x 62 mm, so at touch-safe
-  sizes HA's dialog does not fit in one view - in landscape the tabs move into the header row and
-  the members get their own column; on the 4B the members scroll under the swatches.
-### 11.1 Batch 2 answers (owner, 2026-10-02) - the popup layout
+### 11.1 Layout
 
-"Card Popup Mockup is terrific! Form and function is excellent!" Decisions:
+- **Top left** X (or back); **top middle** "Area > entity" (a member: "Group > entity"); **top right**
+  the corner icons.
+- **The hero is the control**: a tap anywhere along the slider moves it there. Beside it: the label of
+  what it controls, the value, and the selector Power | Brightness, Color, Temperature; modes the
+  light does not support are hidden (from HA's `supported_color_modes`).
+- **Color** has a hue control and eight swatches; a long press on a swatch saves the current color
+  into it, per light.
+- **A sensor's CHART panel** holds span, min/max, legend and shading (§18).
 
-- **D1 - GROW.** "Looks amazing in the mockup!"
-- **D3 - open directly where actions can be taken**, with **no toggle in the header**. A switch's
-  window opens on its control: the hero IS a big toggle (HA's own switch dialog: "On, 2 seconds
-  ago", a tall toggle). Activity is behind the history icon.
-- **D4 - members NOT on the first view** (crowded). A card representing several members gets a
-  **members icon** (the multi-bulb hero icon) that navigates to a members view.
-- **D6 - all four**: X, tap outside, drag down, auto-close.
-- **D7 - hue control yes; the swatches move OFF the first view** into the colour (RGB) mode.
-- **Layout (owner's proposal, built in mock v2):**
-  - **Top left: X** to close. Any view reached from the first one (history, members, a member's
-    own controls) shows a **back arrow** there instead.
-  - **Top middle: "Area > entity"**, or "Group > entity" for a member.
-  - **Top right: navigation icons** like HA's - the graph icon for history; the multi-bulb icon
-    when the card has members.
-  - **The hero is the control** - the slider, or the toggle. **Tapping anywhere along the slider
-    moves it there**; optionally a setting "tap the slider to toggle on/off" - feasible, because a
-    press that does not move is told apart from a grab-and-drag (mock v2 has both).
-  - **Beside the hero:** the label of what it controls ("Brightness", "Colour", "Temperature") or
-    the state; under it the value (percent / state / kelvin); under that the **selector:
-    Power | Brightness, Colour, Temperature** with a small vertical divider after Power, as in HA.
-    Power makes a header toggle redundant. Modes the light does not support are hidden (from HA's
-    `supported_color_modes`) - a dimmable-only light shows Power | Brightness (answers §2 item 3).
-  - Everything justified against the hero, the whole group centred in the window.
-- **The deck in a popup - pathway 1 (the owner's preference), built in mock v2:** when the window
-  springs up, the deck panel animates up from the bottom of the screen to show only its header
-  ("SETTINGS"), as the hidden system header peeks down when swiped. Tap the header to open it; tap
-  the header or anywhere inside the window to fold it back; a tap outside the window closes the
-  panel and the window together. On close the header retracts so it is out of sight by the time the
-  window has gone - quickly if the panel was open, more slowly if only the header showed.
-  (Pathway 2, a gear icon with the deck fully hidden, is the alternative not chosen.)
-- **Sensor cards get a second deck panel header - CHART:** span (24 h / 12 h / 6 h / 1 h), min / max
-  on the card, legend, chart behind the card, units.
-- **Hue groups verified (owner, Developer Tools):** `light.office` carries `is_hue_group: true`,
-  `hue_type: room`, `lights:` (names), **`entity_id:` (the member entity ids)**, and
-  **`hue_scenes:`** (Nightlight, Energize, Bright, Honolulu, Relax, Concentrate, Read), plus
-  `supported_color_modes: [color_temp, xy]`. Members come straight from attributes; no registry
-  lookup. Mock v2 shows the scenes as chips in the colour mode - OPEN whether they belong there.
+### 11.2 Taps
 
-### 11.2 Batch 3 answers (owner, 2026-10-02 night)
+- Tap stays a one-touch toggle where the card has one (K3); a long press opens the window on every
+  card and never toggles (K39).
+- **Scenes** are a view of their own (§16) and a tap behavior: Tap action offers **Scenes...** and
+  SCENES' **Scene action** says whether it loads the default scene or cycles (K70).
 
-- **Mock bug the owner caught:** Desk's settings offered "Card header shows (temperature /
-  occupancy)" - because the mock's rule was "has members". The setting belongs only to clusters
-  and areas that have such a member. Fixed in mock v3.
-- **Hue scenes:** the owner wonders whether they belong on the first view, for one-tap scene
-  loading, and suggests a tap or long press could be configured to **load a specific scene or
-  cycle through scenes** (as with the cycling temperature group). Second choice: **a target in the
-  selector - Power | Brightness / Colour / Temp / Scenes**. Claude's recommendation, built in mock
-  v3: **the selector target** (one tap away, the same place as every mode - uniform navigation, the
-  owner's own rule below) **plus** the per-card tap behaviour "load scene X" / "cycle scenes"
-  (`group-cards.md` §2C) for true one-tap loading from the dashboard. OPEN for confirmation.
-- **Colour presets (item 4) - agreed:** eight defaults like HA's; long-press a swatch to save the
-  current colour into it, per light, in the configuration file.
-- **History (item 6) - agreed:** 24 h default with 1 / 6 / 12 h; 10 activity rows then "Show
-  more"; fetched from HA when the view opens.
-- **Virtual / system cards (item 7) - agreed**, and the reason generalises: **"I want all cards to
-  behave as uniformly as possible so you don't need to remember navigation for every type of
-  card."** Long press always opens a window; the same header, the same back arrow, the same deck.
-- **Light effects (item 5): later.**
+### 11.3 The settings model
 
-### 11.3 Settings scope (item 10) - the owner's model, and Claude's review
+- **Precedence** (D-7): the more specific wins - device, page, group, card - and every setting
+  inherits on its own: a card's Card UI rows start at **Inherit**, which follows UI Tweaks.
+- The tag's shape is the **card label type** (float / band / tag / none; UI Tweaks' "Label type",
+  K114); its words are the **card label** (Inherit, Custom, None, in Card UI); the words under the
+  hero are the **entity label** (Inherit, Name (HA), State, Custom, None).
+- A card with no area hides its pill and keeps its space, so cards stay lined up.
+- Group colors: a color used by another group is warned about, never forbidden (K46).
+- D-7's **Detach** (copy the inherited values onto the card) and **LOCKED** (a parent forbids
+  overrides) are not built.
 
-**The owner's proposal (2026-10-02):**
+## 12. Not built
 
-- **Separate the tag from the area.** The tag's shape is the **card label type** (tag / float /
-  band / folder / none); its words are the **card label text**, defaulting to the card's area. A
-  card with no area still shows its label type, with blank text.
-- **Inheritance as per-card checkboxes:** "Disable page inheritance", "Disable area or group
-  inheritance", "LOCKED - disable all inheritance".
-- **Per page (every card on it):** variant (default compact), label type (default float), label
-  text on/off (default on = area), entity label (name / state / none; default name), colour
-  scheme, fill (default fill).
-- **Per area or group:** label type, label text, label colour. Not changeable on a card unless it
-  has disabled inheritance; re-enabling restores the area's settings.
-- **Per card within a group:** variant, entity label, visibility.
-- **Per card that has blocked inheritance:** variant, label type, label text (area / custom),
-  label colour (ideally not one already used by another area or card), entity label (name /
-  state / none / custom), visibility.
-- "Much of this is a moot point as soon as clusters enter the picture" - tiles inside a cluster
-  wear no per-card decoration.
+Light effects; a brightness chart for lights (the default for a light stays its activity); a fixed
+or custom range for charts, with a number wheel (`lv_roller`) for low and high - proposed as CHART's
+"Scale: Auto / Fixed", kept per card; the local log for non-HA entities (their History is empty);
+a full-screen chart; thermostat controls and units in UI Tweaks (`carried-from-2.13.md` §6);
+Backup and Restore (`carried-from-2.13.md` §4).
 
-**Claude's review - viable, and mostly a good idea; four corrections:**
+## 13. The window's rules of build
 
-1. **Precedence must be stated.** Page and area both set label type. Proposed: **device defaults <
-   page < area / group < card** - the more specific wins - which is ROADMAP Q2's order with the
-   area added.
-2. **Inherit per SETTING, not per card.** Instead of checkboxes that must be ticked before a value
-   can change, every setting shows where its value comes from - "Float (from page)" or "Band (from
-   Kitchen)" - and changing it on the card simply overrides that one setting, with a **Reset**
-   that returns it to inheriting. Same safety (the source is always named; reset restores), one
-   fewer step, and no hidden state where a control refuses to change. It is how the build sheet
-   already works (`*Defaults` < sheet < runtime overrides, stored sparse). The owner's "disable
-   all inheritance" becomes a "Detach" button that copies the current values onto the card.
-3. **"LOCKED" is already taken.** ROADMAP Q2's lock means the opposite: a PARENT forbids children
-   to override (a kiosk page, a guest board). Keep that word for that.
-4. **Unique label colours: warn, do not forbid.** A palette has only so many colours the owner can
-   tell apart (G9); forbidding a used colour runs out fast. Show "Kitchen uses this colour" and let
-   the user choose.
+- **Paused** is a switch in Visibility (K14, K111) and is the entity's: pausing a member's card
+  pauses it in every card it is on.
+- **The window's panels** (a window's own, not the page deck's) keep their settings in RAM until the
+  window closes, then write once (§17).
+- **A drag down to close starts on the header row only.**
+- **Long press opens the window on every card type** (K3, K39).
 
-**DECIDED (owner, 2026-10-02):** "I'll go with your suggestions regarding the corrections."
-So: precedence **device defaults < page < area / group < card**; inheritance **per setting**, with
-the source named and a **Reset**; "Detach" instead of a per-card "disable all inheritance";
-**LOCKED** keeps ROADMAP Q2's meaning; label colours **warn** rather than forbid. A card with no
-area **hides its pill and keeps its space** (today's behaviour - cards stay lined up). The coloured
-label type is called **"band"** - "bar" is confusing beside the system header bar. Label types:
-**tag / float / band / folder / none**. (The code still says `HDR_BAR`; rename when it is next
-touched.)
+---
 
-## 12. Section 2 CLOSED - 2026-10-02
+## 14. The panels and the window's frame
 
-**Decided:** D1 grow; D2 tabs for the entity's features, deck panels for dashboard settings; D3
-open on the control, no header toggle; D4 members behind their own icon; D5 settings in the
-configuration file by stable card id, written on close; D6 X / tap outside / drag down /
-auto-close; D7 hue control, swatches in the colour mode. The window layout is the owner's (§11.1),
-the deck peeks up from the bottom (pathway 1), sensors get a CHART panel, scenes are a selector
-target plus a per-card tap action (§11.2 - recommended, not objected to), presets / history /
-uniform popups (§11.2), the settings model (§11.3).
-
-**Still open, none blocking 2.10a:** the group taxonomy's confirmations (`group-cards.md` §4, for
-interview §4); `render_template` for area members (verify); light effects (later).
-
-**The build order is unchanged** (§9): 2.10a frame, 2.10b light controls, 2.10c HA attributes
-and calls, 2.10d stable ids + saving, 2.10e history - with this section's answers replacing draft
-2's guesses wherever they differ.
-
-- **D4 - opened a larger question: what kinds of "group" exist.** Recorded and answered as a draft
-  taxonomy in `group-cards.md` (source x presentation x behaviour). The members-inside-the-popup
-  part of D4 matches the HA reference above.
-
-## 13. 2.10a build decisions (owner, 2026-10-02)
-
-Asked before building; the owner took every recommendation. These replace §9's 2.10a line where
-they differ (it still says "Settings tab" and "pause moved into it" without saying where).
-
-- **Body:** a switch gets its real big toggle (simple enough to build now); every other kind shows a
-  read-only value / state with "N minutes ago". Lights' sliders are 2.10b.
-- **Pause** moves from long press to a **"Paused: Off / On" row in the SETTINGS deck**.
-- **Drag down to close starts on the header row only**, so it never fights 2.10b's tall vertical
-  slider.
-- **The window's deck is a new, small part** owned by the popup. Reshaping the page deck
-  (`GUIManager`'s Audio / Display accordion) waits until interview §5 decides where the deck lives.
-- **History and members icons** are shown and lead to an empty placeholder view with a working back
-  arrow, so the navigation is testable before 2.10e and the group work fill them.
-- **Deck contents in 2.10a:** label choice (HA name / custom / state / none), Shown / Hidden, Paused.
-  Custom name shows the option; the keyboard is later.
-- **The window sits on LVGL's top layer**, above the header and the system drawer. The page under
-  the dim keeps updating live.
-- **The dim appears at once, not faded**: each frame of a fade redraws the whole screen (~85 ms a
-  frame on P4_5); appearing costs one redraw. The grow runs over it. If it looks abrupt on glass, a
-  fade is the thing to try.
-- **Long press opens the window on every card type** (§11.2's uniform rule); tap is unchanged.
-- **Deck settings live in RAM** and are lost at reboot - except Paused, which already persists
-  through #60's pause store. Saving by stable card id is 2.10d.
-
-## 14. The popup's deck, as built and tested (owner, 2026-10-05)
-
-What 2.10a ended up with, after rounds 4-12 on glass (`docs/archive/TEST_2.10a.md`); signed off and merged
-2026-10-05 (`v0.2.8`). Where it differs from the sections above, this wins.
-
-- **The window appears complete at once and closes at once** - no grow, no dim (owner: speed first).
-  The held card is pressed in with an accent border, and stays so while its window is open.
-- **Each deck panel is the window's full width when open; only its TAB is offset.** A folder-tab
-  shape: the pane has its own top edge, the tab rises from it with a curved inner corner. Folded,
-  only the tab shows at the bottom of the screen, at the page deck's header height; the corner and
-  the pane's edge sit just below the screen. Open, the pane's bottom edge stays below the screen.
-- **SETTINGS always takes the right half.** A card that needs a second panel (a sensor's CHART,
-  11.1) puts it in the left half - so SETTINGS is never pushed around.
-- **With two panels (not built yet):** both tabs sit at the bottom when closed; each panel has its
-  own open and close animation; opening one hides the other's tab; only one can be open at a time.
+- **Each panel is the window's full width when open; only its TAB is offset** - a folder-tab shape
+  with its own top edge. Folded, only the tab shows, at the page deck's header height.
 - **While a panel is open, the window is out of reach**: a tap anywhere in the window only folds
-  the panel. A tap outside both closes everything.
-- **Closing**: an open panel vanishes with the window; a tab that was only peeking slides back down.
-- **Speed**: the deck is quicker than the page deck's panels (220 ms vs 300 ms, over a longer
-  travel) and that is kept - settings should be quick to reach. Other expanding menus are judged as
-  they come (no one-size rule).
-- **Contents in 2.10a**: Paused works (kept on the device); Label, Custom name and On the dashboard
-  are shown, quieter, and inactive - "fine for now", which settings exist is not settled.
-- **Memory**: a window with its deck costs ~11-12 KB of LVGL's pool; with the pool at 128 KB in
-  internal RAM, ~16 KB was left with one open. Answered at 2.10b: the pool is in PSRAM (§15).
+  the panel; a tap outside both closes everything.
+- **Speed** (W6): the window's panels are quicker than the page deck's (260 ms against 300 ms) and
+  that is kept - settings should be quick to reach.
+- **Usable first**: the window is built in one quiet pass so its first frame draws only itself
+  (`Kit::sheetBegin()`); a window with its panels costs ~11-12 KB of LVGL's pool.
 
-## 15. 2.10b - the light controls, as built and signed off (2026-10-06, `v0.2.9`)
+## 15. The light controls
 
-Signed off on WS_P4_5 after seven rounds, and seen on WS_P4_4B and CYD_P4_1060; every round and
-measurement is in `docs/archive/TEST_2.10b.md`. Where this differs from sections 9-14, it wins.
+**Light state lives in the registry.** What a light can do (HA's `supported_color_modes` folded into
+dim / temperature / color) arrives from the source with every report, so nothing is saved to flash;
+levels are null while off, as HA reports them. A brightness, temperature or color command is applied
+at once and confirmed only by a matching report, exactly as on/off is (A4); three seconds without
+one, it reverts and the card says FAILED. After a reboot, or while the link is down, nothing is
+shown as confirmed that the source has not said.
 
-**Size.** The P4_5's hero (the toggle or slider, 30 mm on calipers, "the perfect size") is the
-reference: on every board the hero is the same share of the window as on the P4_5 (`pm()`, "P4_5
-millimetres", from the height of the biggest P4_5-shaped window that fits). Touch targets and text
-stay real millimetres. **The window is up to 2:1, never wider than 100 mm, with a side gap of at
-least 6 mm or 8% of the screen**: P4_5 93 x 47 mm, 7" 100 x 75 mm, 4B ~60 mm. (Round 1 gave every
-board the P4_5 window's 787:545 shape; the owner then asked for width on the P4_5, and round 5's
-~129 mm on the 7" made every reach long.) Hiding the system header makes the window taller, never
-wider. The rearranged layout (the selector centred along the bottom) was declined: the P4_5 lacks
-the height (62 mm tall at 294 PPI). Covering the system header: decide at 2.10e, with the charts.
-Portrait boards (the 4880) are left for later (owner).
+**Commands while dragging go every 300 ms and once on release** (K12). The slider and the value
+follow the finger every frame; toggles command on release. A switch, an on/off light and a light
+whose source has not said what it can do get the big toggle.
 
-**Nothing moves within one window** (owner, rounds 3-5). The column beside the slider or toggle is
-as wide as that light's selector - for a group, everything its members can do, paused or not - or
-a fixed allowance for its words, whichever is wider, and as tall as the hero: the label line at the
-top (the PAUSED pill beside the label, the same height), the selector level with the hero's bottom.
-The row is centred, so a toggle and its words sit centred, four controls are centred as a whole,
-and two move in from the edge.
+**Groups behave as in HA** (K13): what is offered is everything any member can do; each member is
+sent what it can take (a brightness turns an on/off member on; a temperature becomes the nearest hue
+for a member with color but no temperature; a color leaves the others on). HA's own rules (from its
+`group/light.py`): brightness and color temperature are the mean over the members that are on, hue
+a circular mean, the mode the most common, the capabilities the union. **The group card fills to
+that mean brightness.** A mixed group shows every control any member has (K185). A lamp comes back
+on at its remembered levels. **"On when: any / all"** (Active state, `GroupOn`) is a card setting
+for a group made on the board that has a member that can be on; a tap on a group that is on turns
+all off, otherwise all on. A native HA group is one entity and HA decides for it.
 
-**Light state lives in the registry (owner).** What a light can do (HA's `supported_color_modes`
-folded into dim / temperature / colour) arrives from the source with every report, so nothing is
-saved to flash; levels are null while off, as HA reports them. A brightness, temperature or colour
-command is applied at once and confirmed only by a matching report, exactly as on/off is (#63);
-three seconds without one, it reverts and the card says FAILED. That is the "trust but verify" the
-owner asked for: after a reboot, or while the link is down, nothing is shown as confirmed that the
-source has not said.
-
-**Commands while dragging: every 300 ms, and once on release (owner: "300ms sounds about right").**
-The slider and the value follow the finger every frame; toggles still command on release.
-
-**The window (mock v3, owner):** the slider is the hero, a tap jumps to that point; beside it what it
-controls, the value, when it changed, and Power | Brightness, Temperature, Colour, showing only what
-the light can do. Colour shows eight default swatches in place of the value line (the column must
-fit 34 mm on the P4_5). A switch, an on/off light and a light whose source has not said what it can
-do get the big toggle.
-
-**Groups behave as in HA (owner):** what is offered is everything any member can do; each member is
-sent what it can take (a brightness turns an on/off member on - the owner's 1% test; a temperature
-becomes the nearest hue for a member with colour but no temperature, as HA converts; a colour leaves
-the others on). Shown levels are the mean of the members that are on. A lamp comes back on at its
-remembered levels (the owner saw HA restore a member's brightness). **"On when: any / all"** (HA's
-group helper option) is a card setting, `GroupOn`, in the deck of a card standing for several
-things; a tap on a group that is on turns all off, otherwise all on (it was "the inverse of the
-majority"). Native HA groups are one entity, and HA decides for them.
-
-HA's own rules, read from its source (`group/light.py`): brightness and colour temperature are the
-mean over the members that are ON, hue a circular mean, the mode the most common, the capabilities
-the union. **The group card fills to that mean brightness** (one at 100%, one at 50%: 75%).
-
-**Paused.** A paused member is out of its group: not counted for on or off, not offered (a mode
+**Paused** (K14). A paused member is out of its group: not counted for on or off, not offered (a mode
 only it has leaves the selector, even when every member is paused), not commanded. The group is
 PAUSED only when every member is - a fully paused group keeps its greyed slider and offers only
 Power; its status line says "1 paused" otherwise; Members lists the member, reading "Paused". The
-card follows the same rule (`Card::counts()`). For a group defined at the source the registry
-keeps the group's own pause in step with its members both ways (2.10c round 9, K32): pausing every
-member pauses the group, and resuming any member resumes it - before that, a group paused from
-its own window stayed PAUSED after each member was resumed from its own. A paused window: controls greyed, a PAUSED pill
-beside the label, a touch on a control explains itself. **Paused in the deck is a switch** ("Off /
-On" read two ways).
+card follows the same rule (`Card::counts()`). For a group defined at the source the registry keeps
+the group's own pause in step with its members both ways (K32). A paused window has its controls
+greyed, a PAUSED pill beside the label, and a touch on a control explains itself.
 
 **Members.** A tap on a member row opens that member's own controls in the same window ("Group >
-member", the back arrow returns to Members) - section 11.1's member view, reached by a tap (owner)
-rather than the mock's long press. It needs no card of its own.
+member"; the back arrow returns to Members). It needs no card of its own.
 
-**The header.** The chart button is always in the corner; the members icon sits inside it.
+**Failed commands are recorded**: no matching report in 3 s, with what was asked and what the light
+last said, or HA's refusal and its message. The last four are logged and listed by `/popup?view=3`.
+A refusal of an earlier call while a newer one is in flight (a drag) does not fail the newer one.
 
-**Memory.** The deck's rows are built when it is first opened, and only the chosen control is built
-(owner: every reasonable saving without side effects). **LVGL's pool is in PSRAM at 512 KB on every
-P4** (owner, 2026-10-06, #88): internal heap free 233 -> 361 KB, a window's biggest free block
-13 -> 399 KB, full-screen frames ~10% slower.
+## 16. Home Assistant's lights
 
-**Open, for 2.10c-e:** scenes (`hue_scenes` on `light.office`) as a selector target (11.2) need HA's
-attributes - 2.10c; saving a swatch with a long press needs the settings store - 2.10d; covering the
-system header - 2.10e. The sensor hero's disc grows with the window around a fixed-size icon face,
-so on a 7" it is large for its glyph (a bigger face costs flash).
+Measured: `ha-websocket.md` §9. Decisions: C5, K12, K15, K17-K21.
 
-## 16. 2.10c - Home Assistant's lights, as built (signed off 2026-10-07, `archive/TEST_2.10c.md`)
+**Levels.** An HA light reports what it can do, what it is showing (`color_mode`) and its levels; one
+reader (`HaValue.h`) serves the boot fetch and the live feed. So an HA light gets exactly the
+window a virtual lamp of the same kind gets. Commands are `light.turn_on` with `brightness`
+(0-255), `color_temp_kelvin` or `hs_color`, confirmed by the light's own report (C5). HA's reply to
+the call is read: a refusal (`success: false`, which means HA sent nothing) shows FAILED at once.
+A Hue bulb may correct a color to what it can really make about 1.4 s after confirming, and the
+window follows.
 
-Measured before building: `ha-websocket.md` section 9. Decisions: `DECISIONS.md` C5, K12, K15, K17.
-
-**Step 1 - levels.** An HA light reports what it can do (`supported_color_modes`, folded into the
-four capability bits of section 15), what it is showing (`color_mode`) and its levels; one reader
-(`HaValue.h`) serves the boot fetch and the live feed. So an HA light gets exactly the window a
-virtual lamp of the same kind gets, and a light HA reports as on/off only - or a `switch.*` - keeps
-the big toggle. Commands are `light.turn_on` with `brightness` (0-255), `color_temp_kelvin` or
-`hs_color`; confirmed by the light's own report as before. HA's reply to the call is read: a
-refusal (`success: false`, which means HA sent nothing) shows FAILED at once instead of after 3 s.
-On the owner's Hue bulbs a colour confirms on the first report, then the bridge may correct it to
-what the bulb can really make (blue 240 -> 255) about 1.4 s later, and the window follows.
-
-**Step 2 - groups defined in HA or Hue (K17).** `light.office` is one entity to HA. Its `entity_id`
+**Groups defined in HA or Hue** (K17, K18). `light.office` is one entity to HA. Its `entity_id`
 attribute names its bulbs; the registry LEARNS them - registers each as an entity of its own while
-the board runs (id `ha_light_office_lamp`, name from its own `friendly_name`), subscribes and
-fetches it. So Desk's window has the members icon, Members lists the three bulbs, and a tap opens
-one bulb's own controls - exactly as All Lamps does with Lamp 4, which has no card either.
+the board runs (id `ha_light_office_lamp`, name from its own `friendly_name`, A13), subscribes and
+fetches it. So Desk's window has Members, listing the bulbs, and a tap opens one bulb's controls.
 
-- **With no member paused, the window and the card stand for the group itself**: HA's own report
-  is shown, and a command goes to `light.office` once, so the Hue bridge changes the bulbs together.
-- **While any member is paused, they stand for the members** (section 15's rule, K14): the paused
-  bulb is out - not shown in the mean, not commanded - and the others are commanded one by one
-  (they may change a moment apart). The card does the same (`Card::liveEntities()`).
-- **Pausing Desk itself pauses the group and every member**; resuming resumes them all.
-- **"On when: any / all" is not offered** for such a group: HA or Hue decides when it is on.
+- **With no member paused, the window and the card stand for the group itself**: HA's report is
+  shown, and a command goes to `light.office` once, so the Hue bridge changes the bulbs together.
+- **While any member is paused, they stand for the members** (K14): the paused bulb is out - not
+  shown in the mean, not commanded - and the others are commanded one by one (`Card::liveEntities()`).
+- **Pausing Desk itself pauses the group and every member**; resuming resumes them all (K18).
+- **"On when: any / all" is not offered** for such a group: HA or Hue decides.
 - A member's pause is saved like any other and applied once the member is learnt after a reboot.
-- Adding a member as a card of its own: later (owner) - it needs a place on the page (#78) and
-  saving (2.10d).
 
-**Step 3 - scenes (K15, K19).** A light's scenes are HA's scene entities on the light's own device -
+**Scenes** (K15, K19, K21, K43). A light's scenes are HA's scene entities on the light's own device -
 for a Hue room, the scenes made in the Hue app - found by one `render_template` per session
-(`ha-websocket.md` section 7a's pattern, cancelled once answered) and learnt like members, each a
-BUTTON entity named as HA names it ("Relax"). Stock HA, no helper; scenes kept in HA's own
-`scenes.yaml` belong to no device and are not offered.
+(`ha-websocket.md` §7a) and learnt like members, each a BUTTON entity named as HA names it. Scenes
+kept in HA's `scenes.yaml` belong to no device and are not offered. Scenes hidden in HA's UI
+(`hidden_by`, read through `is_hidden_entity`) are hidden here too, unless SCENES' "Show hidden
+scenes" is ticked.
 
-- **Scenes is a view of its own** (owner, after round 3 - it was first built as a fifth selector
-  button, and the off-centre selector looked awkward). Its icon (`mdi:movie-open`, a clapperboard,
-  already in the icon faces; HA's own scene icon, the palette, is Colour's here) sits **under the
-  chart** in the window's corner, on the light's controls and its scenes only, and only for a light
-  with scenes - not while the window works through a group's members, as a scene would reach the
-  paused one.
+- **Scenes is a view of its own**, its icon (`mdi:movie-open`, a clapperboard) under the chart in the
+  window's corner.
 - **The brightness slider stays where it is; the scene buttons take the column** - the label, the
-  value and the selector give way. Sized as a share of the window (9 "P4_5 millimetres", never under
-  the swatches' 6.5 mm), three rows in the slider's height; when there are more, half a fourth row
-  shows so it is plain there is more to scroll to. Centred, sorted by name.
+  value and the selector give way. Sized as a share of the window (9 P4_5 millimeters, never under
+  the swatches' 6.5 mm), three rows in the slider's height, and half a fourth row shows when there
+  are more. Centered, sorted by name.
 - **A tap loads the scene** (`scene.turn_on`) and rings that button. The ring means "as the scene
   left it", so it goes with any command from the window, with a change from elsewhere once the
-  scene has held still for 3 s (its own fade reports come within ~1.5 s), and with the window. HA
-  records only when a scene was last activated, so no scene is ever shown as on. A refusal by HA
-  marks it FAILED.
-- A stacked layout for windows too narrow for a fifth selector button was built for the 4B and
-  removed with the button.
-- **The control deck under the hero where the window has the height** (owner, 2026-10-07, K23): the
-  4B and the 7" panels; the P4_5, the one board too short (its screen is the widest shape), keeps it
-  beside the slider. Worked out from the window's height. The slider, its words and the deck are
-  centred. ~~Scenes - and Colour under a tall window - push the slider to the stage's left edge~~
-  (see "The slider's place", below, K26). The control deck never moves - in Scenes, where there is
-  no deck, its room is kept so the slider stays at the same height.
-- **The control deck after HTC's TouchFLO 3D** (owner, 2026-10-07, K24): a **ribbon** three quarters
-  of a switch tall, and on it the **selector**, as tall as the deck, carrying the chosen switch's icon
-  a size up (the LG icon face) in the accent. The selector can be grabbed and slid: its icon becomes
-  a neighbour's once it is more than halfway over it, and on release it snaps to the nearest switch,
-  which is chosen. A tap on a switch glides it there (140 ms); the view is rebuilt after the glide.
-  Power is an action, never selected: it has **a short ribbon of its own, with a break before the
-  modes' ribbon** (no divider line). **The selector is metal** (owner: the plain dark one "looks like
-  a void"): a two-tone face with a sharp step a little below the middle - a polished bevel, from
-  LVGL's two-stop gradient - and a fine lighter edge; gunmetal on the dark schemes, silver on Linen;
-  rounded squares by default. Icons in the text colour, the chosen one in the accent. **Lit corner
-  chips take the same metal.** Looks to compare on glass from a debug-only SETTINGS row, "Deck look":
-  square / round, gunmetal / silver.
-- **The SETTINGS panel, reworked** (owner, 2026-10-07, K25): one list of rows (`deckSpecs()`) gives
-  both its size and its contents. **As wide as its longest row**, its right edge on the window's,
-  never narrower than its tab (within a curve's width of the tab it is the tab's width, one straight
-  edge, no inner curve). **Never taller than the window**: open, the tab's top stops at the window's
-  top; more rows scroll. **Dropdowns** for choices, **a checkbox** for Paused. Rows: Paused; Active
-  state (Any / All members are on - groups defined here only); Label (Default / From HA / State /
-  Custom / None); Visibility (Show on dashboard / only in group / only as member / Hidden); Tap action
-  (Toggle / Details / Members / History view / Cycle scenes / Nothing); Scenes (Visible scenes only /
-  Show all / Disabled); and in debug builds, Deck look. Label, Visibility and Tap action are shown
-  greyed until saving (2.10d); Custom name joins when Label can be Custom.
-- ~~**Scenes and Colour (wide): the slider and the buttons or swatches are one group**, centred~~
-  (superseded in round 7 by the slider's place, below). Scenes are **a stack**: one column of
-  buttons as wide as the longest name, a second column only when one is full, then scrolling.
-  Not yet: switching the control live while dragging (to be measured first), and the inverted-icon
-  variant.
-- **The slider's place** (owner, round 7, K26 - `placeWide()`): in Scenes, and Color under a tall
-  window, the slider stays exactly where the controls put it and the buttons or swatches sit just to
-  its right, centred top to bottom in its height. Only what does not fit moves anything, and only as
-  far as it must: wider than the room (more scene columns), the slider goes left by the difference;
-  running under the clapperboard chip, the content first drops to the bottom of the slider's height,
-  then the slider goes left until it clears; and when neither is enough (the 4B's seven scenes: their
-  rows fill the height, and two columns do not fit beside the chip even with the slider at the
-  edge), the scenes take the columns that fit beside the chip and scroll. The row is moved with
-  `translate_x`, so taps land where it is drawn.
-- **Four looks, hand-drawn faces** (owner, round 6-7, K27): Black - Square, Black - Round, Silver -
-  Square, Silver - Round, all kept; unchosen, Black - Square on Midnight and Fleet, Silver - Round on
-  Linen (round 9). **Chosen per scheme** (K31, SETTINGS' "Selector" row, in every build): a choice
-  holds for the scheme it was made in, so a Linen page and a Fleet page each keep their own. LVGL's gradient has two stops and runs straight, and the owner asked for the line between
-  the selector's light and dark halves to **curve up in the middle** (in the upper two fifths, a
-  raised look) and for unlit chips to be **soft dents**, so the faces are ARGB8888 images painted per
-  pixel (`paintFace()`): the curved line, faint brushed row streaks, a fine edge, corners
-  anti-aliased in the alpha; a dent is shaded at the top, gone by the middle, a whisper of light at
-  the bottom, in the window's colour, no border. Painted the first time a size is needed and kept in
-  PSRAM (12 slots, ~40-55 KB each on the P4_5), **taken back when full** (round 9): a slot painted in
-  another scheme's colours first, else the one asked for longest ago by an earlier window - never
-  one the open window may be showing. (Never giving them back filled the cache after a few swipes
-  between pages of different schemes, and faces came out flat.) **Dithered to the 16-bit grid** (4x4 ordered): a
-  smooth grey ramp truncated to RGB565 banded pink and green, because green steps twice as finely as
-  red and blue. The selector's icon is scaled 1.4x (the largest icon face is not big enough); lit
-  chips use the next face up. Pressed chips tint.
-- **CHART, a second panel** (owner, rounds 7-8, K28 - a demo): **SETTINGS' mirror image**, both
-  made by one builder (`buildFolder()`): its tab in the left half, a millimetre short of SETTINGS'
-  tab, its pane growing rightwards from the window's left edge, the inner curve on the tab's right.
-  Five demo rows (time range, chart style, shading, min/max, compare) that work as controls and
-  change nothing, so the pane is wider than its tab on every board. It peeks up when History shows
-  and slides down when the window goes to another view. Opening either panel brings it to the front
-  and folds the other; a tap in the window folds whichever is open. It leaves with the window as
-  SETTINGS does: folded, its tab slides down on its own; open, it goes at once. Both open and fold
-  in 260 ms (from 220 - round 7 found them choppier now that SETTINGS opens further; the page deck's
-  panels take 300). **Each panel's holder is only as wide as its tab and pane** (round 9, measured on
-  the P4_5): a window-wide transparent holder made every frame of a slide redraw the cards and the
-  window under it - 35-105 ms a frame; now 8-40.
-- **The stacked control deck is centred against the stage itself** (L5, measured on the 1060): a
-  content-sized holder was centred inside a flex "track" as wide as the widest child, itself
-  centred in the stage, and Color's wider row moved the deck by a pixel of rounding. Its holder is
-  now the stage's full width.
-- **The title gives way in steps** (owner, round 7, K29): centred when "Area > Name" fits between
-  ends of equal width; else it takes the room beside the X (a window with two chips on the right has
-  a chip's width spare on the left), left of centre; else the name alone - the back arrow still goes
-  up. Sized before the view is built: a DOT label laid out at the last view's width rewrites its own
-  text ("Sce..."), and measuring that kept it.
-- **No word over the swatches**: Color shows only the swatches (and the PAUSED pill when paused).
-  Text on the panels is US English (K30).
-- **Scenes hidden in HA's UI are hidden here too** (owner, 2026-10-07, K21): the scene query asks HA's
-  `is_hidden_entity` per scene (the entity registry's `hidden_by`). A card setting in SETTINGS,
-  "Scenes: Visible / All / Off", Visible by default; live, in RAM until 2.10d. Office: Bright,
-  Concentrate and Relax visible, four hidden.
+  scene has held still for 3 s, and with the window. HA records only when a scene was last
+  activated, so no scene is ever shown as on. A refusal marks it FAILED.
+- **The SCENES panel**: Show hidden scenes (checkbox), Default scene, Scene action (K43, K70).
 
-**The corner icons are tabs (owner, after round 3).** History (the chart), Members and Scenes are
-views of their own; their icons stay on every view they belong to, the one showing is lit (as a
-chosen selector button is), and a tap on a lit one goes back to the controls. Members on the
-window's own views; Scenes on the light's controls and scenes; the chart everywhere - **the group's
-from the group's views, a member's from that member's own** ("Office lamp > History").
+**The control deck sits under the hero where the window has the height** (K23): the 4B and the 7"
+panels; the P4_5, the one board too short, keeps it beside the slider. The slider, its words and
+the deck are centered. The control deck never moves; in Scenes, where there is no deck, its room is
+kept so the slider stays at the same height.
 
-**Back is hard-linked, not a history** (owner, round 4 - the first build had only the X, and the
-way back to the controls was to close and reopen). The X is on the controls only; every other view
-has the back arrow, and it always goes to the same place: History, Members, Scenes -> the controls;
-a member -> Members; a member's History -> that member. **The title's first part is a link up**:
-"Desk >" goes to Desk's controls from any view below it, "Office lamp >" to the bulb's. **Members'
-rows** are as wide as the controls view's slider and words together, and centred both ways (rounds
-2 and 4).
+**The control deck after TouchFLO 3D** (K24). A **ribbon** three quarters of a switch tall, and on
+it the **selector**, as tall as the deck, carrying the chosen switch's icon a size up in the accent.
+The selector can be grabbed and slid: its icon becomes a neighbor's once it is more than halfway
+over it, and on release it snaps to the nearest switch, which is chosen. A tap on a switch glides it
+there (140 ms). Power is an action, never selected: it has a short ribbon of its own with a break
+before the modes' ribbon. The selector is metal (a two-tone face with a sharp step a little below
+the middle: gunmetal on the dark schemes, silver on Linen); lit corner chips take the same metal.
 
-**When a command fails, the board records why** (round 2, G8 - Desk said FAILED once, not
-reproduced): no matching report in 3 s, with what was asked and what the light last said, or HA's
-refusal and its message. The last four are logged and listed by `/popup?view=3`. A refusal of an
-earlier call while a newer one is in flight (a drag) no longer fails the newer one.
+**The slider's place** (K26, `placeWide()`): in Scenes, and Color under a tall window, the slider
+stays exactly where the controls put it and the buttons or swatches sit just to its right, centered
+top to bottom in its height. Only what does not fit moves anything, and only as far as it must:
+wider than the room (more scene columns), the slider goes left by the difference; running under
+the clapperboard chip, the content first drops to the bottom of the slider's height, then the slider
+goes left until it clears; and when neither is enough (the 4B's seven scenes), the scenes take the
+columns that fit beside the chip and scroll. The row is moved with `translate_x`, so taps land
+where it is drawn.
 
-## 17. 2.10d - stable card ids and saved settings (signed off, `v0.2.11`, 2026-10-12)
+**Four looks, hand-drawn faces** (K27, K31, K36): Black - Square, Black - Round, Silver - Square,
+Silver - Round; Black - Square on Midnight and Fleet and Silver - Round on Linen unless chosen. The
+choice is per scheme (UI Tweaks, or a card's own in Card UI). The faces are ARGB8888 images painted
+per pixel (`paintFace()`): the light and dark halves meet in a line that curves up in the middle,
+with faint brushed streaks and a fine edge; an unlit chip is a soft dent. A face is painted the
+first time a size is needed and kept in PSRAM in 12 slots (~40-55 KB each on the P4_5), **taken back
+when full**: a slot painted in another scheme's colors first, else the one asked for longest ago by
+an earlier window, never one the open window may be showing. They are **dithered to the 16-bit grid**
+(4x4 ordered), since a smooth grey ramp truncated to RGB565 bands pink and green. The selector's
+icon is scaled 1.4x; lit chips use the next face up; pressed chips tint.
 
-Decided with the owner on 2026-10-08: `DECISIONS.md` K33-K38. What the problem is, in the owner's
-words: how does a device stay customised instead of reverting to its compiled configuration at every
-reset?
+**SETTINGS' rows** (K25): one list of rows (`deckSpecs()`) gives both the panel's size and its
+contents. Dropdowns for choices, a checkbox for a yes/no. The rows: **Active state** (Any / All
+members are on - only for a group made here with a member that can be on); **Tap action** (Toggle,
+Details view, Group view, Members view, History view, Scenes..., Nothing - only what the card can
+do); **Long press opens** (Details view, Members view, Group view, History view - never a toggle);
+**Units** (a temperature's C or F, only where there is a choice); **Entity properties** (a button to
+a read-only view: HA's name, entity id, HA's area, device, source, class, unit, members, the card's
+label and id, and its other cards); **Visibility** (a button to a view whose options depend on where
+the card is, `ha-cards.md` §3); **Card UI** (a button to the card's own looks: Entity label, Card
+label, Selector and its shape, Card density, Window timeout, Timer bar, and for a group Card state,
+Card appearance and Card margins; each starts at Inherit, D-28). Paused is in Visibility (K111).
 
-**How it works.** The board boots from the compiled dashboard, then applies the owner's saved
-changes from one file on top. A value comes from the first layer that sets it: the file, the card's
-spec, the page's spec, the built-in default (D-7's order). New firmware with a changed dashboard
-keeps every saved change for cards that are still there; new cards simply appear. At 3.1 the build
-sheet replaces the two spec layers and the file stays on top, unchanged - Q2's runtime layer.
+**Text on the panels is US English** (K30). Color shows only the swatches, with no word over them.
 
-**Ids (K33).** Every saved change says which card it belongs to. Before 2.10d a card was "the Nth
-entry of its page", so inserting a card above Desk would have moved Desk's settings onto Overhead.
-An id is a name for the card made once, at creation, never changed and never reused - as HA makes
-an area's id from its name and keeps it through renames. It is made automatically, so a fresh build
-sheet just makes new ones and nobody looks anything up. Format
-`<area>_<label>_<yymmdd>_<hhmm>`, e.g. `office_desk_261008_0310`; the label is dropped where it
-repeats the area (`kitchen_261008_0310`), a same-minute twin takes a letter (`..._0310b`). The 35
-compiled cards were given theirs on 2026-10-08. `checkCardIds()` runs at boot: a card with no id, a
-malformed one or a duplicate draws but is never given its id, so it saves nothing.
+## 17. Card ids and saved settings
 
-**A card's life (K35, the owner's page-pool idea).**
+What the problem is: a device stays customized instead of reverting to its compiled configuration at
+every reset.
+
+**How it works.** The board boots from what is compiled in (Garage - Doors and the Fleet page's
+Panel, `ha-cards.md` §2), then applies the saved file on top; since K171 the file holds nearly every
+card. A value comes from the first layer that sets it: the file, the card's spec, the page's spec,
+the built-in default (D-7). New firmware keeps every saved change for cards that are still there.
+
+**Ids (K33).** Every saved change says which card it belongs to. An id is made once, when the card
+is created, never changed and never reused. Format `<area>_<label>_<yymmdd>_<hhmm>`, for example
+`office_desk_261008_0310`; the label is dropped where it repeats the area, and a same-minute twin
+takes a letter (`..._0310b`). `checkCardIds()` runs at boot: a card with no id, a malformed one or a
+duplicate draws but is never given its id, so it saves nothing. The same entity on several cards is
+several ids.
+
+**A card's life (K35, K66, K160).**
 
 | State | Its saved settings |
 |---|---|
 | Shown | - |
-| Dropped because the grid is too small | still on its page; nothing changes |
-| Hidden from its page (2.11, K96: Visibility's "Hide from this page" - K66's remove, every card) | in the page's pool, kept (`removed`: `yes`); listed in the page slot's panel, where Restore brings it back |
-| Hidden from its cluster (2.11, K96, K104) | still in the cluster's list (`hidden`: `yes`); restored from its own Visibility, through the cluster's Members (K125, K129) |
-| Deleted | only by the owner, from the pool; gone |
+| Dropped because the grid is too small | still on its page; listed under Hidden as "No room" with nothing to restore |
+| Hidden from its page (Visibility's Hide from this page) | in the page's pool, kept (`removed`: `yes`); listed under Hidden in the page's Edit cards, where Restore brings it back |
+| Unpinned from its group | still a member (`hidden`: `yes`), off the page, in the group view and Members; Pin this card, or Edit cards' tap, puts it back |
+| Deleted | only by the web app (K117) |
 | No longer in the dashboard definition | kept, listed as "unclaimed", cleared only by the owner |
-| Its entity gone from HA | kept, listed as "entity missing" - the board cannot tell "gone" from "HA restarting" or "renamed" |
+| Its entity gone from HA | kept, listed as "entity missing": the board cannot tell "gone" from "HA restarting" or "renamed" |
 
-**The file (K34).** JSON on LittleFS, in the unused data partition. Only what was changed is stored;
-choices by name, never by enum number, so reordering an enum cannot change what a saved choice
-means; keys this firmware does not know are kept when it rewrites the file. Credentials stay in NVS.
-Written whole to a temporary file and renamed, once, when the window closes, only if something
-changed - on a task of its own with its stack in internal RAM (LESSONS: a flash write from a task
-with a PSRAM stack reboots the board).
+**The file (K34).** One JSON file on LittleFS in the `spiffs` partition, in the build sheet's shape.
+Only what was changed is stored; choices by name, never by enum number, so reordering an enum cannot
+change what a saved choice means; keys this firmware does not know are kept when it rewrites the
+file. Credentials stay in NVS. It is written whole to a temporary file and renamed, once, when the
+window closes, only if something changed - on a task of its own with its stack in internal RAM (a
+flash write from a task with a PSRAM stack reboots the board, LESSONS). `Settings.h` describes the
+file's behavior and `HTTP_REFERENCE.md` the addresses that read and change it.
 
 ```json
 { "schema": 1,
@@ -702,51 +388,21 @@ with a PSRAM stack reboots the board).
   "cards":    { "office_desk_261008_0310": { "label": "custom", "name": "Desk lamp", "scenes": "all" } } }
 ```
 
-**The flash-write test (step 1, `/panel?flash=`).** On WS_P4_5: NVS writes of 512 B took 2-5 ms,
-38 ms when NVS erased a page; 4 KB erases 15-17 ms; 64 KB 32 ms; 256 KB 117-360 ms. The DSI bridge
-latched no underrun in any of them - but it masks underruns in a frame's first 413 lines, which is
-where a write's late frame start would land, so whether a write is visible takes the owner's eyes.
-HomeTiles saw a blue flash on every P4 panel during writes and fixed it by rebuilding three IDF
-objects cache-safe (`HomeTiles/tools/esp-idf-3.3.7-p4-cache-safe/README.md`); our libraries have
-the same setting off (`CONFIG_LCD_DSI_ISR_CACHE_SAFE`). The owner had paused cards many times
-without seeing a flash.
+Paused lives in this file too (`EntityRegistry::PauseStore`). Active state and Scenes are read each
+time a page is built, so they survive a page swipe.
 
-**The owner's white flash (P4_5 only, now and then, no action it follows).** Not yet explained.
-`/panel` now lists any underrun the bridge does see, with its time; read it right after a flash.
+**Card settings that the window keeps**: Label (Inherit / From HA / State / Custom / None, K40), Tap
+action and Long press opens (K37, K39, K156), Scenes (Visible / All, K21), Scene action and Default
+scene (K70), Units, Active state, and every History choice (K56).
 
-**Built so far** (WS_P4_5, driven from the PC with `/popup`; the owner's testing on glass began
-2026-10-09):
+**Labels (K42, K49).** A name the dashboard gives a card ("Desk" for HA's "Office") is a **Custom**
+name; **Inherit** means the card has no name of its own and shows HA's. The system panel's label knob
+is a test tool: State or None shows the whole page that way; Name shows each card's own
+(`cardResolveLabel()` in `CardIcons.cpp`).
 
-| Step | What | Measured |
-|---|---|---|
-| 1 | `/panel?flash=` and the underrun recorder (`PanelDebug.h`) | above |
-| 2 | Card ids and `checkCardIds()` | "35 cards on 2 pages, 0 id problems"; the failure paths not yet tried |
-| 3 | `Settings.h`: the file, `GET /settings` (`?stats=1`); Active state, Scenes and Selector kept | mount 52 ms the first time, 3-11 ms after; a save 7-66 ms (66 when LittleFS erased a block), once per close; Desk's Scenes and a Midnight selector back after a reset; internal heap -6.6 KB |
-| 3b | Paused in the file (`EntityRegistry::PauseStore`), #60's NVS list imported once | Garage North paused, PAUSED after a reset, resumed and the entry gone |
-| 4 | Label: Inherit / From HA / State / Custom / None (K40); `Entity::sourceName`; custom names from a PC (`/settings?card=..&name=..`) | after a reset: Desk "From HA" -> "Office", Overhead "Ceiling lamp", Sink "State" -> "Off" |
-| 5 | Tap action (K37, K39): Toggle / Details / Members / History / Cycle scenes / Load scene / Nothing, only what the card can do; a Tap scene row, greyed unless Load scene; `CardPopup::openOn()`; the toast "Scene: Desk - Bright" | Desk History -> History, Overhead Details -> window, North -> nothing; Cycle x4 = Bright, Concentrate, Relax, Bright (HA's last-activated times), hidden scenes untouched; Load Relax -> Relax |
-| 6 | The SCENES panel (K43): the left panel is CHART on History, SCENES on Scenes - Show hidden scenes, Tap scene; Scenes "Off" dropped. SETTINGS loses both scene rows; a folded pane goes back to its top | screenshots on the P4_5 and the 4B |
-| 7 | Unclaimed settings (K35): `Settings::setClaims()`, `/settings?prune=`, the System Doctor's [SETTINGS] | a made-up card id listed, pruned |
-| 8 | Selector to the system panel; "Entity label" (K45) | SETTINGS: Paused, Entity label, (Card label), Visibility, Tap action - no scrolling on the P4_5, 4B and 1060 (screenshots) |
-| 9 | Groups for card labels (K44): HA areas learnt with the scenes; `CardGroups`; the Card label row; groups from a PC | nothing chosen = as before; a custom group, HA area, Custom with and without words, None; a group recoloured and a detached card not (screenshots) |
-| 10 | Groups get colours of their own (K47): saved colours first, then each group its name's colour if free, then a free one | House page: only Kitchen moved (lime -> ochre `E07A3F`), seven groups, seven colours |
-| 11 | From the owner's first touches (2026-10-09): dropdown lists as tall as the screen (the theme capped them at 260 px - five rows on the P4_5 and 4B); the Card label row greyed (K48); Entity label settled (K49: a dashboard-named card is Custom, Inherit shows HA's name, the label knob a test tool); HangWatch (`-D DEBUG_HANG`, `/hang`) | the freeze caught and decoded (A15); the rest awaits the owner's sheet |
-
-Active state and Scenes are read every time a page is built, so they also survive a page swipe -
-before 2.10d a swipe lost them.
-
-**The flash writes flashed the panel** (owner, on glass): all three `/panel?flash=` tests, more with
-the longer erases, light blue. Fixed by the cache-safe library rebuild (`REBUILD_P4_LIBS.md`, "The
-second rebuild"), installed 2026-10-08; the owner's look at the same tests afterwards is pending.
-
-**A lost setting, once.** One boot started with an empty store although the file was there, and the
-next save replaced it (Desk's Scenes). Not explained; a file that will not read now makes the boot
-read-only instead, and `/settings?stats=1` says what the boot saw.
-
-**Groups as built (K46, which replaced the first model the next day).** One kind of group: the
-dashboard's own version of an area - a name, a colour, perhaps a link to an HA area - belonging to
-the device, so it spans pages. Colour is the default key to a group; a card's words are the group's
-name unless it has its own.
+**Groups for card labels (K46, K47).** One kind of group: the dashboard's own version of an area - a
+name, a color, perhaps a link to an HA area - belonging to the device, so it spans pages (the group
+model: `group-cards.md`). A card's label shows its group's name unless it has its own words.
 
 | Group id | What it is | Its name |
 |---|---|---|
@@ -754,134 +410,72 @@ name unless it has its own.
 | `sheet_<name>` | a dashboard area that is not one HA area | the dashboard's |
 | `<name>_<stamp>` | made by the owner (kept), or by "Own group" for one card (`kind: solo`, deleted when its last card leaves) | saved |
 
-A dashboard area IS an HA area when every HA card in it sits in that one HA area; on the owner's
-pages all eight are (Living = "Living Room", Front = "Front Room", Bedroom = "Eric Bedroom").
-A card's group: its saved `group` (an id or `none`), else its dashboard area's. Its words:
-`label_text` if it has its own (rename a, the group's colour kept), else the group's name. A group's
-colour: saved, else the colour of its own name (the dashboard's or HA's, or its id for one made
-here) - **so a rename never changes it** (it did, for one build: renaming Office to "Work" turned it
-lime). "Own group" (rename b) takes a colour no other group uses while one is left; another card
-choosing that group joins it. Renaming a group (rename c) renames every card in it. From a PC until
-the web UI: `/settings?group=new&name=..`, `group=<id>&name=..` (empty: its own name again),
-`group=<id>&color=RRGGBB`, `group=<id>&delete=1`, `card=<id>&group=..`, `card=<id>&label_text=..`.
-The System Doctor's [SETTINGS] lists every group, HA or local; `/popup?groups=1` (debug) lists the
-groups and each card's.
+A card's group is its saved `group` (an id or `none`), else its dashboard area's. Its words are
+`label_text` if it has its own (the group's color kept), else the group's name. **Color is the key to
+a group and never follows a rename**: a group's color is saved, else the color of its own name (the
+dashboard's or HA's, or its id for one made here). **Groups try to have colors of their own**
+(K47, `CardGroups.cpp` `autoColour()`): colors set on purpose first, then each group its own name's
+color if no group before it has it, then the free colors for the rest. A group's color is worked
+out again for every card when any of HA's areas changes (`CardBinder::tick()`). A group made with
+"Own group" takes a color no other group uses while one is left. Renaming a group renames every card
+in it. From a PC: `/settings?group=new&name=..`, `group=<id>&name=..`, `group=<id>&color=RRGGBB`,
+`group=<id>&delete=1`, `card=<id>&group=..`, `card=<id>&label_text=..`. The System Doctor's
+[SETTINGS] lists every group and `/popup?groups=1` (debug) lists the groups and each card's.
 
-**Colours are unique (K47)**: Garage and Kitchen were both lime by name; groups now take colours of
-their own unless one is set on purpose to match another.
+**A lost setting must never happen** (A17): a file that will not read makes the boot read-only
+instead of being overwritten, and `/settings?stats=1` says what the boot saw.
 
-**The P4 freezes were not this window's** (A15): the PPA hanging on a rotated strip, IDF #19023,
-patched in the framework libraries. **The Card label row is greyed** for 2.10d (K48); its redesign
-and the move-to-group window come after.
+## 18. History
 
-The owner's test sheet: `docs/archive/TEST_2.10d.md`. Signed off and merged with 2.10e as `v0.2.11`
-(2026-10-12). K17 waits until after 2.10d (K45).
-
-**Late in 2.10d (2026-10-11):** the panels are dragged whole (K50, `archive/TEST_2.10d.md` round D); a
-group's colour is worked out again for every card when any of HA's areas changes (the P4_5's
-Kitchen cards kept Garage's green when Garage's area arrived after theirs - `CardBinder::tick()`).
-
-## 18. 2.10e - History, as built (2026-10-11 to 12; signed off, `v0.2.11`, `archive/TEST_2.10e.md`)
-
-**Scope (owner):** Home Assistant's entities; the board's own and MQTT entities keep a local log
-later. Decisions K52-K55.
+**Scope:** Home Assistant's entities; the board's own and MQTT entities have no history yet.
 
 **What the view shows follows the entity** (K52):
-- **A number** (a sensor whose value is a number): a chart over a span picked on the view - chips
-  24 h / 12 h / 6 h / 1 h (owner: quick to switch) - with now, min and max over the span. The
-  left panel is **CHART**: Span (follows the chips) and Show min and max.
-- **Anything that turns on and off** (light, switch, binary sensor, input boolean, a text
-  sensor): its **activity** - each change, newest first, the state in the card's own words
-  (On / Off, Detected / Clear, Open / Closed), the time ("2:12 AM", "Yesterday 8:58 PM"), and
-  what caused it: "By psyki" (a person), "Automation: Office: Occupancy Lighting Control", "By
-  <entity>", "Action light.turn_on". 10 rows, then "Show more (N)" (up to 60 drawn). A tap on
-  a row shows its details - the time to the second, how long it lasted (or "so far"), and HA's
-  own words (`triggered by state of binary_sensor.office_occupancy`, `light.turn_off`). The left
-  panel is **ACTIVITY**: Period (Last 24 hours / Last 7 days) and Show causes.
-- **A group defined in HA** (Desk = `light.office`) is its own entity, as in HA (owner): its
-  members' histories are each member's, reached through Members. A card standing for several
-  entities made here (All Lamps) has none of its own and says so.
-- **Round 2 (owner, 2026-10-11 morning; K56-K58):** every History choice is kept per card;
-  "Now" beside the chips, and **min and max in the chart** - faint dotted lines where each
-  happened, their values in a strip above the plot (on the 4B the old readout ran under the
-  chips); **a finger on the chart** puts a dotted line at that time with its time and value in
-  the same strip, and slides; CHART adds **Legend** (X axis / Y axis / Both) and **Show span
-  buttons**; ACTIVITY's Period is **Span**, with 24 h / 7 d chips and its own Show span buttons,
-  its rows in from the sides. SETTINGS adds **Units** (°C/°F per card, `units`) and an **Entity
-  properties** button opening a read-only view (HA's name, entity id, HA's area, source, class,
-  unit, members, the card's group and id). A card that toggles nothing taps to History.
-- **Round 3 (owner, the same afternoon): axes in round steps.** Values: a label every ~2.4 lines
-  of text of plot height, each step 1 / 2 / 2.5 / 5 x 10^n, the range widened to whole steps, the
-  labels in a gutter left of the plot, the unit on the top one; times: ticks on the local clock
-  (5, 10, 15, 30 min, 1, 2, 3, 4, 6, 12 h - the shortest whose labels fit), a faint grid line at
-  every tick both ways. More room - the 1060, the span buttons hidden - gives more ticks. With the
-  buttons hidden, the span in words takes their place. Legend chooses which labels; the grid stays.
-- **Round 4 (owner, that evening; K59-K61):** CHART rows Span, Legend (+ None), Show min/max,
-  Span buttons; "Showing: last 24 hours" centred when the buttons are hidden; min and max labels
-  inside the plot, above or below the line where it runs under them, never on it; a gradient fill
-  under the line (LVGL's `lv_example_chart_5` approach, `histFillCb()`). ACTIVITY rows Span,
-  Details (Basic / Extra), Show triggers, Span buttons; wording through `TimeFormat`. Properties
-  shows the HA **device** (the area template asks `device_attr(device_id(e), 'name_by_user')` or
-  `'name'`). Deferred to #92: fixed range, bars/steps, compare to yesterday, more shading.
-- **Round 5 (owner, 2026-10-12; K62-K63), the final one.** CHART: one top line - Min over Max
-  in the left corner (the words in one label, the numbers right-aligned in another), "Now: ..."
-  in the right, the span chips centred between them, their padding narrowing to fit (the 4B), or
-  "Showing: ..." half a line higher, which a tap steps through the spans. The dotted min/max
-  lines carry their **times**. Rows: Span, Legend (None / X axis / Y axis / X / Y axes), Show
-  min/max, Shading: under line, Span buttons. ACTIVITY is **one view** - Details retired: the
-  state on the left (centred when alone), the time in the larger text over `TfAgo::AGO_DATED`
-  ("12 minutes ago", "Yesterday", "3 days ago - Oct 8") on the right, day headings always,
-  centred. Show duration ("for: 2 hrs 38 min", the newest "(and counting)", off by default) and
-  Show triggers add small lines under the state; with lines under it the two sides line up from
-  the top. A tap adds the next thing down: the trigger, or with triggers on HA's own words. Rows:
-  Span, Show duration, Show triggers, Span buttons. Humidity beside temperature waits for
-  multi-sensor charts (#92); a popup timeout choice and hiding the countdown bar for the device
-  settings pages (#23).
-- **Round 6 (owner, 2026-10-12; K64).** History's stage reaches up into the header row's empty
-  lower half (`s.win`'s row gap is `-histLift()` in History only), so the chips or "Showing:"
-  sit a small gap under the title while the corners (Min/Max, Now) stay under the back and chart
-  buttons; nothing there but the middle is clickable, so those buttons still take their taps.
-  `histTopRow()` is the one top line for chart, activity and loading - "Showing:" used to jump
-  when the answer arrived because the loading line was shorter. LV_OBJ_FLAG_OVERFLOW_VISIBLE was
-  tried first and failed: LVGL draws in strips and skips a child whose parent is outside the
-  strip, and never hit-tests outside a parent. Activity's chips are centred and its "Showing:"
-  steps 24 h / 7 d. The chart sits half a line closer to the top line (the finger's strip looked
-  like a blank line). Min/max lines say "Max: 3:53 PM". Activity rows are at most 70 mm wide.
-  Properties closes its row gaps (to a third) so everything fits where it can.
-- **Open, the owner's to decide: a fixed range (#92).** "Auto" uses the span's own min and max (one
-  entity or, later, many); a user may want a "normal" range so charts look alike (e.g. 15-90 °F
-  for a year of Seattle). The owner's idea: a popup with a number wheel for high and low. LVGL has
-  one (`lv_roller`). Claude's proposal: CHART "Scale: Auto / Fixed"; Fixed opens a small window
-  with two wheels (Low, High) in round steps, first set to the range showing; kept per card - and
-  later per multi-entity chart, which is why it should be designed with 3.x's chart cards.
+- **A number** (a sensor whose value is a number): a chart over a span picked on the view, with now,
+  min and max. The left panel is **CHART**: Span, Legend (None / X axis / Y axis / X / Y axes), Show
+  min/max, Shading: under line, Span buttons.
+- **Anything that turns on and off** (light, switch, binary sensor, input boolean, a text sensor):
+  its **activity** - each change, newest first, the state in the card's own words (On / Off,
+  Detected / Clear, Open / Closed). The left panel is **ACTIVITY**: Span (Last 24 hours / Last 7 days),
+  Show duration, Show triggers, Span buttons.
+- **A group defined in HA** (Desk = `light.office`) is its own entity, as in HA (K54): its members'
+  histories are each member's, reached through Members. A group made on the board has none of its own.
+- A light defaults to its activity; a card that toggles nothing taps to History (K57).
+- **Every History choice is kept per card** (K56), by name under the card id; a member's own History
+  keeps nothing.
 
-**Where the data comes from** (K53; measured from the PC on 2026-10-11, the owner's HA):
+**The chart.** A line over the span with a gradient under it (a checkbox, K61); the span chips
+24 / 12 / 6 / 1 h are a compact selector on the view (K75), with "Showing: ..." in their place when
+hidden, which a tap steps through the spans. **One top line** (K63, K64): Min over Max (the numbers
+right-aligned) at the left, "Now: ..." at the right, the chips centered between them (narrowing to
+fit) - it reaches up into the header row's empty lower half (`histLift()`; only the middle is
+clickable there, so the corner buttons keep their taps), and `histTopRow()` builds it for the chart,
+the activity and the loading line so nothing jumps when the answer arrives. Min and max are faint
+dotted lines at the time each happened, carrying their times ("Max: 3:53 PM"), their values
+inside the plot above or below the line, never on it; **a finger on the chart** puts a dotted line
+at that time with its time and value, and slides. Axes are in round steps: values a label every
+~2.4 lines of text of plot height, each step 1 / 2 / 2.5 / 5 x 10^n, the range widened to whole
+steps, the unit on the top label; times ticks on the local clock (5, 10, 15, 30 min, 1, 2, 3, 4, 6,
+12 h - the shortest whose labels fit), a faint grid line at every tick. Legend chooses which labels;
+the grid stays. The chart samples HA's points at even steps across the span, each step holding the
+last value at or before it, so changes are steps as HA draws a sensor; the y range is the span's
+own plus a tenth; values follow the card's C/F.
 
-| Ask | What | Size, a day |
-|---|---|---|
-| `history/history_during_period`, minimal, no attributes | a number's real changes, as HA's own graph | thermostat 0.5 KB, deck light level 5.5 KB |
-| `recorder/statistics_during_period`, 5-minute mean/min/max | the fallback for a sensor too chatty for the buffer | 22.7 KB (16.3 KB means only) |
-| `logbook/get_events` | each change WITH its cause - history has no cause | 0.5-2.3 KB; a week of Office 20.5 KB |
-| `render_template` over `states.person` | user id -> person name, once a session; no admin rights | 281 B |
+**Activity** is one view (K62): the state on the left (centered when alone); the time over "12
+minutes ago" / "Yesterday" / "3 days ago - Oct 8" on the right (`TfAgo::AGO_DATED`); day headings
+always. Show duration ("for: 38 sec", "(and counting)", off by default) and Show triggers add small
+lines under the state; a tap adds the trigger, or with triggers on, HA's own words about it. Each
+change says what caused it: a person ("By psyki"), an automation, another entity, an action. Rows
+at most ~70 mm wide; 10 rows, then "Show more". Wording goes through `TimeFormat` (K59).
 
-A week of the Office group's logbook had three kinds of cause: a person's call_service (50), an
-automation with what triggered it (21), nothing at all (24 - the Hue app, a wall switch). Every
-numeric sensor on the dashboard has statistics. A light's brightness over time would need history
-WITH attributes (~350 B a change, every attribute repeated): not built.
-
-**How** (K54): `HaHistory` (`components/Fleet_HA`, no LVGL) asks on the loop task; its answers
-are told from everything else by their id (HA writes it first) through a raw hook HaProvider
-offers before its filtered parse, and parsed on the websocket task - with ArduinoJson's pool in
-PSRAM - into tables in PSRAM (1,024 points, 120 events). The window's tick notices the answer
-and draws. One request at a time; a new one replaces the last, and a late answer is dropped by
-its id. HaClient's receive buffer is **48 KB in PSRAM** where the board has it (twice the largest
-measured), 8 KB internal otherwise; an answer past it is dropped and counted as before, and a
-chart then asks for statistics, while activity says "Too much history to show here".
-
-**The chart** samples HA's points at even steps across the span (a quarter of the chart's width,
-48-240 steps), each step holding the last value at or before it - so changes are steps, as HA
-draws a sensor; the y range is the span's own plus a tenth; values follow the card's °C/°F.
-
-**Not built, for later:** a brightness chart for lights (owner: "value in it", default stays the
-list); a custom range (owner: "Range" in CHART); saving the span per card; the local log for
-non-HA entities; a full-screen chart (owner: not over the header now, maybe a toggle one day).
+**Where the data comes from** (K53). A number's real changes (`history/history_during_period`,
+minimal, no attributes), with 5-minute statistics (`recorder/statistics_during_period`) only as the
+fallback for a sensor too chatty for the receive buffer; activity from `logbook/get_events`, which
+carries the cause (history has none); people named from `render_template` over `states.person`,
+once a session. `HaHistory` (`components/Fleet_HA`, no LVGL) asks on the loop task; its answers are
+told from everything else by their id through a raw hook HaProvider offers before its filtered
+parse, and parsed on the websocket task - with ArduinoJson's pool in PSRAM - into tables in PSRAM
+(up to 1,024 points). The window's tick notices the answer and draws. One request at a time; a new
+one replaces the last, and a late answer is dropped by its id. HaClient's receive buffer is 48 KB in
+PSRAM where the board has it (8 KB internal otherwise); an answer past it is dropped and counted,
+a chart then asks for statistics, and activity says "Too much history to show here". A light's
+brightness over time would need history with attributes: not built.

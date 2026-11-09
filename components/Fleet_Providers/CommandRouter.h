@@ -20,8 +20,8 @@ class HaClient;
 //
 // ONE PLACE DECIDES WHICH TRANSPORT, AND IT IS NOT THE REGISTRY.
 //
-// The registry stays transport-agnostic - ROADMAP 4.1's whole point is that a
-// card binds to an entity and never learns how the value travels. So the
+// The registry stays transport-agnostic - a card binds to an entity and never
+// learns how the value travels (DECISIONS A3). So the
 // registry hands a commanded entity to a sink, and this class is the sink. It
 // is the only code in the project that knows a command can go two ways.
 //
@@ -33,7 +33,7 @@ class HaClient;
 //
 // THE SERVICE DOMAIN COMES FROM THE ENTITY ID, NOT FROM `kind`.
 //
-// The owner uses `switch.tv_room_switch_1` as a living-room light, and the card
+// A `switch.tv_room_switch_1` can be used as a living-room light, and the card
 // is declared LIGHT because that is what it is in the room. Calling
 // `light.turn_on` on it would fail. Home Assistant guarantees the part of an
 // entity id before the dot names the service domain, so that is what gets read
@@ -46,10 +46,10 @@ class HaClient;
 //
 // Nothing here waits for a reply. `call_service` returns a result and MQTT
 // returns nothing at all, and neither says the light actually changed - only
-// the state coming back does. (Since 2.10c a REFUSAL is read: HA's
-// success:false fails the command at once - see onHaResult().) That arrives through the ordinary inbound path
-// and clears `pending` exactly as an unsolicited change would. Measured against
-// the owner's instance on 2026-09-20: a `light.turn_on` echoes back through
+// the state coming back does. (A REFUSAL is read: HA's success:false fails the
+// command at once - see onHaResult().) The state arrives through the ordinary
+// inbound path and clears `pending` exactly as an unsolicited change would.
+// On the owner's instance a `light.turn_on` echoes back through
 // `subscribe_trigger` in **~91 ms**, so the reconcile window has orders of
 // magnitude of slack.
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ public:
     uint16_t refused()  const { return _refused; }
     uint16_t haRefused() const { return _haRefused; }
 
-    // HaProvider's result hook (2.10c): HA's reply to one of our calls. ON THE
+    // HaProvider's result hook: HA's reply to one of our calls. ON THE
     // WEBSOCKET TASK. success:false means HA sent nothing (ha-websocket.md
     // section 9), so the command fails at once; success:true only means HA
     // accepted it, and the entity's own report still decides.
@@ -75,8 +75,8 @@ private:
     static void onCommand(const Entity &e, const EntityValue &v, void *ctx);
     void route(const Entity &e, const EntityValue &v);
 
-    // The registry's LightSink (2.10b): a light's levels. VIRTUAL lamps answer
-    // themselves; an HA light gets light.turn_on with its data (2.10c).
+    // The registry's LightSink: a light's levels. VIRTUAL lamps answer
+    // themselves; an HA light gets light.turn_on with its data.
     static void onLight(const Entity &e, const LightCommand &c, void *ctx);
 
     bool sendHa(const Entity &e, const EntityValue &v);

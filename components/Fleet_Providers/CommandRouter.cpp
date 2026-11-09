@@ -45,7 +45,7 @@ void CommandRouter::onHaResult(uint32_t id, bool ok, const char *code, const cha
             c.id = 0;
             break;
         }
-        // A LATER CALL FOR THE SAME ENTITY OUTRANKS THIS ONE (G8). While a
+        // A LATER CALL FOR THE SAME ENTITY OUTRANKS THIS ONE. While a
         // slider is dragged a call goes every 300 ms; a refusal of an earlier
         // one says nothing about the latest, which the registry is waiting on.
         if (entity[0])
@@ -180,7 +180,7 @@ bool CommandRouter::sendHa(const Entity &e, const EntityValue &v) {
 // light.turn_on with brightness (0-255, the registry's own scale, so nothing is
 // rounded twice), color_temp_kelvin or hs_color - DECISIONS C5. A level means
 // ON, as in HA; temperature and colour are exclusive and colour wins, as in
-// LightCommand. Measured on the owner's Hue bulbs: the first report matches
+// LightCommand. On the owner's Hue bulbs the first report matches
 // within the registry's tolerances (ha-websocket.md section 9).
 bool CommandRouter::sendHaLight(const Entity &e, const LightCommand &c) {
     char domain[32];

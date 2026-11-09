@@ -11,8 +11,8 @@
 // BatteryProvider - a single-cell Li-ion read through a resistor divider on
 // one ADC pin, as battery percentage and millivolts.
 //
-// Quick prototype (2026-09-29). ESP-IDF's oneshot ADC driver plus its eFuse
-// calibration, not Arduino's analogRead - the fleet's IDF-first rule. The pin
+// ESP-IDF's oneshot ADC driver plus its eFuse calibration (DECISIONS W4: IDF
+// facilities over Arduino's analogRead). The pin
 // and the divider come from the BSP (BoardHardware.BAT_ADC, BAT_DIV_X1000);
 // a board that leaves BAT_DIV_X1000 at 0 has no battery ADC and this stays off.
 //

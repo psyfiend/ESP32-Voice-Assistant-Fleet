@@ -5,6 +5,7 @@
 #include "Entity.h"
 #include "Settings.h"
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,17 +19,21 @@ namespace {
 struct Rec {
     char    id[CARD_ID_MAX + 1];
     char    page[24];
-    char    in[CARD_ID_MAX + 1];      // a member added to this cluster (2.11, K91), else ""
-    char    from[CARD_ID_MAX + 1];    // ...the card it was copied or moved from (round 7), else ""
+    char    in[CARD_ID_MAX + 1];      // a member added to this cluster (K91), else ""
+    char    from[CARD_ID_MAX + 1];    // ...the card it was copied or moved from (K111), else ""
     char    after[CARD_ID_MAX + 1];
     char    entity[ENTITY_ID_MAX];
     char    area[ENTITY_SHORT_MAX];
     uint8_t pri;
     bool    removed;
+    bool    cluster;                  // a cluster made here (K140): "kind": "cluster", no entity
+    char    name[ENTITY_SHORT_MAX];   // ...its name
 };
 
-Rec      s_rec[CardAdded::MAX];
-CardSpec s_spec[CardAdded::MAX];   // each record as a spec - built once, never moved
+// MAX of each, allocated once by begin() in PSRAM: the records and specs are
+// too big for an S3's internal RAM.
+Rec      *s_rec  = nullptr;
+CardSpec *s_spec = nullptr;        // each record as a spec - built once, never moved
 uint8_t  s_n = 0;
 uint16_t s_pooled = 0;             // removed ones, in the file only
 char     s_page[24] = "";
@@ -48,6 +53,13 @@ void specFor(uint8_t i) {
     cs.label        = nullptr;                    // Inherit: HA's name (K65)
     cs.labelMode    = CardLabel::LBL_INHERIT;
     cs.place.priority = r.pri;
+    // A CLUSTER MADE HERE: no entity of its own; its members are the
+    // records "in" it (membersIn()), its words its name.
+    if (r.cluster) {
+        cs.primaries[0] = nullptr;
+        cs.present      = GroupPresent::PRESENT_CLUSTER;
+        cs.label        = r.name;
+    }
     s_spec[i] = cs;
 }
 
@@ -65,15 +77,19 @@ void readOne(const char *id, const char *page, void *) {
     r.pri = Settings::card(id, "pri", v, sizeof(v)) ? (uint8_t)atoi(v) : 128;
     // REMOVED ONES STAY IN THE FILE ONLY (the page's pool, K66): a slot here is
     // for a card on a page. known() and idTaken() still find them in the file.
-    // So do ones moved into a cluster (round 7): off the page, not in its pool.
+    // So do ones moved into a cluster (K111): off the page, not in its pool.
     if (Settings::card(id, "removed", v, sizeof(v)) && (!strcmp(v, "yes") || !strcmp(v, "moved"))) { s_pooled++; return; }
     r.removed = false;
-    if (!r.entity[0]) return;   // nothing to show: not taken
+    if (Settings::card(id, "kind", v, sizeof(v)) && !strcmp(v, "cluster")) {
+        r.cluster = true;
+        if (!Settings::card(id, "name", r.name, sizeof(r.name))) copy(r.name, sizeof(r.name), r.area);
+    }
+    if (!r.entity[0] && !r.cluster) return;   // nothing to show: not taken
     specFor(s_n);
     s_n++;
 }
 
-// A MEMBER ADDED TO A CLUSTER ON THE DEVICE (2.11, K91, K100): a card entry with
+// A MEMBER ADDED TO A CLUSTER ON THE DEVICE (K91): a card entry with
 // "in" (the cluster's id) where a page card has "page" - a copy with an id of
 // its own (K92: a grouping is of copies), wearing its cluster's group.
 void readMember(const char *id, const char *in, void *) {
@@ -140,6 +156,13 @@ bool makeId(const char *area, const char *label, char *id, size_t cap) {
 namespace CardAdded {
 
 void begin(bool (*compiledId)(const char *id)) {
+    if (!s_rec) {
+        s_rec  = (Rec *)heap_caps_calloc(MAX, sizeof(Rec), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_spec = (CardSpec *)heap_caps_calloc(MAX, sizeof(CardSpec), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_rec)  s_rec  = (Rec *)calloc(MAX, sizeof(Rec));
+        if (!s_spec) s_spec = (CardSpec *)calloc(MAX, sizeof(CardSpec));
+        if (!s_rec || !s_spec) { Serial.println("[CardAdded] no memory for the added cards"); return; }
+    }
     s_compiled = compiledId;
     s_n = 0;
     s_pooled = 0;
@@ -158,9 +181,14 @@ void setPage(const char *slugName, const PageSpec *compiled) {
 const PageSpec *pageSpec() { return s_pageSpec; }
 
 const CardSpec *specOf(const char *cardId) {
-    if (!cardId || !s_pageSpec) return nullptr;
+    if (!cardId) return nullptr;
     const CardSpec *found = nullptr;
-    forEachCardSpec(*s_pageSpec, [&](const CardSpec &cs) { if (!found && cs.id && !strcmp(cs.id, cardId)) found = &cs; });
+    if (s_pageSpec)
+        forEachCardSpec(*s_pageSpec, [&](const CardSpec &cs) { if (!found && cs.id && !strcmp(cs.id, cardId)) found = &cs; });
+    // NEARLY EVERY CARD IS MADE HERE (K171): look among the made ones too, or
+    // Restore and the names it says never find a group that was once compiled.
+    for (uint8_t i = 0; !found && i < count(); i++)
+        if (specAt(i).id && !strcmp(specAt(i).id, cardId)) found = &specAt(i);
     return found;
 }
 
@@ -180,7 +208,7 @@ uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap) {
         }
     };
     for (uint8_t c = 0; c < page.count && n < cap; c++) {
-        // K96: hidden, in the pool; round 7: moved into a cluster, in neither.
+        // K96: hidden, in the pool; K111: moved into a cluster, in neither.
         if (!isHidden(page.cards[c].id) && !isMoved(page.cards[c].id)) out[n++] = page.cards[c];
         followers(page.cards[c].id, followers);
     }
@@ -193,6 +221,11 @@ uint8_t merge(const PageSpec &page, CardSpec *out, uint8_t cap) {
     }
     return n;
 }
+
+uint8_t count() { return s_n; }
+const CardSpec &specAt(uint8_t i) { return s_spec[i < s_n ? i : 0]; }
+bool liveAt(uint8_t i) { return i < s_n && !s_rec[i].removed; }
+bool nearLimit() { return (uint16_t)s_n * 4 >= (uint16_t)MAX * 3; }   // within 25% (K176)
 
 bool known(const char *cardId) {
     if (!cardId) return false;
@@ -217,7 +250,7 @@ const char *addedFor(const char *parentId, const char *entityId) {
 }
 
 bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, const char *fromId) {
-    if (s_n >= MAX || !parent.hasId() || !s_page[0]) return false;
+    if (!s_rec || s_n >= MAX || !parent.hasId() || !s_page[0]) return false;
     Rec &r = s_rec[s_n];
     r = Rec{};
     if (!makeId(parent.sheetArea(), member.desc.name, r.id, sizeof(r.id))) return false;
@@ -237,7 +270,7 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, cons
     if (r.area[0]) Settings::setCard(r.id, "area", r.area);
     if (r.from[0]) Settings::setCard(r.id, "from", r.from);
     Settings::setCard(r.id, "pri", pri);
-    // ITS PARENT'S GROUP (owner, K65): the card label's words, colour and type.
+    // ITS PARENT'S GROUP (K65): the card label's words, colour and type.
     CardGroups::Group g;
     if (CardGroups::ofCard(parent, g)) Settings::setCard(r.id, "group", g.id);
 
@@ -246,6 +279,57 @@ bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, cons
     s_changed = true;
     if (idOut && cap) copy(idOut, cap, r.id);
     Serial.printf("[CardAdded] %s: %s after %s on %s\n", r.id, r.entity, r.after, r.page);
+    return true;
+}
+
+bool addToPage(const Entity &e, const char *area, const char *groupId, char *idOut, size_t cap) {
+    if (!s_rec || s_n >= MAX || !s_page[0]) return false;
+    Rec &r = s_rec[s_n];
+    r = Rec{};
+    if (!makeId(area ? area : "", e.desc.name, r.id, sizeof(r.id))) return false;
+    copy(r.page, sizeof(r.page), s_page);
+    copy(r.entity, sizeof(r.entity), e.desc.id);
+    copy(r.area, sizeof(r.area), area ? area : "");
+    r.pri = CardPlacement{}.priority;   // the default: a page's own cards' (128)
+    r.removed = false;
+    char pri[8];
+    snprintf(pri, sizeof(pri), "%u", (unsigned)r.pri);
+    Settings::setCard(r.id, "page", r.page);   // no "after": it follows the page's own cards
+    Settings::setCard(r.id, "entity", r.entity);
+    if (r.area[0]) Settings::setCard(r.id, "area", r.area);
+    Settings::setCard(r.id, "pri", pri);
+    if (groupId && groupId[0]) Settings::setCard(r.id, "group", groupId);
+    specFor(s_n);
+    s_n++;
+    s_changed = true;
+    if (idOut && cap) copy(idOut, cap, r.id);
+    Serial.printf("[CardAdded] %s: %s on %s, from HA\n", r.id, r.entity, r.page);
+    return true;
+}
+
+bool addCluster(const char *name, const char *area, const char *groupId, char *idOut, size_t cap) {
+    if (!s_rec || s_n >= MAX || !s_page[0] || !name || !name[0]) return false;
+    Rec &r = s_rec[s_n];
+    r = Rec{};
+    if (!makeId(area ? area : "", name, r.id, sizeof(r.id))) return false;
+    copy(r.page, sizeof(r.page), s_page);
+    copy(r.area, sizeof(r.area), area ? area : "");
+    copy(r.name, sizeof(r.name), name);
+    r.cluster = true;
+    r.pri = CardPlacement{}.priority;
+    char pri[8];
+    snprintf(pri, sizeof(pri), "%u", (unsigned)r.pri);
+    Settings::setCard(r.id, "page", r.page);
+    Settings::setCard(r.id, "kind", "cluster");
+    Settings::setCard(r.id, "name", r.name);
+    if (r.area[0]) Settings::setCard(r.id, "area", r.area);
+    Settings::setCard(r.id, "pri", pri);
+    if (groupId && groupId[0]) Settings::setCard(r.id, "group", groupId);
+    specFor(s_n);
+    s_n++;
+    s_changed = true;
+    if (idOut && cap) copy(idOut, cap, r.id);
+    Serial.printf("[CardAdded] %s: a cluster, \"%s\", on %s\n", r.id, r.name, r.page);
     return true;
 }
 
@@ -258,7 +342,7 @@ bool addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap, const 
 
 bool addTo(const char *clusterId, const char *clusterArea, const char *groupId, const Entity &e,
            char *idOut, size_t cap, const char *fromId) {
-    if (s_n >= MAX || !clusterId || !cardIdWellFormed(clusterId)) return false;
+    if (!s_rec || s_n >= MAX || !clusterId || !cardIdWellFormed(clusterId)) return false;
     Rec &r = s_rec[s_n];
     r = Rec{};
     if (!makeId(clusterArea, e.desc.name, r.id, sizeof(r.id))) return false;
@@ -294,10 +378,10 @@ bool isMember(const char *cardId) {
     return false;
 }
 
-// A MEMBER MOVED OUT KNOWS WHICH CARD IT BECAME (the follow-ups): "moved_to",
-// that card's id - a page card, or a copy in another cluster. Without it (a move
-// saved before it existed) any card it came from is that card, as before.
-// A page card moved into a cluster (round 2 of the follow-ups) knows it too.
+// A MEMBER MOVED OUT KNOWS WHICH CARD IT BECAME (K137): "moved_to", that card's
+// id - a page card, or a copy in another cluster. With no "moved_to" saved, any
+// card it came from counts as that card. A page card moved into a cluster
+// knows it too.
 static bool becameThis(const char *origId, const char *cardId) {
     if (!isMovedToPage(origId) && !isMoved(origId)) return false;
     char v[CARD_ID_MAX + 1];
@@ -323,7 +407,7 @@ const char *becameOf(const char *origId) {
     return nullptr;
 }
 
-// Deleted, entry and all, wherever it is. A MOVED CARD GOES BACK (round 7): the
+// Deleted, entry and all, wherever it is. A MOVED CARD GOES BACK (K111): the
 // card it was moved from is home again - on its page, or a tile in its cluster -
 // the move undone, nothing lost. A copy's original is untouched.
 bool unmake(const char *cardId) {
@@ -340,6 +424,39 @@ bool unmake(const char *cardId) {
         return true;
     }
     return false;
+}
+
+const char *clusterOf(const char *cardId) {
+    for (uint8_t i = 0; cardId && i < s_n; i++)
+        if (!s_rec[i].removed && s_rec[i].in[0] && !strcmp(s_rec[i].id, cardId)) return s_rec[i].in;
+    return nullptr;
+}
+
+// A GROUP MADE ON THE BOARD IS DELETED WHEN NO CARD IS IN IT (K200): no entry names it
+// in "in". A member moved out to the page keeps its "in" (its Restore goes back
+// there), so that group stays, hidden by the caller. Its label group goes with
+// it unless another card wears it. A compiled group is never deleted. Called once
+// a change is complete, never between a removal and an add in the same save.
+bool emptied(const char *clusterId) {
+    if (!clusterId || !cardIdWellFormed(clusterId)) return false;
+    if (s_compiled && s_compiled(clusterId)) return false;
+    char v[48];
+    if (!Settings::card(clusterId, "kind", v, sizeof(v)) || strcmp(v, "cluster")) return true;   // already gone
+    if (Settings::countCards("in", clusterId)) return false;
+    char gid[48] = "";
+    Settings::card(clusterId, "group", gid, sizeof(gid));
+    for (uint8_t i = 0; i < s_n; i++)
+        if (!strcmp(s_rec[i].id, clusterId)) s_rec[i].removed = true;   // the record stays until the next boot
+    Settings::dropCard(clusterId);
+    if (gid[0] && !Settings::countCards("group", gid)) {
+        Settings::setGroup(gid, "name", nullptr);
+        Settings::setGroup(gid, "color", nullptr);
+        Settings::setGroup(gid, "kind", nullptr);
+        Settings::setGroup(gid, "ha_area", nullptr);
+    }
+    s_changed = true;
+    Serial.printf("[CardAdded] %s deleted: no card is in it%s\n", clusterId, gid[0] ? " (and its label group)" : "");
+    return true;
 }
 
 void keepHome(const char *memberId, const char *name, const char *groupId) {
@@ -428,7 +545,7 @@ bool rehome(const char *memberId, const Card &cluster) {
     return rehome(memberId, cluster.id(), cluster.sheetArea(), CardGroups::ofCard(cluster, g) ? g.id : nullptr);
 }
 
-// A card made here RELOCATES (round 2 of the follow-ups): out of a cluster or off
+// A card made here RELOCATES (K137): out of a cluster or off
 // the page, into another cluster - its record changes, its id and settings stay.
 bool rehome(const char *cardId, const char *clusterId, const char *clusterArea, const char *groupId) {
     if (!cardId || !clusterId || !cardIdWellFormed(clusterId)) return false;

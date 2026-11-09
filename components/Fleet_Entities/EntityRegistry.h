@@ -7,8 +7,8 @@
 #include <atomic>
 
 // ---------------------------------------------------------------------------
-// The Entity Registry. ROADMAP section 4.1 (what it is) and 4.2 (the rule that
-// keeps it from corrupting LVGL).
+// The Entity Registry (DECISIONS A3): what it is, and the rule that keeps it
+// from corrupting LVGL.
 //
 // THE THREADING CONTRACT, restated because getting it wrong does not crash
 // immediately - it corrupts LVGL and crashes randomly, hours later:
@@ -27,28 +27,29 @@
 //
 // std::mutex rather than a FreeRTOS handle, deliberately: it works on the
 // device AND on a PC, which is what keeps this library unit-testable per
-// ROADMAP Q9. Nothing in this library includes Arduino.h.
+// DECISIONS A6. Nothing in this library includes Arduino.h.
 // ---------------------------------------------------------------------------
 
-// Default capacity. NOT a hard limit any more - it is what the application
-// asks for when it allocates storage, and it may pass something else.
+// Default capacity. NOT a hard limit - it is what the application asks for when
+// it allocates storage, and it may pass something else.
 //
-// This used to be a fixed inline array, which put ~21 KB in internal SRAM on
-// every board. That was fine everywhere except CYD_S3_3248: it is the fleet's
-// only QSPI board, so it is the only one whose LVGL buffers must live in
-// INTERNAL SRAM rather than PSRAM (see GuiManager's bus-type branch), and the
-// combination left too little internal RAM for the WiFi driver to bring up an
-// AP. It crashed inside ieee80211_hostap_attach. See docs/LESSONS.md.
+// The table lives in PSRAM, never in an inline array: an inline array puts its
+// size in internal SRAM on every board, and CYD_S3_3248 - the fleet's only QSPI
+// board, whose LVGL buffers must live in INTERNAL SRAM rather than PSRAM (see
+// LVGL_Flush_Gfx.cpp) - is then left with too little internal RAM for the WiFi
+// driver to bring up an AP (a crash inside ieee80211_hostap_attach). See
+// docs/LESSONS.md.
 //
-// RAISED FROM 48 AT 2.5, and the number is chosen rather than inherited. The
-// owner's own Home Assistant carries 1,662 entities and answers /api/states
-// with 742 KB, so the panel is never going to mirror a house - it subscribes
-// to a named subset, and this is the ceiling on that subset. His first
-// dashboard is around 18 cards, which with battery and last-seen siblings and
-// this board's own eight diagnostics lands near 40; 128 is headroom without
-// being a blank cheque. It costs ~450 bytes each IN PSRAM and nothing in
-// internal SRAM. The index type caps it at 255 regardless.
-static constexpr uint8_t ENTITY_MAX = 128;
+// The number is chosen rather than inherited. A home HA carries over a
+// thousand entities and answers /api/states with hundreds of KB, so the panel
+// never mirrors a house - it subscribes to a named subset, and this is the
+// ceiling on that subset. Cards are added from HA at runtime (design/ha-cards.md
+// 2.2): the board's own entities, the entities labelled "fleet" in HA, and the
+// members and scenes learnt from them. An Entity is ~1 KB (the boot log prints
+// it), so 192 costs ~192 KB of PSRAM and nothing in internal SRAM. HaPublisher's
+// per-slot arrays are in PSRAM too. The index type caps the count at 255
+// regardless.
+static constexpr uint8_t ENTITY_MAX = 192;
 
 class EntityRegistry {
 public:
@@ -56,7 +57,7 @@ public:
     // outlive the registry.
     //
     // Storage is injected rather than allocated here ON PURPOSE: this library
-    // has zero dependencies (ROADMAP Q9) so it can compile and unit-test on a
+    // has zero dependencies (DECISIONS A6) so it can compile and unit-test on a
     // PC, and calling heap_caps_malloc() would end that. The application knows
     // it is on an ESP32 and can place the block in PSRAM; a host test can pass
     // a plain array.
@@ -91,15 +92,15 @@ public:
     // is writing. It returns a pointer into the table, so a concurrent
     // setValue() could tear the value out from under the reader.
     //
-    // Safe today because every provider so far runs on the loop() task. The
-    // moment a provider runs on its own task, callers that need a consistent
-    // read must go through drainDirty() (which snapshots under the lock) or
+    // Safe only for providers that run on the loop() task. Callers that need a
+    // consistent read while a provider runs on its own task (HA, MQTT) must go
+    // through drainDirty() (which snapshots under the lock) or
     // find() a copy. Kept unlocked rather than made safe-by-default because a
-    // locking accessor invites exactly the pattern 4.2 forbids: holding the
+    // locking accessor invites exactly the pattern A3 forbids: holding the
     // registry lock while doing LVGL work.
     const Entity *at(uint8_t i) const { return (i < count()) ? &_items[i] : nullptr; }
 
-    // --- Groups defined at the source, 2.10c (#65) -------------------------
+    // --- Groups defined at the source (#65) --------------------------------
     //
     // A group's members, as the source names them (HA's `entity_id` attribute
     // on light.office). Each ref not yet in the table is REGISTERED NOW - the
@@ -110,12 +111,22 @@ public:
     // lock. Returns how many entities were added.
     uint8_t learnMembers(const char *groupId, const char *const *refs, uint8_t n);
 
+    // AN ENTITY ADDED WHILE RUNNING: a card added from HA names one the
+    // compiled table does not have. As learnMembers(): the entity already in
+    // the table with this source and ref is returned as it is; else `d` is
+    // registered now with an id made from its ref ("ha_switch_office_3d_printer"
+    // - the same one every boot) and its ref for a name until the source sends
+    // one. Any task; under the lock. Null when the table is full or `d` has no ref.
+    const Entity *adopt(const EntityDescriptor &d);
+    // The entity with this source and ref, or null. Under the lock.
+    const Entity *findRef(EntitySource src, const char *ref) const;
+
     // Member `i` of a group, or null.
     const Entity *memberOf(const Entity &g, uint8_t i) const {
         return (i < g.nMembers) ? at(g.members[i]) : nullptr;
     }
 
-    // A light's scenes (2.10c): the same, with each scene's name as the source
+    // A light's scenes: the same, with each scene's name as the source
     // gives it ("Relax"), registered as a BUTTON with a TEXT value (HA's
     // scene state is when it was last activated).
     // `hidden` (may be null): hidden in the source's own UI - sourceHidden.
@@ -138,14 +149,15 @@ public:
     bool adoptName(const char *id, const char *name);
 
     // The source's own name (Entity::sourceName), for any entity. Marks it
-    // dirty only when it changed, so a card showing "From HA" repaints.
+    // dirty only when it changed, so a card showing the entity label "HA name"
+    // repaints.
     bool setSourceName(const char *id, const char *name);
     // Entity::sourceArea and sourceAreaId, the same way; "" clears them (HA
     // says no area).
-    // `device` (2.10e): its HA device's name, or null to leave it as it is.
+    // `device`: its HA device's name, or null to leave it as it is.
     bool setSourceArea(const char *id, const char *areaId, const char *area, const char *device = nullptr);
     // Counts area changes on any entity: a group's colour depends on every
-    // group's, so one entity's area can recolour cards on others (2.10d).
+    // group's, so one entity's area can recolour cards on others.
     uint32_t areaEpoch() const { return _areaEpoch.load(); }
 
     // True once after learnMembers() added anything: the caller (the loop
@@ -170,7 +182,7 @@ public:
     // that repeats "unavailable" does not repaint the screen.
     bool setAvailable(const char *id, bool available, uint32_t nowMs);
 
-    // Record the source's attributes - live icon, brightness, colour. 2.7.
+    // Record the source's attributes - live icon, brightness, colour.
     //
     // Separate from setValue() because the two change independently: a light
     // fading down sends "on", "on", "on" with a falling brightness, and none of
@@ -181,8 +193,8 @@ public:
     // that arrives with the attributes does that, through setValue().
     bool setAttrs(const char *id, const EntityAttrs &a);
 
-    // The user's pause. Issue #60. Persisted to NVS so a reboot does not undo
-    // it. Returns false if the id is unknown.
+    // The user's pause. Issue #60. Persisted (see PauseStore) so a reboot does
+    // not undo it. Returns false if the id is unknown.
     bool setPaused(const char *id, bool paused, uint32_t nowMs);
     bool isPaused(const char *id) const;
 
@@ -190,11 +202,10 @@ public:
     // registered, because an id that is not in the table yet cannot be marked.
     void restorePaused();
 
-    // WHERE PAUSES ARE KEPT (2.10d). A comma-delimited list of entity ids,
+    // WHERE PAUSES ARE KEPT. A comma-delimited list of entity ids,
     // loaded and saved through these two functions. Unset, the registry keeps
-    // it in NVS itself (fleet_ent/paused), as it did from #60; SystemCore
-    // points it at the owner's settings file (Settings.h) - the registry knows
-    // nothing about that file. save() may be called on any task that already
+    // it in NVS itself (fleet_ent/paused); SystemCore points it at the
+    // settings file (Settings.h) - the registry knows nothing about that file. save() may be called on any task that already
     // calls setPaused().
     struct PauseStore {
         bool (*load)(char *out, size_t cap, void *ctx) = nullptr;
@@ -202,7 +213,7 @@ public:
         void *ctx = nullptr;
     };
     void setPauseStore(const PauseStore &s) { _pauseStore = s; }
-    // The list as #60 left it in NVS, for a one-time import. "" if none.
+    // The list in NVS, for a one-time import into the settings file. "" if none.
     static bool readNvsPauseList(char *out, size_t cap);
 
     // How many entities are currently paused - for the system dump, which is
@@ -233,10 +244,9 @@ public:
 
     // WHERE A COMMAND LEAVES THE DEVICE. Issue #44.
     //
-    // commandValue() has existed since #10 and applies a value optimistically,
-    // but nothing ever TRANSMITTED it - the outbound leg was the missing half.
-    // The registry still knows nothing about transports: it hands the command
-    // to whatever registered here and that thing decides whether it is a
+    // commandValue() applies a value optimistically; the sink TRANSMITS it.
+    // The registry knows nothing about transports: it hands the command to
+    // whatever registered here and that thing decides whether it is a
     // websocket call_service or an MQTT publish.
     //
     // CALLED WITH THE REGISTRY LOCK RELEASED. The sink sends over a socket,
@@ -245,7 +255,7 @@ public:
     typedef void (*CommandSink)(const Entity &e, const EntityValue &v, void *ctx);
     void setCommandSink(CommandSink fn, void *ctx) { _cmdFn = fn; _cmdCtx = ctx; }
 
-    // A LIGHT'S LEVELS - brightness, colour temperature, colour. 2.10b (#65).
+    // A LIGHT'S LEVELS - brightness, colour temperature, colour (#65).
     //
     // The same contract as commandValue(): applied at once so the control and
     // the card answer the finger, then handed to the sink, then confirmed or
@@ -266,7 +276,7 @@ public:
     typedef void (*LightSink)(const Entity &e, const LightCommand &c, void *ctx);
     void setLightSink(LightSink fn, void *ctx) { _lightFn = fn; _lightCtx = ctx; }
 
-    // THE SOURCE REFUSED A COMMAND - end the wait now instead of in 3 s. 2.10c.
+    // THE SOURCE REFUSED A COMMAND - end the wait now instead of in 3 s.
     //
     // For a transport that can say so: HA answers call_service with
     // success:false when it sent nothing (ha-websocket.md section 9). Reverts
@@ -275,10 +285,10 @@ public:
     // into the failure record below.
     bool failCommand(const char *id, const char *why = "refused by the source");
 
-    // WHY THE LAST FEW COMMANDS FAILED (2.10c, the owner's G8: Desk said FAILED
-    // once and it could not be reproduced). Each FAILED - a confirming report
-    // that never came, or a refusal - is recorded with what was asked and what
-    // the source last said, and logged. The newest first. Any task.
+    // WHY THE LAST FEW COMMANDS FAILED, so a FAILED that cannot be reproduced
+    // can be explained. Each FAILED - a confirming report that never came, or a
+    // refusal - is recorded with what was asked and what the source last said,
+    // and logged. The newest first. Any task.
     struct FailNote {
         char     id[ENTITY_ID_MAX];
         char     why[80];
@@ -324,7 +334,7 @@ private:
     // which is the point - only the table is large, and only the table moves.
     Entity *_items    = nullptr;
     uint8_t _capacity = 0;
-    // Atomic since 2.10c: learnMembers() adds entities while other tasks walk
+    // Atomic: learnMembers() adds entities while other tasks walk
     // the table with at(). The slot is written first, then the count raised.
     std::atomic<uint8_t> _count{0};
     std::atomic<bool>    _learnt{false};
@@ -339,10 +349,9 @@ private:
     PauseStore _pauseStore;   // unset: NVS, see setPauseStore()
     bool loadPauses(char *out, size_t cap) const;
     bool savePauses(const char *list) const;
-    // 3 s since 2.7 (#63). Was 5 s, sized for a round trip through a broker.
-    // Since #63 only a MATCHING echo confirms, so the window must outlast a
-    // fading light: the owner timed his Desk group at ~1.5 s, and asked for
-    // FAILED after 2-3 s. The websocket echo itself is ~91 ms, measured.
+    // 3 s (#63). Only a MATCHING echo confirms, so the window must outlast a
+    // fading light: a Hue group takes ~1.5 s to settle, and FAILED should
+    // show after 2-3 s. The websocket echo itself is ~91 ms.
     uint32_t _reconcileMs = 3000;
 
     int  indexOf(const char *id) const;   // caller holds the lock (or startup)

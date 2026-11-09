@@ -22,7 +22,7 @@
 // restores the previous one on Back, and the dashboard stands down before it
 // opens. That last part is not optional - two full widget trees at once is
 // what exhausts LVGL's layer buffers and hangs the board, which this project
-// has now been bitten by three times.
+// has been bitten by repeatedly.
 // ---------------------------------------------------------------------------
 
 namespace LogPage {

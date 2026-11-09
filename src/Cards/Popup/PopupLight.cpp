@@ -1,11 +1,11 @@
-// A light's controls (2.12 P1, split from CardPopup.cpp): the slider, what it sends, and the
+// A light's controls: the slider, what it sends, and the
 // column beside it.
 #include "PopupState.h"
 
 namespace popup {
 
 // ---------------------------------------------------------------------------
-// The light's controls (2.10b; card-sheet 11.1, Card Popup Mock v3)
+// The light's controls (card-sheet 11.1)
 //
 // The hero is a tall slider for whichever control is chosen below it:
 // brightness (filled from the bottom, in the light's own colour), colour
@@ -15,29 +15,29 @@ namespace popup {
 // for a group, ANY member) can do. Colour shows eight swatches in place of the
 // value line: a hue in degrees says nothing a swatch does not.
 //
-// A TAP JUMPS THERE, A DRAG FOLLOWS THE FINGER (owner, 2026-10-05). While a
+// A TAP JUMPS THERE, A DRAG FOLLOWS THE FINGER. While a
 // finger is on it, the slider and the value follow the finger every frame,
-// and a command goes out at most every LIGHT_SEND_MS - "enough so that a user
-// could adjust brightness and see the level change" - plus once on release,
+// and a command goes out at most every LIGHT_SEND_MS - often enough that the
+// level visibly changes while adjusting - plus once on release,
 // with where it ended. Power is the selector's first button.
 //
-// A GROUP ACTS AS HA'S LIGHT GROUP (owner, 2026-10-05): each member is sent
+// A GROUP ACTS AS HA'S LIGHT GROUP: each member is sent
 // what it can take. A brightness to a member that only switches turns it on;
 // a temperature to a member with colour but no temperature becomes the
 // nearest hue (HA's conversion); a colour to a member without one turns it
 // on. Levels shown are the mean over the members that are on.
 //
 // ONLY WHAT IS SHOWING IS BUILT: choosing another control rebuilds the view,
-// so the swatches exist only in Colour (owner: memory first).
+// so the swatches exist only in Colour (memory comes first).
 //
 // Cheap to move because it is small: a drag redraws the slider and the value
 // - tens of thousands of pixels - never the window.
 // ---------------------------------------------------------------------------
 
-constexpr uint32_t LIGHT_SEND_MS = 300;   // owner: "300ms sounds about right"
+constexpr uint32_t LIGHT_SEND_MS = 300;   // at most one command per 300 ms while dragging
 
 // Eight defaults, like HA's (card-sheet 11.2). Saving the current colour into
-// one with a long press needs the settings store (2.10d).
+// one with a long press is not built.
 struct Swatch { int16_t hue; int8_t sat; };
 constexpr Swatch SWATCHES[8] = {
     {   0, 100 }, {  30, 100 }, {  55, 100 }, { 120,  90 },
@@ -46,7 +46,7 @@ constexpr Swatch SWATCHES[8] = {
 
 bool canSlide(uint8_t caps) { return caps & (LIGHT_CAN_DIM | LIGHT_CAN_TEMP | LIGHT_CAN_COLOUR); }
 
-// D3: open on the control - brightness first, as HA's dialog does. Nothing
+// Open on the control - brightness first, as HA's dialog does. Nothing
 // offered (a group with every member paused): brightness, greyed.
 uint8_t firstCtl(uint8_t caps) {
     if (!caps)                 return LCTL_DIM;
@@ -95,7 +95,7 @@ int32_t valueAtFinger(const LightAgg &L) {
 void lightSend(int32_t v, int8_t sat) {
     if (!s.reg) return;
     const uint32_t now = millis();
-    s.lastScene = -1;   // the light is no longer as a scene left it (S5)
+    s.lastScene = -1;   // the light is no longer as a scene left it
     for (uint8_t i = 0; i < s.nEnt; i++) {
         const Entity *e = s.ent[i];
         if (!e || !e->desc.writable || e->paused) continue;
@@ -142,7 +142,7 @@ void renderLight() {
         lv_async_call(rebuildMainAsync, nullptr);
     }
 
-    // US spelling on screen (owner). Color shows no label at all - the
+    // US spelling on screen. Color shows no label at all - the
     // swatches say what it is - unless the PAUSED pill needs the line.
     setText(s.lblWhat, s.lightCtl == LCTL_DIM ? "Brightness" : s.lightCtl == LCTL_TEMP ? "Temperature" : "");
 
@@ -162,7 +162,7 @@ void renderLight() {
         } else {
             // On but no temperature: it is showing a colour, and a light in a
             // colour reports no kelvin (HA the same) - so no ring, and the
-            // words say why (owner, round 1, L7).
+            // words say why.
             if (v < 0)                       setText(s.lblValue, !on ? "Off"
                                                      : L.mode == LightMode::LMODE_COLOUR ? "A color" : "--");
             else if (s.lightCtl == LCTL_DIM) { snprintf(buf, sizeof(buf), "%ld%%", (long)v); setText(s.lblValue, buf); }
@@ -184,8 +184,8 @@ void renderLight() {
         uint32_t fillHex = lightShownRgb(shown);
         if (!fillHex || LV_ABS(lumOf(fillHex) - lumOf(track)) < 60) fillHex = p.ST_ACTIVE;
         fillHex = quiet(fillHex);
-        // Never shorter than its own rounded end: at 1% a 3 px fill was a flat
-        // line wider than the slider's rounded bottom. The value says 1%.
+        // Never shorter than its own rounded end: at 1% a 3 px fill would be a
+        // flat line wider than the slider's rounded bottom. The value says 1%.
         const int32_t fh = v > 0 ? LV_MAX(s.heroH * v / 100, 2 * s.heroR) : 0;
         lv_obj_set_style_bg_color(s.fill, UI::c(fillHex), 0);
         lv_obj_set_y     (s.fill, s.heroH - fh);
@@ -193,9 +193,9 @@ void renderLight() {
         // The grip: a short bar near the top of the fill, where a finger takes it.
         // Small, so HIDDEN costs only its own few pixels (the HIDDEN lesson is
         // about screen-sized objects). Its x from the width it is GIVEN: read
-        // back with lv_obj_get_width() before LVGL had laid it out, it was 0
-        // on the first draw, and the grip sat half a slider to the right until
-        // the next redraw a second later (owner, round 1).
+        // back with lv_obj_get_width() before LVGL has laid it out, it is 0 on
+        // the first draw, and the grip would sit half a slider to the right
+        // until the next redraw.
         if (s.grip) {
             const int32_t gw = s.heroW * 34 / 100;
             lv_obj_set_style_bg_color(s.grip, UI::c(UI::contrastOf(fillHex, p.GROUND, p.TEXT)), 0);
@@ -205,8 +205,8 @@ void renderLight() {
             else             lv_obj_add_flag  (s.grip, LV_OBJ_FLAG_HIDDEN);
         }
     } else if (s.mark) {
-        // HIDDEN, not 0 wide: a 0-wide ring still drew its outline, the
-        // stray vertical line beside the strip (owner, round 1, L7/L9).
+        // HIDDEN, not 0 wide: a 0-wide ring still draws its outline, a stray
+        // vertical line beside the strip.
         const int32_t mh = lv_obj_get_height(s.mark);
         if (v < 0) {
             lv_obj_add_flag(s.mark, LV_OBJ_FLAG_HIDDEN);
@@ -220,7 +220,7 @@ void renderLight() {
 
     // --- The selector ------------------------------------------------------
     // Power says whether the light is on - LIT glass while it is, glass while
-    // not (round 5; #99 had satin and glass), its icon in lit glass's dark ink;
+    // not, its icon in lit glass's dark ink;
     // the chosen switch is the selector's (buildControlDeck()).
     if (s.btnCtl[0]) {
         Kit::selectorActionLit(d, on);
@@ -242,7 +242,7 @@ void renderLight() {
     // --- Scenes: the one loaded from this window is glass ------------------
     // Only that: HA does not say which scene is showing, and the lights may
     // have been changed since (K15). Glass, its words in the accent, in place
-    // of the ring it had (#99, K77); the others satin. A paused window's are
+    // of a ring (K77); the others satin. A paused window's are
     // plain and greyed.
     for (uint8_t i = 0; i < ENTITY_SCENES_MAX; i++) {
         lv_obj_t *b = s.sceneBtn[i];
@@ -309,8 +309,8 @@ int32_t stripInset() { return s.lightCtl == LCTL_DIM ? 0 : s.heroR; }
 // stops (LV_GRADIENT_MAX_STOPS), so it is n-1 square two-stop pieces over the
 // straight middle of the slider; the slider itself draws the rounded ends, in
 // the end colours, flat. No clip_corner, which would cost a layer (LESSONS).
-// (Round 1 of this had the end pieces carry the rounding and reach into their
-// neighbours; at a radius 3/4 of a piece tall that hid most of the next hue.)
+// (End pieces that carried the rounding and reached into their neighbours
+// would hide most of the next hue at a radius 3/4 of a piece tall.)
 void stripPieces(const uint32_t *cols, int n) {
     const int32_t in = stripInset();
     const int32_t span = s.heroH - 2 * in;
@@ -345,7 +345,7 @@ void buildLightHero(lv_obj_t *row) {
     lv_obj_add_flag(s.hero, LV_OBJ_FLAG_CLICKABLE);
     // A drag on the slider is the slider's: no gesture walks up from it to the
     // window or the screen, and no scroll is handed to a parent (LESSONS,
-    // "Events do not reach the screen", and #68's scrolling layer).
+    // "Events do not reach the screen").
     lv_obj_clear_flag(s.hero, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_clear_flag(s.hero, LV_OBJ_FLAG_SCROLL_CHAIN);
     lv_obj_add_event_cb(s.hero, lightSlideCb, LV_EVENT_PRESSED,    nullptr);
@@ -389,16 +389,16 @@ void buildLightHero(lv_obj_t *row) {
 }
 
 // `deckParent`: the column itself (the control deck at its bottom, level with
-// the slider's) or a row under the hero (a tall window, 2.10c).
+// the slider's) or a row under the hero (a tall window).
 void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
     const UIPalette &p = UI::pal();
     const UIType    &t = UI::type();
     const LightAgg   L = lightAggregate();
     const uint8_t    caps = L.caps;
-    // Color has no label line (owner, round 6) - except when paused, for the
-    // PAUSED pill. Without it the swatches and the deck fit the P4_5's column
-    // with room to spare; with it the column was a few pixels too tall and
-    // the deck moved down (L5).
+    // Color has no label line - except when paused, for the PAUSED pill.
+    // Without it the swatches and the deck fit the P4_5's column with room to
+    // spare; with it the column would be a few pixels too tall and the deck
+    // would move down.
     if (s.lightCtl != LCTL_COLOUR || s.builtPaused) makeLabelRow(col);
     if (s.lightCtl != LCTL_COLOUR) {
         s.lblValue = makeLabel(col, UIToolkit::Font_Hero, p.TEXT);
@@ -428,7 +428,7 @@ void buildLightColumn(lv_obj_t *col, lv_obj_t *deckParent) {
     }
 
     // The selector sits at the BOTTOM of the column, level with the bottom of
-    // the slider, whatever is above it (owner, round 3).
+    // the slider, whatever is above it.
     if (deckParent == col) {
         lv_obj_t *spacer = plain(col);
         lv_obj_set_size(spacer, 1, 0);

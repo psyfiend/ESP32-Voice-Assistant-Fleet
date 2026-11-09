@@ -1,28 +1,30 @@
 #pragma once
 //
-// Settings - the owner's saved changes, in one JSON file on LittleFS (2.10d,
-// DECISIONS K34; design: docs/design/card-sheet.md section 17).
+// Settings - the owner's saved changes, in one JSON file on LittleFS
+// (DECISIONS K34; design: docs/design/card-sheet.md section 17).
 //
-// The board boots from the compiled dashboard and applies this file on top: a
-// value comes from the first layer that sets it - this file, the card's spec,
-// the page's spec, the built-in default. At 3.1 the build sheet replaces the
-// spec layers and this file stays on top unchanged (ROADMAP Q2's runtime
-// layer), so nothing here is a second store to reconcile later.
+// A value comes from the first layer that sets it - this file, the card's spec,
+// the page's spec, the built-in default. Most cards exist only as entries in
+// this file (K171); the compiled dashboard holds the Panel group and the
+// Garage - Doors card. At 3.1 the build sheet replaces the spec layers and
+// this file stays on top unchanged (ROADMAP Q2's runtime layer).
 //
-//   /cfg/settings.json, on the "spiffs" data partition (unused before 2.10d):
+//   /cfg/settings.json, on the "spiffs" data partition:
 //   { "schema": 1,
 //     "schemes":  { "<scheme>": { "selector": "silver_round" } },
 //     "entities": { "<entity id>": { "paused": true } },
 //     "cards":    { "<card id>": { "scenes": "all", "active": "all" } },
 //     "system":   { "window": { "close": "30", "bar": "off" } } }
-//   A card added on the device (K17) is a card entry with "page", "after" and
+//   A card added on the device is a card entry with "page", "after" and
 //   "entity" as well - see Cards/CardAdded.h.
-//   2.8 round 3: UI Tweaks' choices under "system": "ui" ("scheme", "label",
-//   "entity", "state", "density"), "header" ("glyphs"), "window", "alarm"
-//   ("warn"); a page's "cols" / "rows" (a count, since 2.11 round 9 a pin the
-//   arranger keeps; "auto" in older files reads as not pinned) and "header"; Card
-//   UI's per card: "label", "group" / "label_text", "selector", "density",
-//   "close", "bar" (GUIManagerTweaks.cpp, Cards/Popup/PopupCardUi.cpp).
+//   UI Tweaks' choices are under "system": "ui" ("scheme", "label",
+//   "entity", "state", "density", "group_view"), "header" ("glyphs"), "window",
+//   "alarm" ("warn"); a page's "cols" / "rows" (a count held - "fixed" on the
+//   glass, K164; "auto" in older files reads as not held) and
+//   "header"; Card UI's per card: "label", "group" / "label_text", "selector",
+//   "density", "close", "bar", a group's "card_state" and "group_view" (K162)
+//   (GUIManagerTweaks.cpp, Cards/Popup/PopupCardUi.cpp). A group member's
+//   "hidden": "yes" is UNPINNED - off the page, in the group view (K160).
 //
 // Rules that are load-bearing:
 //   - Only what was changed is stored; a missing key means "inherit". Setting a
@@ -44,7 +46,7 @@
 // the whole file to settings.tmp and renames it over settings.json (a power
 // cut leaves the old file) - once, and only if something changed. The task's
 // stack is in internal RAM: a flash write from a task whose stack is in PSRAM
-// reboots the board (LESSONS, 2.10d). The card window calls save() when it
+// reboots the board (LESSONS). The card window calls save() when it
 // closes (K8).
 //
 // Thread safety: every call takes the store's mutex. Values are copied out;
@@ -86,7 +88,7 @@ bool entityFlag(const char *entityId, const char *key, bool dflt);
 // Every entity whose `key` is true, for a restore at boot. Calls fn(id, ctx).
 void forEachEntityFlag(const char *key, void (*fn)(const char *entityId, void *ctx), void *ctx);
 
-// GROUPS for card labels (K44): "groups": {"<group id>": {"name": "...",
+// GROUPS for card labels (K46): "groups": {"<group id>": {"name": "...",
 // "color": "RRGGBB"}}. A custom group has a name; any group may have a colour
 // that overrides its colour-by-name. Ids: "sheet_<name>" for the dashboard's
 // own areas, "ha_<name>" for HA areas, "<name>_<yymmdd>_<hhmm>" for custom
@@ -104,15 +106,15 @@ uint8_t countCards(const char *key, const char *value);
 // back into the store. CardAdded's way to find the cards added on the device.
 void forEachCardWith(const char *key, void (*fn)(const char *cardId, const char *value, void *ctx), void *ctx);
 
-// SYSTEM SETTINGS, the device's own, by area (owner, T6, 2026-10-14): the first
-// is "window" - "close" (seconds, or "off"; 60 when unset, D6) and "bar"
-// ("off" hides the countdown bar). Set from a PC until the system settings
-// page; read as each window opens.
+// SYSTEM SETTINGS, the device's own, by area: the first is "window" - "close"
+// (seconds, or "off"; 60 when unset, K79) and "bar" ("off" hides the
+// countdown bar). Set from a PC until the system settings page; read as each
+// window opens.
 bool system(const char *area, const char *key, char *out, size_t cap);
-// "header": "glyphs" is the header's glyph style by name (2.8, UI/HeaderSlots.h):
-// "bare" (the default, stored as nothing), "square" or "circle".
+// "header": "glyphs" is the header's glyph style by name (UI/HeaderSlots.h):
+// "square" (the default, stored as nothing), "bare" or "circle".
 
-// PAGE SETTINGS, by the page's slug (2.8): "pages": {"<slug>": {"header":
+// PAGE SETTINGS, by the page's slug: "pages": {"<slug>": {"header":
 // "hidden"}}. The first is the page header's shown / hidden (D-14), read when
 // the page is built; nothing stored means the page's compiled default.
 bool page(const char *slug, const char *key, char *out, size_t cap);
@@ -122,7 +124,7 @@ bool setPage(const char *slug, const char *key, const char *value);
 // scheme's object once empty). True when the document changed.
 bool setCard(const char *cardId, const char *key, const char *value);
 // The card's whole entry gone - a copy the owner removed from its cluster on
-// the glass (2.11, K91). Every other entry is kept until the owner prunes it.
+// the glass (K91). Every other entry is kept until the owner prunes it.
 bool dropCard(const char *cardId);
 bool setScheme(const char *schemeName, const char *key, const char *value);
 bool setSystem(const char *area, const char *key, const char *value);

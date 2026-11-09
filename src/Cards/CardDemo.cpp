@@ -20,26 +20,23 @@ EntityRegistry *s_reg    = nullptr;
 CardBinder     *s_binder = nullptr;
 
 // Which header treatment every card on the page is currently wearing. One knob
-// for the whole page rather than per card, because the question cards.md is
-// asking is "which of these two do you prefer", and that is easiest to answer
-// when the whole page switches at once.
+// for the whole page rather than per card, so the treatments compare when the
+// whole page switches at once.
 CardHeaderStyle s_hdr = CardHeaderStyle::HDR_TAG;
 
 
-// Which actor treatment the page is wearing. Same idea as s_hdr: a knob rather
-// than a decision, because the question is "which of these do you prefer" and
-// that is answered by looking at both.
+// Which actor treatment the page is wearing. Same idea as s_hdr: a knob for
+// comparing both by looking.
 StateCardFill s_actorStyle = StateCardFill::FILL_SURFACE;
 
-// Whether cards display their area at all. INDEPENDENT of the header style -
-// two build-sheet settings, not one, which is what the owner asked for. With
-// this off, HDR_TAG has nothing to put in its left pill and the tags simply do
+// Whether cards display their area at all. INDEPENDENT of the header style:
+// two settings, not one. With this off, HDR_TAG has nothing to put in its left pill and the tags simply do
 // not appear; the row spacing does not change, so nothing on the page moves.
 bool s_showArea = true;
 
 // Colour-code the header band or tag by AREA, so a group of cards reads as a
-// group before you read a word of it. Independent of s_showArea: the owner
-// wants the colour available whether or not the name is displayed.
+// group before you read a word of it. Independent of s_showArea: the colour is
+// available whether or not the name is displayed.
 bool s_areaColor = true;
 
 // Testing: walk every card on the page through each state in turn.
@@ -60,9 +57,8 @@ const CardState FORCED[] = {
 const char *FORCED_LABEL[] = { "Live", "Stale", "Long", "Failed", "Partial", "Paused" };
 
 // Measured across the page build, in LVGL's own pool. ESP.getFreeHeap() is the
-// wrong instrument here and 2.3 established why: LV_USE_STDLIB_MALLOC is
-// LV_STDLIB_BUILTIN with LV_MEM_ADR 0, so every widget comes out of a 128 KB
-// static array in internal DRAM and the system heap barely moves.
+// wrong instrument here: LVGL's builtin allocator serves every widget from its
+// own pool (CLAUDE.md, "lv_conf.h"), so the system heap barely moves.
 uint32_t s_lvBefore = 0;
 lv_obj_t *s_btnState = nullptr;
 
@@ -161,10 +157,9 @@ void close() {
     // else the moment we leave. UI::grid() is global state and this page
     // borrows it.
     //
-    // Restoring it by measuring the previous SCREEN was wrong as soon as the
-    // dashboard stopped owning the whole screen: it sits under a header and
-    // above the deck, so the screen's size is not its viewport. The owner of
-    // the dashboard is the only thing that knows, so it is asked.
+    // Measuring the previous SCREEN would be wrong: the dashboard sits under a
+    // header and above the deck, so the screen's size is not its viewport. The
+    // owner of the dashboard is the only thing that knows, so it is asked.
     if (s_onClose) s_onClose();
 }
 
@@ -173,9 +168,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     s_binder = &binder;
 
     // Registered once, on first open. The System Doctor is where spans and
-    // priorities become checkable on a real board - priority especially, since
-    // nothing reads it until 2.5 and an unread field that is also invisible is
-    // one nobody notices is wrong.
+    // priorities become checkable on a real board.
     static bool s_sectionAdded = false;
     if (!s_sectionAdded) {
         SystemReport::addSection("CARDS", []() {
@@ -189,19 +182,18 @@ void show(EntityRegistry &reg, CardBinder &binder) {
 
     // THE OLD PAGE COMES DOWN FIRST.
     //
-    // It used to be built-then-swapped, which meant eighteen cards alive at
-    // once: double the widgets, double the lv_mem, and double the intermediate
-    // layer buffers LVGL wants for them. That is what exhausted the P4's draw
-    // buffers mid-rebuild - "Allocating layer buffer failed", forever - and
-    // what blew the 3248's loopTask stack, which surfaced as a stack canary
-    // panic with a backtrace full of recursive LVGL frames.
+    // Building the new page before swapping would keep two pages of cards
+    // alive at once: double the widgets, double the lv_mem, and double the
+    // intermediate layer buffers LVGL wants for them. That exhausts the P4's
+    // draw buffers mid-rebuild ("Allocating layer buffer failed") and blows
+    // the 3248's loopTask stack (a stack canary panic with a backtrace full
+    // of recursive LVGL frames).
     //
-    // The cost is a frame of the dashboard with no cards on it. The
-    // alternative is a board that reboots when you press a button.
+    // The cost is a frame of the dashboard with no cards on it.
     // Load the previous screen BEFORE deleting this one. Deleting the active
-    // screen and then replacing it works, but LVGL rightly complains about it
-    // every time ("lv_obj_delete: the active screen was deleted"), and a log
-    // full of warnings that are fine is how a real one gets missed.
+    // screen and then replacing it works, but LVGL complains about it every
+    // time ("lv_obj_delete: the active screen was deleted"), and a log full
+    // of harmless warnings is how a real one gets missed.
     if (s_previous) lv_screen_load(s_previous);
     if (s_page)   { delete s_page;           s_page   = nullptr; }
     if (s_screen) { lv_obj_delete(s_screen); s_screen = nullptr; }
@@ -229,11 +221,10 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     lv_obj_set_height             (bar, LV_SIZE_CONTENT);
     // ONE ROW THAT SCROLLS SIDEWAYS, rather than wrapping onto two.
     //
-    // Wrapping made every button reachable on the 3248's 320 px screen, but it
-    // cost a second row of chrome - and on a 2x3 grid that is a third of the
-    // page, which is why only four cards survived there. Scrolling keeps the
-    // buttons full size and gives the row back to the grid. This is demo
-    // chrome; a real page has none of it.
+    // Wrapping would cost a second row of chrome - on the 3248's 2x3 grid
+    // that is a third of the page. Scrolling keeps the buttons full size and
+    // gives the row to the grid. This is demo chrome; a real page has none of
+    // it.
     lv_obj_set_flex_flow          (bar, LV_FLEX_FLOW_ROW);
     lv_obj_set_scroll_dir         (bar, LV_DIR_HOR);
     lv_obj_set_scrollbar_mode     (bar, LV_SCROLLBAR_MODE_OFF);
@@ -286,10 +277,8 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // --- Two small builders -----------------------------------------------
     //
     // Every card here is created by DOMAIN, through cardForEntity(), and never
-    // by naming a layout. That is the whole point of the catalog: this demo is
-    // the closest thing to a build sheet that exists yet, so if it had to pick
-    // between a value layout and a state layout, the real build sheet would
-    // have to as well - and that is not a user's decision to make.
+    // by naming a layout. That is the whole point of the catalog: choosing
+    // between a value layout and a state layout is not a user's decision.
     //
     // Note every label: "Deck", never "Temperature". cards.md section 4 - the
     // tinted icon says what the quantity is, so the name says WHERE.
@@ -333,7 +322,7 @@ void show(EntityRegistry &reg, CardBinder &binder) {
         s_page->add(c);
     };
 
-    // Spans are UNITS at 2.5: U_2 is two whole cells, U_CELL is one.
+    // Spans are UNITS: U_2 is two whole cells, U_CELL is one.
     CardPlacement wide;  wide.prefSpanX = U_2;  wide.minSpanX = U_CELL;
     wide.priority = 200;
 
@@ -341,9 +330,8 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     place("deck_temp", "Deck", "Outdoor", ent("deck_battery"), nullptr, false);
     place("deck_lux",  "Deck", "Outdoor", nullptr,             nullptr, false);
 
-    // binary_sensor -> state layout, and NOTHING happens when it is tapped.
-    // Before the catalog existed this was an ActorCard whose tap tried to
-    // command a read-only entity and was saved only by a writable check.
+    // binary_sensor -> state layout, and a tap commands nothing: it is
+    // read-only.
     place("deck_motion", "Deck", "Outdoor", nullptr, nullptr, false);
 
     // switch -> state layout, and a tap actually commands. Both halves of the
@@ -368,9 +356,9 @@ void show(EntityRegistry &reg, CardBinder &binder) {
     // IT, and no stale card anywhere on this page dims.
     place(SYS_ENT_UPTIME, "Paused", "Panel", nullptr, nullptr, true);
 
-    // NOTHING IS BUILT UNTIL HERE. CardPage::add() only queues at 2.5,
-    // because which cards survive is a decision about all of them at once now
-    // that priority can drop some - it cannot be made one card at a time.
+    // NOTHING IS BUILT UNTIL HERE. CardPage::add() only queues, because
+    // which cards survive is a decision about all of them at once (priority
+    // can drop some) - it cannot be made one card at a time.
     s_page->commit();
 
     // A rebuild creates fresh cards, which derive their own state - so a

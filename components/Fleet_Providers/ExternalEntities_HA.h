@@ -5,12 +5,12 @@
 #include "Entity.h"
 
 // ---------------------------------------------------------------------------
-// The owner's 18 Home Assistant entities, read over the websocket (#43).
+// The owner's compiled Home Assistant entities, read over the websocket (#43).
 //
-// TEMPORARY, exactly like ExternalEntities.h beside it: this is a stand-in for
-// the build sheet (#20). It exists so #43 and 2.7 can be judged against the
-// real dashboard rather than against virtual switches. When the build sheet
-// lands, this file goes away.
+// A compiled stand-in for per-device entity selection (#20), like
+// ExternalEntities.h beside it. The dashboard's cards come from the settings
+// file and from HA (DECISIONS K171); this table declares the entities they
+// bind to.
 //
 // The list itself is docs/design/dashboard-target-7b.md. THAT FILE IS THE
 // SPEC AND THIS ONE IS THE TRANSCRIPTION - if they disagree, the doc wins and
@@ -19,10 +19,9 @@
 // Every entry is source = HA, advertise = false. Someone else owns these;
 // announcing them to Home Assistant would duplicate entities HA already has.
 //
-// NO `icon` FIELDS, deliberately, since 2.7. They used to transcribe HA's
-// icons, and a descriptor icon OUTRANKS the live one - so they froze whatever
-// HA said on the day they were copied. Empty means "follow HA"; set one only
-// to override. cards.md section 13.
+// NO `icon` FIELDS, deliberately: a descriptor icon OUTRANKS the live one, so
+// it would freeze whatever HA said on the day it was copied. Empty means
+// "follow HA"; set one only to override. cards.md section 13.
 //
 //
 // THREE DECISIONS ARE ENCODED HERE THAT ARE NOT OBVIOUS FROM THE TABLE.
@@ -36,19 +35,18 @@
 //    age is evidence of NOTHING. A stale window here would grey out every
 //    quiet sensor in the house overnight and call it a fault.
 //
-//    Availability has to come from the source saying so - #56 - not from
-//    value age. #57 is the same problem from the other side: the card wants
-//    "when did this last CHANGE", which is a different question from "when did
-//    we last hear anything". Until those land, zero is the honest value.
+//    Availability comes from the source saying so (#56), not from value age.
+//    #57 is the same problem from the other side: the card wants "when did
+//    this last CHANGE", which is a different question from "when did we last
+//    hear anything".
 //
 // 2. kind IS WHAT THE THING IS TO THE USER; THE SERVICE DOMAIN COMES FROM THE
 //    ENTITY ID.
 //
-//    Row 1 is `switch.tv_room_switch_1` and the owner listed it as a light. It
-//    is declared LIGHT here because that is what it is in the room and what
-//    decides the card. But #44 must call `switch.turn_on`, not
-//    `light.turn_on`, and the only authority on that is the domain prefix of
-//    the entity id.
+//    A relay such as `switch.tv_room_switch_1` can be a light in the room. It
+//    is declared LIGHT because that is what decides the card, but commands
+//    must call `switch.turn_on`, not `light.turn_on`, and the only authority
+//    on that is the domain prefix of the entity id (CommandRouter.h).
 //
 //    That prefix is safe to read. dashboard-target-7b.md warns against parsing
 //    meaning out of an entity id, and it is right - but the warning is about
@@ -64,29 +62,25 @@
 //    topic. Registering both means the same reading appears twice under two
 //    ids.
 //
-//    Left in deliberately, because it is the only side-by-side comparison of
-//    the two transports we will ever get for free - same sensor, same instant,
-//    two paths. If the numbers or the timing disagree, that is worth knowing
-//    before the fleet leans on the websocket. Drop one once #43 is trusted;
-//    do NOT quietly leave both on the finished dashboard.
+//    Left in deliberately as a side-by-side comparison of the two transports -
+//    same sensor, same instant, two paths. Drop one when the websocket is
+//    trusted; do NOT leave both on the finished dashboard.
 // ---------------------------------------------------------------------------
 
 // UTF-8 degree sign written as explicit bytes so the file's own encoding can
 // never silently mangle it - same reason as ExternalEntities.h.
 //
-// FAHRENHEIT, AND THAT IS NOT A GUESS. Measured against the live instance on
-// 2026-09-20: all seven temperature entities report unit_of_measurement "F".
-// HA serves values already converted to the user's configured display unit.
+// FAHRENHEIT: all seven temperature entities report unit_of_measurement "F"
+// on the owner's instance. HA serves values already converted to the user's
+// configured display unit.
 //
 // THE SAME SENSOR THEREFORE ARRIVES IN TWO DIFFERENT UNITS DEPENDING ON THE
 // TRANSPORT. The deck probe reads 53.276 F here and ~11.8 C through
 // Zigbee2MQTT's raw topic in ExternalEntities.h, because the broker carries
 // what the device emitted and HA carries what the user asked to see. Both are
-// correct and they are not comparable without converting.
-//
-// This is exactly the hazard note 3 predicted, arriving on the first look. It
-// also means the fleet cannot assume a unit from a device_class - the unit has
-// to come from the source, per entity.
+// correct and they are not comparable without converting. The fleet cannot
+// assume a unit from a device_class - the unit has to come from the source,
+// per entity.
 #define HA_DEG_F "\xC2\xB0" "F"
 
 inline const EntityDescriptor HA_ENTITIES[] = {
@@ -100,8 +94,8 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = true,
         .advertise   = false,
         .staleAfterMs = 0,
-        // Was switch.tv_room_switch_1 (note 2); HA wraps the relay as a light
-        // since 2026-10-28 (Switch-as-X), the switch hidden.
+        // A relay (switch.tv_room_switch_1, note 2) that HA wraps as a light
+        // (Switch-as-X), the switch itself hidden.
         .externalRef = "light.living_room_light_laundry",
     },
 
@@ -127,7 +121,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .advertise   = false,
         .staleAfterMs = 0,
         // Dimmable - supported_color_modes is ['brightness']. What a light can
-        // do is read from HA with every report (2.10c), never declared here.
+        // do is read from HA with every report, never declared here.
         .externalRef = "light.kitchen_light_table",
     },
     {
@@ -170,7 +164,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .writable    = false,
         .advertise   = false,
         .staleAfterMs = 0,
-        // The thermostat's room since 2026-10-27 is the Hallway (logical).
+        // The thermostat's room is the Hallway (HA's logical sensor).
         .externalRef = "sensor.hallway_temperature",
     },
 
@@ -181,11 +175,9 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .kind        = EntityKind::LIGHT,
         .source      = EntitySource::HA,
         .valueType   = ValueType::BOOL,
-        // The GROUP bulb is the HERO, not the corner - the owner's call on glass,
-        // 2026-09-22: "it (mostly) acts and functions just like any other light
-        // card", so the corner is the ordinary bulb every light wears, and what
-        // makes it different "should be prominent, the first and most easy thing
-        // to see". A custom on/off pair - the first real use of one.
+        // A group acts like any other light card, and what makes it different
+        // "should be prominent, the first and most easy thing to see": the GROUP
+        // bulb is the hero, as a custom on/off icon pair.
         .iconOn      = "mdi:lightbulb-group",
         .iconOff     = "mdi:lightbulb-group-outline",
         .writable    = true,
@@ -311,7 +303,7 @@ inline const EntityDescriptor HA_ENTITIES[] = {
     {
         // THE HOUSE-WIDE OUTDOOR READING (HA's logical sensor: the porch, else
         // the deck, else the weather service). On no card: the page header's
-        // sensor slot reads it (HeaderSlots.cpp, owner 2026-10-29).
+        // sensor slot reads it (HeaderSlots.cpp).
         .id          = "outdoor_temp",
         .name        = "Outdoor Temperature",
         .kind        = EntityKind::SENSOR,
@@ -369,19 +361,18 @@ inline const EntityDescriptor HA_ENTITIES[] = {
         .externalRef = "sensor.garage_temperature",
     },
 
-    // --- Test fixtures, 2026-09-23 --------------------------------------------
+    // --- Test fixtures --------------------------------------------------------
     //
-    // Three throwaway HA entities the owner created so two card states can be
-    // tested on demand rather than waited for. They live on the FLEET page,
-    // not on House. Delete these and the three HA helpers when done.
+    // Three throwaway HA entities (helpers in HA) so two card states can be
+    // tested on demand rather than waited for. Their cards are on the FLEET
+    // page, not on House.
     //
     //   fleet_test_available  input_boolean. Tapping its card turns the sensor
-    //                         below available / unavailable - ST_UNAVAILABLE,
-    //                         never before seen on hardware (T15)
+    //                         below available / unavailable (ST_UNAVAILABLE)
     //   fleet_test_reading    a template sensor whose availability follows the
     //                         toggle above
     //   fleet_test_refuse     a template switch that accepts taps and never
-    //                         changes state - the command-refused path (R9/T10)
+    //                         changes state - the command-refused path
     {
         .id          = "test_available",
         .name        = "Test Available",
@@ -430,7 +421,7 @@ inline constexpr uint8_t HA_ENTITY_COUNT =
 // because a card header is narrow. So: group on the id, render from this
 // table, and fall back to HA's own name when an id is not listed.
 //
-// ONE TRAP, MEASURED 2026-09-20. The obvious-looking slug is the wrong room:
+// ONE TRAP. The obvious-looking slug is the wrong room:
 //
 //     bedroom    -> "Eric Bedroom"
 //     bedroom_2  -> "Bedroom"

@@ -4,6 +4,14 @@
 #include "HaValue.h"
 #include <string.h>
 #include <stdlib.h>
+#include <esp_heap_caps.h>
+
+// A buffer in PSRAM when there is some, else internal RAM: the templates'
+// frames and answers are too big to belong in .bss.
+static char *bigBuf(size_t n) {
+    char *p = (char *)heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : (char *)malloc(n);
+}
 
 #ifdef DEBUG_HA
   #define DBG_HAP(...) Serial.printf("[HaProv] " __VA_ARGS__)
@@ -22,7 +30,8 @@ void HaProvider::begin(EntityRegistry *reg, HaClient *ha, HaRest *rest) {
 // Subscription - loop task
 // ---------------------------------------------------------------------------
 
-int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
+int HaProvider::sendSubscribe(uint8_t from, uint8_t to, uint8_t *reached) {
+    if (reached) *reached = from;
     if (!_reg || !_ha) return -1;
 
     // Built from the REGISTRY, not from a list, so an entity added anywhere
@@ -40,8 +49,12 @@ int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
                      "\"trigger\":{\"platform\":\"state\",\"entity_id\":[",
                      (unsigned long)id);
 
-    uint8_t named = 0;
-    for (uint8_t i = from; i < to; i++) {
+    // ONE FRAME-FULL AT A TIME: the frame holds about 45 entity ids, fewer
+    // than a board can hold. A full frame is sent as it is and `reached` says
+    // where the next one starts - HA keeps every subscription a connection
+    // makes.
+    uint8_t named = 0, i = from;
+    for (; i < to; i++) {
         const Entity *e = _reg->at(i);
         if (!e) continue;
         if (e->desc.source != EntitySource::HA) continue;
@@ -50,18 +63,13 @@ int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
         int add = snprintf(frame + n, sizeof(frame) - n, "%s\"%s\"",
                            named ? "," : "", e->desc.externalRef);
         if (add < 0 || n + add >= (int)sizeof(frame) - 8) {
-            // Refuse rather than send a truncated subscription. A half list
-            // would silently drop entities and look like HA not reporting
-            // them - the exact class of lying diagnostic this project keeps
-            // paying for.
-            Serial.printf("[HaProv] subscription frame full at %u entities; "
-                          "raise the buffer or split the request.\n",
-                          (unsigned)named);
-            return -1;
+            if (named == 0) return -1;   // one id larger than a frame: never
+            break;                       // the rest in the next frame
         }
         n += add;
         named++;
     }
+    if (reached) *reached = i;
 
     if (named == 0) {
         DBG_HAP("no HA-sourced entities registered; nothing to subscribe to\n");
@@ -72,86 +80,92 @@ int HaProvider::sendSubscribe(uint8_t from, uint8_t to) {
     if (tail < 0 || n + tail >= (int)sizeof(frame)) return -1;
     n += tail;
 
-    if (!_ha->sendText(frame, n)) return -1;
+    if (!_ha->sendText(frame, n)) { if (reached) *reached = from; return -1; }
 
-    // Remembered so the reply can be matched. Cleared when it arrives.
-    _pendingSubId = id;
-    _subAccepted  = false;
+    // Remembered so the reply can be matched - several may be out at once.
+    // A ring written only here (loop task) and only read by the websocket task;
+    // the oldest is overwritten, answered long before.
+    if (from == 0) { _subAccepted = false; _subRefused = false; }
+    _subIds[_subHead++ % SUB_IDS].store(id);
 
     Serial.printf("[HaProv] subscribe_trigger id %lu for %u entities (%d B)%s\n",
-                  (unsigned long)id, (unsigned)named, n, from ? ", learnt since" : "");
+                  (unsigned long)id, (unsigned)named, n,
+                  from ? ", the next part" : (i < to ? ", the first part" : ""));
     return named;
 }
 
 bool HaProvider::sendSceneQuery() {
     if (!_reg || !_ha) return false;
 
-    // The lights we were given (not learnt members - a single bulb's device
-    // carries no scenes). Single quotes inside, so the JSON needs no escapes.
-    // 3 KB since 2.10d: the same template also asks each entity's area.
-    static char frame[3072];
+    // The lights we were given, and those a card made from HA stands for - not
+    // learnt members, whose single bulb's device carries no scenes. Single
+    // quotes inside, so the JSON needs no escapes. The same template also asks
+    // each entity's area, so the frame is 8 KB, in PSRAM: the areas of up to
+    // ENTITY_MAX entities.
+    static constexpr size_t FRAME = 8192;
+    static char *frame = bigBuf(FRAME);
+    if (!frame) return false;
     const uint32_t id = _ha->nextId();
-    int n = snprintf(frame, sizeof(frame),
+    int n = snprintf(frame, FRAME,
                      "{\"id\":%lu,\"type\":\"render_template\",\"template\":\"{%% for l in [",
                      (unsigned long)id);
     uint8_t named = 0;
     for (uint8_t i = 0; i < _reg->count(); i++) {
         const Entity *e = _reg->at(i);
-        if (!e || e->learnt || e->desc.source != EntitySource::HA) continue;
+        if (!e || (e->learnt && !e->adopted) || e->desc.source != EntitySource::HA) continue;
         if (strncmp(e->desc.externalRef, "light.", 6) != 0) continue;
-        const int add = snprintf(frame + n, sizeof(frame) - n, "%s'%s'", named ? "," : "",
+        const int add = snprintf(frame + n, FRAME - n, "%s'%s'", named ? "," : "",
                                  e->desc.externalRef);
-        if (add < 0 || n + add >= (int)sizeof(frame) - 1400) {
+        if (add < 0 || n + add >= (int)FRAME - 1400) {
             Serial.printf("[HaProv] scene query frame full at %u lights\n", (unsigned)named);
             break;
         }
         n += add;
         named++;
     }
-    // No lights is no longer "nothing to ask": the areas below are asked of
-    // every entity, and an empty list is a loop that does nothing.
+    // No lights is not "nothing to ask": the areas below are asked of every
+    // entity, and an empty list is a loop that does nothing.
 
-    // Measured from the PC, 2026-10-06: 367 characters of template, 300 bytes
-    // back for light.office's seven Hue scenes, sorted by name. The last field
-    // says whether the owner hid the scene in HA's UI (is_hidden_entity, HA's
-    // own test of the entity registry's hidden_by - checked 2026-10-07: four
-    // of Office's seven are hidden).
-    const int tail = snprintf(frame + n, sizeof(frame) - n,
+    // 367 characters of template, 300 bytes back for light.office's seven Hue
+    // scenes, sorted by name. The last field says whether the scene is hidden
+    // in HA's UI (is_hidden_entity, HA's own test of the entity registry's
+    // hidden_by; four of Office's seven are hidden).
+    const int tail = snprintf(frame + n, FRAME - n,
         "] %%}{%% set d = device_id(l) %%}{%% if d %%}"
         "{%% for s in device_entities(d) | sort if s.startswith('scene.') %%}"
         "{{ l }}>{{ s }}>{{ state_attr(s,'name') or state_attr(s,'friendly_name') }}>"
         "{{ 'H' if is_hidden_entity(s) else 'V' }}|"
         "{%% endfor %%}{%% endif %%}{%% endfor %%}");
-    if (tail < 0 || n + tail >= (int)sizeof(frame)) return false;
+    if (tail < 0 || n + tail >= (int)FRAME) return false;
     n += tail;
 
-    // EVERY ENTITY'S AREA (2.10d, K44, K46): "@>sensor.x>office>Office|" -
+    // EVERY ENTITY'S AREA (K46): "@>sensor.x>office>Office|" -
     // HA's area_id() and area_name(), the entity's own area or else its
-    // device's; empty when it has none. For a card label set to "HA area". Learnt members are asked
-    // too: a member can be a card's primary one day (K17).
-    int add = snprintf(frame + n, sizeof(frame) - n, "{%% for e in [");
-    if (add < 0 || n + add >= (int)sizeof(frame)) return false;
+    // device's; empty when it has none. For a card label set to "HA area".
+    // Learnt members are asked too: a member can be a card of its own (K17).
+    int add = snprintf(frame + n, FRAME - n, "{%% for e in [");
+    if (add < 0 || n + add >= (int)FRAME) return false;
     n += add;
     uint8_t asked = 0;
     for (uint8_t i = 0; i < _reg->count(); i++) {
         const Entity *e = _reg->at(i);
         if (!e || e->desc.source != EntitySource::HA || e->desc.kind == EntityKind::BUTTON) continue;
-        add = snprintf(frame + n, sizeof(frame) - n, "%s'%s'", asked ? "," : "", e->desc.externalRef);
-        if (add < 0 || n + add >= (int)sizeof(frame) - 260) {
+        add = snprintf(frame + n, FRAME - n, "%s'%s'", asked ? "," : "", e->desc.externalRef);
+        if (add < 0 || n + add >= (int)FRAME - 260) {
             Serial.printf("[HaProv] area query frame full at %u entities\n", (unsigned)asked);
             break;
         }
         n += add;
         asked++;
     }
-    // ...and its DEVICE's name (2.10e, the window's Properties): the owner's
-    // name for it, else the device's own; empty without a device. Measured
-    // 2026-10-11: light.office -> "Office", the thermostat -> "THERMOSTAT".
-    add = snprintf(frame + n, sizeof(frame) - n,
+    // ...and its DEVICE's name (the window's Properties): the user's name for
+    // it, else the device's own; empty without a device. light.office gives
+    // "Office", the thermostat "THERMOSTAT".
+    add = snprintf(frame + n, FRAME - n,
                    "] %%}@>{{ e }}>{{ area_id(e) or '' }}>{{ area_name(e) or '' }}>"
                    "{%% set d = device_id(e) %%}{{ (device_attr(d,'name_by_user') or device_attr(d,'name')) if d else '' }}"
                    "|{%% endfor %%}\"}");
-    if (add < 0 || n + add >= (int)sizeof(frame)) return false;
+    if (add < 0 || n + add >= (int)FRAME) return false;
     n += add;
     if (!named && !asked) return true;   // nothing to ask this session
 
@@ -167,7 +181,7 @@ bool HaProvider::sendSceneQuery() {
 // Grouped by light, as the template writes them; each group is learnt in one
 // call. The last field: V visible, H hidden in HA's UI.
 void HaProvider::parseScenes(const char *result) {
-    static char buf[4096];   // websocket task only; the areas (2.10d) follow the scenes
+    static char buf[4096];   // websocket task only; the areas follow the scenes
     snprintf(buf, sizeof(buf), "%s", result ? result : "");
 
     const char *refs[ENTITY_SCENES_MAX], *names[ENTITY_SCENES_MAX];
@@ -195,13 +209,13 @@ void HaProvider::parseScenes(const char *result) {
         char *a = strchr(tok, '>');
         char *b = a ? strchr(a + 1, '>') : nullptr;
         if (!a || !b) continue;
-        // "@>sensor.x>office>Office": an entity's area id and name (2.10d),
+        // "@>sensor.x>office>Office": an entity's area id and name,
         // not a scene.
         if (tok[0] == '@' && a == tok + 1) {
             *b = '\0';
             char *c2 = strchr(b + 1, '>');
             if (c2) *c2 = '\0';
-            char *c3 = c2 ? strchr(c2 + 1, '>') : nullptr;   // the device (2.10e)
+            char *c3 = c2 ? strchr(c2 + 1, '>') : nullptr;   // the device
             if (c3) *c3 = '\0';
             const char *ref = a + 1, *areaId = b + 1, *area = c2 ? c2 + 1 : "", *device = c3 ? c3 + 1 : "";
             for (uint8_t i = 0; i < _reg->count(); i++) {
@@ -214,7 +228,7 @@ void HaProvider::parseScenes(const char *result) {
             }
             continue;
         }
-        char *c = strchr(b + 1, '>');   // absent from an older template: visible
+        char *c = strchr(b + 1, '>');   // absent: visible
         *a = '\0';
         *b = '\0';
         if (c) *c = '\0';
@@ -232,6 +246,62 @@ void HaProvider::parseScenes(const char *result) {
                   (unsigned)scenes, (unsigned)lights, (unsigned)nHidden, (unsigned)withArea, (unsigned)areas);
 }
 
+// ---------------------------------------------------------------------------
+// What HA offers (HaCatalog.h). Loop task.
+// ---------------------------------------------------------------------------
+
+bool HaProvider::sendCatalogQuery() {
+    if (!_cat || !_ha) return false;
+    static char *frame = bigBuf(1536);
+    if (!frame) return false;
+    const uint32_t id = _ha->nextId();
+    const int n = snprintf(frame, 1536, "{\"id\":%lu,\"type\":\"render_template\",\"template\":\"%s\"}",
+                           (unsigned long)id, HaCatalog::templateText());
+    if (n <= 0 || n >= 1536) return false;
+    _catDone.store(false);
+    _catTpl.store(id);
+    if (!_ha->sendText(frame, n)) { _catTpl.store(0); return false; }
+    Serial.printf("[HaProv] render_template id %lu: the fleet catalogue (%d B)\n", (unsigned long)id, n);
+    return true;
+}
+
+// HA's own word that something in its registries moved: an entity labelled,
+// moved to another area or renamed, an area added or renamed. Allowed to any
+// user's token (HA's subscription allowlist). Answered with the catalogue
+// asked again, a few seconds after the last of a burst.
+bool HaProvider::sendRegistrySubs() {
+    static const char *const TYPES[2] = {"entity_registry_updated", "area_registry_updated"};
+    for (uint8_t k = 0; k < 2; k++) {
+        char frame[112];
+        const uint32_t id = _ha->nextId();
+        const int n = snprintf(frame, sizeof(frame), "{\"id\":%lu,\"type\":\"subscribe_events\",\"event_type\":\"%s\"}",
+                               (unsigned long)id, TYPES[k]);
+        _regIds[k].store(id);
+        if (!_ha->sendText(frame, n)) return false;
+    }
+    return true;
+}
+
+void HaProvider::catalogLoop(uint32_t session) {
+    if (!_cat) return;
+    if (_regSession != session && sendRegistrySubs()) _regSession = session;
+    if (_catSession != session) { _catSession = session; _catWanted.store(true); }
+    const uint32_t changed = _regChangedMs.load();
+    if (changed && millis() - changed > 3000) { _regChangedMs.store(0); _catWanted.store(true); }
+
+    const uint32_t tpl = _catTpl.load();
+    if (tpl && _catDone.exchange(false)) {
+        char frame[96];
+        const int n = snprintf(frame, sizeof(frame),
+                               "{\"id\":%lu,\"type\":\"unsubscribe_events\",\"subscription\":%lu}",
+                               (unsigned long)_ha->nextId(), (unsigned long)tpl);
+        _ha->sendText(frame, n);
+        _catTpl.store(0);
+        return;
+    }
+    if (!tpl && _catWanted.load() && sendCatalogQuery()) _catWanted.store(false);
+}
+
 void HaProvider::loop(uint32_t nowMs) {
     (void)nowMs;
     if (!_ha) return;
@@ -246,23 +316,24 @@ void HaProvider::loop(uint32_t nowMs) {
     if (!_ha->isReady() || session == 0) return;
 
     if (_subscribedForSession == session) {
-        // ENTITIES LEARNT SINCE (2.10c): the members of a group, registered
+        // ENTITIES LEARNT SINCE: the members of a group, registered
         // when it reported. A second subscribe_trigger for just them - HA keeps
         // both - and HaRest fetches their values on its own, since it walks
         // the table to its end whenever the table has grown.
         const uint8_t count = _reg->count();
-        if (count > _subscribedCount) {
-            if (sendSubscribe(_subscribedCount, count) < 0) return;   // retried next loop
-            _subscribedCount = count;
+        while (count > _subscribedCount) {
+            uint8_t reached = _subscribedCount;
+            if (sendSubscribe(_subscribedCount, count, &reached) < 0) return;   // retried next loop
+            _subscribedCount = reached;
         }
         // A pause saved for a member could not be applied at boot: it did not
         // exist yet.
         if (_reg->takeLearnt()) {
             _reg->restorePaused();
-            // NOR WERE ITS AREA AND DEVICE ASKED (#93): the session's query
-            // goes as soon as the subscription does, and a group reports its
-            // members after that - so a member's Properties said "None". Asked
-            // once more, everything again, when the first query is done.
+            // A member's AREA AND DEVICE are not in the session's query (#93):
+            // it goes as soon as the subscription does, and a group reports its
+            // members after that, so their Properties would say "None". The
+            // query is asked once more, everything again, when the first is done.
             if (_scenesForSession == session) _askAgain = true;
         }
 
@@ -283,20 +354,22 @@ void HaProvider::loop(uint32_t nowMs) {
             _ha->sendText(frame, n);
             _tplId.store(0);
         }
+        catalogLoop(session);
         return;
     }
 
     const uint8_t count = _reg->count();
-    if (sendSubscribe(0, count) <= 0) return;
+    uint8_t reached = 0;
+    if (sendSubscribe(0, count, &reached) <= 0) return;
     _subscribedForSession = session;
-    _subscribedCount      = count;
+    _subscribedCount      = reached;   // the rest, a frame at a time, from the next pass
     _tplId.store(0);   // a template from the last session died with it
     _tplDone.store(false);
     _askAgain = false;
 
     // Subscribing and re-fetching are ONE event, so they happen in one place.
     //
-    // The order matters and it is subscribe-then-fetch, not the reverse. The
+    // The order matters: subscribe, then fetch. The
     // subscription is live from the moment HA accepts it, so anything that
     // changes DURING the fetch pass still arrives; the fetch then fills in
     // everything that was already sitting still. Fetching first would leave a
@@ -317,7 +390,7 @@ void HaProvider::onMessage(const char *json, size_t len, void *ctx) {
 
 void HaProvider::handle(const char *json, size_t len) {
     if (!_reg) return;
-    if (_rawFn && _rawFn(json, len, _rawCtx)) return;   // HaHistory's answer (2.10e)
+    if (_rawFn && _rawFn(json, len, _rawCtx)) return;   // HaHistory's answer
 
     // A FILTERED PARSE, because ~95% of every trigger event is discardable.
     //
@@ -338,7 +411,8 @@ void HaProvider::handle(const char *json, size_t len) {
         JsonObject attrs = ts["attributes"].to<JsonObject>();
         haAttrFilter(attrs);
         haEntityFilter(attrs);
-        filter["event"]["result"]     = true;   // a template's answer (2.10c)
+        filter["event"]["result"]     = true;   // a template's answer
+        filter["event"]["event_type"] = true;   // HA's registries changed
         filter["type"]                = true;
         // Needed to read the subscription's own reply. Without these three the
         // filtered parse drops them and every result looks like success=false.
@@ -361,20 +435,22 @@ void HaProvider::handle(const char *json, size_t len) {
 
     // THE REPLY TO OUR OWN SUBSCRIPTION, AND IT IS WORTH READING.
     //
-    // This was originally discarded with every other "result", which meant a
-    // REFUSED subscription looked exactly like an accepted one that nothing
-    // had happened on yet - and since these entities can be quiet for hours,
-    // "no events" is the normal case. The failure would have surfaced as "the
-    // dashboard never updates", days later, with nothing in the log.
+    // Discarding it with every other "result" would make a REFUSED
+    // subscription look exactly like an accepted one that nothing had happened
+    // on yet - and since these entities can be quiet for hours, "no events" is
+    // the normal case. The failure would surface as "the dashboard never
+    // updates", days later, with nothing in the log.
     //
     // HA answers {"id":N,"type":"result","success":true|false,...}. We match
     // on the id we sent and say so either way.
     if (strcmp(type, "result") == 0) {
         uint32_t rid = doc["id"] | 0UL;
-        if (rid != 0 && rid == _pendingSubId) {
-            _pendingSubId = 0;
+        bool sub = false;
+        for (uint8_t k = 0; rid && k < SUB_IDS; k++) if (_subIds[k].load() == rid) { sub = true; break; }
+        if (sub) {
             bool ok = doc["success"] | false;
-            _subAccepted = ok;
+            if (!ok) _subRefused = true;
+            _subAccepted = !_subRefused;   // every part so far, not just the last
             if (ok) {
                 Serial.printf("[HaProv] HA ACCEPTED the subscription (id %lu)\n",
                               (unsigned long)rid);
@@ -384,6 +460,11 @@ void HaProvider::handle(const char *json, size_t len) {
                 Serial.printf("[HaProv] HA REFUSED the subscription (id %lu): %s - %s\n",
                               (unsigned long)rid, code, msg);
             }
+        } else if (rid != 0 && (rid == _regIds[0].load() || rid == _regIds[1].load() || rid == _catTpl.load())) {
+            if (!(doc["success"] | false))
+                Serial.printf("[HaProv] HA REFUSED a catalogue request (id %lu): %s - %s\n", (unsigned long)rid,
+                              doc["error"]["code"] | "?", doc["error"]["message"] | "");
+            if (rid == _catTpl.load() && !(doc["success"] | false)) _catTpl.store(0);
         } else if (rid != 0 && rid == _tplId.load()) {
             if (!(doc["success"] | false)) {
                 Serial.printf("[HaProv] HA REFUSED the scene query: %s - %s\n",
@@ -399,6 +480,19 @@ void HaProvider::handle(const char *json, size_t len) {
     }
 
     if (strcmp(type, "event") != 0) return;
+
+    // The catalogue's answer, and HA's registries changing.
+    const uint32_t eid = doc["id"] | 0UL;
+    const uint32_t cat = _catTpl.load();
+    if (cat && eid == cat) {
+        if (_cat && !_catDone.load()) _cat->parse(doc["event"]["result"] | "");
+        _catDone.store(true);
+        return;
+    }
+    if (eid && (eid == _regIds[0].load() || eid == _regIds[1].load())) {
+        _regChangedMs.store(millis() | 1);   // never 0, which means none
+        return;
+    }
 
     // The scene query's answer: learnt here, unsubscribed by loop().
     const uint32_t tpl = _tplId.load();
@@ -416,7 +510,7 @@ void HaProvider::handle(const char *json, size_t len) {
     if (!ref[0] || !state[0]) return;
 
     // Map HA's entity id back to ours. A linear scan over the registry is
-    // right at this size - 18 entities, a handful of events a minute - and it
+    // right at this size - at most ENTITY_MAX entities, a handful of events a minute - and it
     // keeps the mapping in exactly one place: the descriptor's externalRef.
     const Entity *match = nullptr;
     for (uint8_t i = 0; i < _reg->count(); i++) {
@@ -438,11 +532,6 @@ void HaProvider::handle(const char *json, size_t len) {
     // anything stopped rendering - which is what keeps the registry and the
     // screen telling the same story.
     //
-    // This guard was written once and silently lost: the scripted edit that
-    // was meant to insert it never matched, and the script reported success
-    // anyway. The owner found it in thirty seconds by pausing a light and
-    // toggling it in HA. See CLAUDE.md on confirming a scripted edit changed
-    // the file.
     if (match->paused) {
         DBG_HAP("%s paused; inbound value dropped\n", match->desc.id);
         return;
@@ -467,7 +556,7 @@ void HaProvider::handle(const char *json, size_t len) {
     EntityAttrs attrs;
     haReadAttrs(to["attributes"], attrs);
     _reg->setAttrs(match->desc.id, attrs);
-    // A learnt member's name; a group's members (2.10c). Anything learnt here
+    // A learnt member's name; a group's members. Anything learnt here
     // is subscribed to by loop(), on the loop task.
     haLearn(*_reg, *match, to["attributes"]);
 

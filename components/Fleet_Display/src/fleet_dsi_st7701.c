@@ -4,7 +4,7 @@
 // comment in fleet_dsi_panel.h.
 //
 // The same chip drives WS_S3_4B over RGB; that half of the driver is not
-// reached from here (2.9 step 4).
+// reached from here (see fleet_rgb_st7701.c).
 #include "fleet_dsi_panel.h"
 #if SOC_MIPI_DSI_SUPPORTED
 

@@ -1,4 +1,4 @@
-// The window's shared helpers (2.12 P1, split from CardPopup.cpp): its sizes, bare objects and
+// The window's shared helpers: its sizes, bare objects and
 // labels, and what the entities it shows say - members, on or off, a light's levels.
 #include "PopupState.h"
 
@@ -9,7 +9,7 @@ namespace popup {
 int32_t mm(float v) { return UI::mm(v); }
 
 // "P4_5 millimetres": a length that is `v` mm in the P4_5's window, the same
-// SHARE of this one (owner, 2026-10-05: the hero the same proportion of the
+// SHARE of this one (the hero is the same proportion of the
 // window on every board). For the hero and what is laid out around it; touch
 // targets and text stay real millimetres, so they are the same size under a
 // finger everywhere.
@@ -17,7 +17,7 @@ int32_t pm(float v) {
     return (int32_t)lroundf(v * (float)s.propH / REF_WIN_H_MM);
 }
 
-// A bare object, and a label in a font and colour: the kit's (2.12 P3).
+// A bare object, and a label in a font and colour: the kit's.
 lv_obj_t *plain(lv_obj_t *parent) { return Kit::plain(parent); }
 
 lv_obj_t *makeLabel(lv_obj_t *parent, const lv_font_t *f, uint32_t hex) { return Kit::label(parent, f, hex); }
@@ -35,15 +35,15 @@ void setText(lv_obj_t *l, const char *t) {
 int32_t textW(const char *txt, const lv_font_t *f) { return Kit::textW(txt, f); }
 
 // A round icon button at the minimum touch size: a soft dent in the card
-// surface (owner, round 6), so it reads as a button and not a stray glyph
-// (owner, H1), tinted while pressed - the kit's (Kit::iconButton()).
+// surface, so it reads as a button and not a stray glyph,
+// tinted while pressed - the kit's (Kit::iconButton()).
 lv_obj_t *iconButton(lv_obj_t *parent, const char *glyph, const lv_font_t *f,
                      lv_event_cb_t cb, lv_obj_t **outLabel) {
     return Kit::iconButton(parent, glyph, f, cb, outLabel);
 }
 
 // ---------------------------------------------------------------------------
-// The members of what the window stands for (2.10c): a group defined here -
+// The members of what the window stands for: a group defined here -
 // the card's entities - or at the source - the members the registry learnt.
 // The Members view lists these, and a tap on one opens it.
 // ---------------------------------------------------------------------------
@@ -54,7 +54,11 @@ const Entity *memberAt(uint8_t i) {
     return (i < s.nEnt) ? s.ent[i] : nullptr;
 }
 
-bool hasMembers() { return s.native ? s.native->nMembers > 0 : s.nEnt > 1; }
+// A group shown as one card has its Members whatever its face is (K157).
+bool hasMembers() {
+    if (s.groupCard && !inMember()) return true;
+    return s.native ? s.native->nMembers > 0 : s.nEnt > 1;
+}
 
 // Should ent[] hold the members? While any is paused - and the group itself is
 // not, which is a group paused as a whole (Card::setPaused pauses both).
@@ -89,14 +93,14 @@ bool allPaused() {
     return s.nEnt && n == s.nEnt;
 }
 
-// A PAUSED MEMBER IS OUT OF THE GROUP (owner, 2.10b round 1) - not counted,
+// A PAUSED MEMBER IS OUT OF THE GROUP (K14) - not counted,
 // not offered, not commanded - unless every member is; Card::counts() is the
 // same rule for the card.
 bool counts(const Entity *e) {
     return e && (!e->paused || allPaused());
 }
 
-// ON BY THE CARD'S GROUP RULE (2.10b): any member, or all of them - GroupOn,
+// ON BY THE CARD'S GROUP RULE: any member, or all of them - GroupOn,
 // what an HA group helper offers. One entity is the same rule with one member.
 Agg aggregate() {
     Agg a;
@@ -136,8 +140,7 @@ LightAgg lightAggregate() {
         const EntityAttrs &at = e->attrs;
         L.allCaps |= at.lightCaps;
         // IN A GROUP A PAUSED MEMBER NEVER OFFERS A MODE - not even when every
-        // member is paused (owner, round 3 P4: pausing the last one brought
-        // Lamp 3's Colour back). One paused light keeps its own, greyed.
+        // member is paused. One paused light keeps its own, greyed.
         if (!group || !e->paused) L.caps |= at.lightCaps;
         if (!counts(e)) continue;   // and its levels are left out too
         if (at.minTempK && (!L.minK || at.minTempK < L.minK)) L.minK = at.minTempK;
@@ -177,7 +180,7 @@ const char *whatWord(const Entity &e, char *buf, size_t cap) {
     return buf;
 }
 
-// --- A PAUSED WINDOW (owner, 2.10b round 1) ---------------------------------
+// --- A PAUSED WINDOW (K14) ---------------------------------
 // Its controls are greyed - every colour mixed toward the window - and a
 // PAUSED pill, the card's own badge, sits at the top of the column. Built
 // in at build time (the strips' colours are baked into their pieces), so a
@@ -187,8 +190,8 @@ uint32_t quiet(uint32_t hex) {
 }
 
 // Inside one member's own views (its controls, its history): the group's
-// entities are set aside in groupEnt while ent[] holds the member.
-bool inMember() { return s.groupN > 0; }
+// entities are set aside (PopupMembers.cpp) while ent[] holds the member's.
+bool inMember() { return s.depth > 0; }
 
 // Rough luminance, to keep the fill visible against its track.
 int32_t lumOf(uint32_t hex) {

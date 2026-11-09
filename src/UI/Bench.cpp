@@ -1,5 +1,5 @@
-// Bench - milestone 2.9 (#67), step 1. The interface is in Bench.h; the
-// reasons are here.
+// Bench - times where a frame goes. The interface is in Bench.h; the reasons
+// are here.
 //
 // WHAT IS TIMED, AND HOW. Each frame is: invalidate the target, then
 // lv_refr_now(), with esp_timer (microseconds) around it. LVGL's own FPS
@@ -12,8 +12,8 @@
 //   copy     inside draw16bitRGBBitmap(), summed over the frame's chunks
 //   present  inside gfx->flush() on the frame's last chunk
 //   wait     LVGL waiting for a flush to finish (LV_EVENT_FLUSH_WAIT_*).
-//            ~0 today because the flush is synchronous; it is here so the
-//            asynchronous esp_lcd flush of step 2 is measured the same way
+//            ~0 where the flush is synchronous; the asynchronous esp_lcd
+//            flush is measured the same way
 //   render   total - copy - present - wait: what LVGL itself costs
 //
 // `copy + present` is the most any flush change can win back. `render` is
@@ -22,9 +22,9 @@
 // Between frames the task yields for one tick, outside the timed part, so the
 // WiFi and websocket tasks are serviced and nothing times out during a run.
 //
-// what=anim IS DIFFERENT: NOTHING IS FORCED. The owner saw P4_5 stutter when
-// one deck panel opens while the other closes (2026-09-26); 7B and 4B stay
-// smooth. A forced full-screen frame cannot show that, so this mode taps the
+// what=anim IS DIFFERENT: NOTHING IS FORCED. It exists to measure the stutter
+// seen when one deck panel opens while the other closes. A forced full-screen
+// frame cannot show that, so this mode taps the
 // panel headers exactly as a finger does and lets loop() run as it always
 // does, recording every frame LVGL draws on its own schedule: when it began,
 // the same total/copy/present/wait split per frame, and how tall each panel
@@ -431,7 +431,7 @@ bool animPrepare() {
     return true;
 }
 
-// The owner's case: tap the closed panel, which opens it and closes the open
+// The case under test: tap the closed panel, which opens it and closes the open
 // one - both animating at once. Swaps alternate B, A, B, ...
 bool animSwap() {
     if (s_res.req.what == What::WHAT_PAGE) {

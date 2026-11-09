@@ -1,16 +1,16 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// THE SYSTEM PANEL - the status icons' panel (2.8, D-13, D-22, D-25).
+// THE SYSTEM PANEL - the status icons' panel (D-13, D-22, D-25).
 //
 //   CONNECTIVITY          Wi-Fi (its network, signal and address), Home
 //                         Assistant, MQTT - each its live state, its glyph
-//   SYSTEM - DIAGNOSTICS  Log, UI Tweaks, About; "Scheme:" Fleet / Midnight /
-//                         Linen; Col - / + Row - / +
+//   SYSTEM - DIAGNOSTICS  Log, UI Tweaks, About, Reset; "Scheme:" Fleet /
+//                         Midnight / Linen; "Grid:" Auto, Col - / + Row - / +
 //
 // Its frame is the kit's drawer (D-20), one shape with the status slot's tab
-// (D-23). The knobs that used to fill it are UI Tweaks' (a window of its own,
-// D-22); the deck is reached from there. Deep links to the Wi-Fi settings and
-// the connectivity stats come with the settings pages (Q6, 4.1).
+// (D-23). The card looks are UI Tweaks' (a window of its own, D-22); the deck is
+// reached from there. Deep links to the Wi-Fi settings and the connectivity
+// stats are planned with the settings pages.
 //
 // It also BUFFERS THE SYSTEM DOCTOR'S LOG (a SystemReport sink) for LogPage,
 // whether or not it is open.
@@ -45,8 +45,8 @@ public:
     using DumpCallback = std::function<void()>;
     void setOnDumpRequested(DumpCallback cb) { _onDumpRequested = cb; }
 
-    // The accumulated report, as plain text. The panel BUFFERS the log; it no
-    // longer displays it - LogPage does. Keeping the buffer here means the
+    // The accumulated report, as plain text. The panel BUFFERS the log; LogPage
+    // displays it. Keeping the buffer here means the
     // boot-time dump is already waiting when the page is first opened.
     const char *logText() const { return _log_text.c_str(); }
     // Called whenever the drained log text changes, so an open LogPage can
@@ -76,10 +76,10 @@ public:
     void requestTweaks();                        // puts the panel away first
     void chooseScheme(uint8_t i);
 
-    // The 2.5 GRID KNOBS - counts, not nudges; "A" (auto) past the ends. One
-    // callback carrying a code: this panel is a remote control and knows
-    // nothing of what a column is. Since 2.11 round 9 a count is a PIN the
-    // arranger keeps, and GRID_AUTO takes both pins away (the arranger chooses).
+    // The GRID KNOBS - counts, not nudges. One callback carrying a code: this
+    // panel is a remote control and knows nothing of what a column is. A count
+    // is a PIN the arranger keeps, and GRID_AUTO takes both pins away (the
+    // arranger chooses).
     enum class GridAction : uint8_t { CARD_W_DOWN, CARD_W_UP, ASPECT_DOWN, ASPECT_UP, GRID_AUTO };
     using GridCallback = std::function<void(GridAction)>;
     void setOnGridAction(GridCallback cb) { _onGridAction = cb; }
@@ -90,7 +90,7 @@ public:
     void setGridText(GridText cb) { _gridText = cb; }
     void refreshGrid();
 
-    // THE DEVELOPMENT RESET (2.11 round 9): SYSTEM - DIAGNOSTICS' Reset and the
+    // THE DEVELOPMENT RESET: SYSTEM - DIAGNOSTICS' Reset and the
     // dialog that asks first - `detail` is its count of what goes ("brief", "as
     // built" / "5 changes", for a line when there is room for one).
     using DashText = std::function<void(char *brief, size_t nBrief, char *detail, size_t nDetail)>;
@@ -105,12 +105,12 @@ public:
     void setConnectivityText(ConnText cb) { _connText = cb; }
 
     void setTopOffset(int32_t y);
-    // THE STATUS SLOT'S PANEL (2.8, D-13): it hangs under its slot, centred on
+    // THE STATUS SLOT'S PANEL (D-13): it hangs under its slot, centred on
     // `centreX` and kept on the screen; a Kit::Drawer like every other slot's
     // panel (D-20), one shape with its tab (D-23).
     void setAnchorX(int32_t centreX);
     // Where the panel stands [l, r), for the tab's coves (D-23).
-    // Called once the panel has finished closing (its tab closes then, round 4).
+    // Called once the panel has finished closing (its tab closes then).
     void setOnClosed(std::function<void()> cb) { _onClosed = cb; }
     void panelSpan(int32_t &l, int32_t &r) const { l = _drawer.x; r = _drawer.x + _drawer.w; }
 
@@ -127,7 +127,7 @@ public:
 
 private:
     // Width thresholds, in LOGICAL pixels: a judgement about readable panel
-    // width (#50). The fleet's logical widths cluster at 330 / 480 / 727-740 /
+    // width. The fleet's logical widths cluster at 330 / 480 / 727-740 /
     // 1024, so both sit in a wide gap.
     static constexpr int32_t PANEL_WIDE_LOGICAL = 700;   // and up -> half width
     static constexpr int32_t PANEL_MID_LOGICAL  = 400;   // and up -> three quarters
@@ -164,11 +164,11 @@ private:
     std::vector<std::string> _log_queue;
     std::string              _log_text;   // what LogPage renders
     // How much log to keep, trimmed from the FRONT: a diagnostic tail, not a
-    // history (at 4 KB a third dump was cut off mid-report).
+    // history (a small cap would cut a dump off mid-report).
     static constexpr size_t  LOG_TAIL_MAX = 12000;
     // The queue between log() and the tick that drains it is capped by BYTES,
-    // at the same budget as the text it feeds (a cap of 100 LINES silently
-    // dropped the tail of every dump once the report passed 100 lines).
+    // at the same budget as the text it feeds (a cap in lines would silently
+    // drop the tail of a long report).
     size_t   _log_queue_bytes = 0;
     uint16_t _log_dropped     = 0;   // lines refused since the last drain, reported once
     std::function<void(const char *)> _log_on_change;

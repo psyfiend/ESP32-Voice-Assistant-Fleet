@@ -36,7 +36,7 @@ void begin(HttpServer &http);
 void service();
 
 #ifdef DISPLAY_ESPLCD
-// THE FLUSH'S CORRECTNESS CHECK (2.9): on the LVGL thread, flush everything
+// THE FLUSH'S CORRECTNESS CHECK: on the LVGL thread, flush everything
 // pending, then compare - in one instant, so nothing can change in between -
 // LVGL's render of the object tree with the frame buffer the panel is
 // showing, pixel by pixel at RGB565 precision. `bad` is the number of pixels

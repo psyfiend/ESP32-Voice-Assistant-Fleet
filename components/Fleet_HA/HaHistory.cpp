@@ -354,7 +354,7 @@ void HaHistory::parseLogbook(const char *json, size_t len) {
         const char *cdom  = e["context_domain"] | "";
         const char *csvc  = e["context_service"] | "";
         ev.detail[0] = '\0';
-        // The forms seen in a week of the Office group (2026-10-11): a person's
+        // The forms seen in a week of the Office group: a person's
         // call_service (50), an automation with what triggered it (21), and
         // nothing at all (24 - the Hue app, a wall switch, the bulb itself).
         if (!strcmp(etype, "automation_triggered")) {

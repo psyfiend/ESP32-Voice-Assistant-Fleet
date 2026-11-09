@@ -10,6 +10,7 @@
 #include "PanelDebug.h"
 #include "HangWatch.h"
 #include "Settings.h"
+#include "HaValue.h"        // haDescriptor(): a card added from HA
 
 // Normally injected by scripts/fw_version.py via extra_scripts (derived from
 // `git describe`). Defined defensively here so a build still succeeds if that
@@ -24,8 +25,7 @@
 #endif
 
 // Who and what this board is. Every line here is BSP identity or chip
-// inventory - none of it is about the display, which is why it no longer opens
-// DisplayManager::begin(). Printed first so a pasted boot log always says which
+// inventory - none of it is about the display. Printed first so a pasted boot log always says which
 // build, on which board, before anything can go wrong.
 void SystemCore::printIdentity() {
     Serial.println();
@@ -43,11 +43,10 @@ void SystemCore::printIdentity() {
     // THE NUMBER THAT DECIDES WHETHER THE NETWORK WORKS.
     //
     // Internal heap is what the WiFi driver and LWIP take socket buffers from,
-    // and it is the first thing a large static array eats. WS_P4_5 spent an
-    // evening unable to hold a TCP connection - MQTT timing out at 60 s, every
-    // reconnect failing raw=-2, unpingable - with 10,928 bytes free, and
-    // nothing in the boot log said so. Printed here so that next time it is
-    // the first thing anyone sees.
+    // and it is the first thing a large static array eats. A board with only
+    // ~10 KB free cannot hold a TCP connection (MQTT times out, every
+    // reconnect fails, the board does not answer ping), so it is printed
+    // here, first.
     const uint32_t internalFree = ESP.getFreeHeap();
     Serial.printf("Internal heap free: %s%s\n",
                   SystemReport::fmtBytes(internalFree, b, sizeof(b)),
@@ -72,11 +71,27 @@ void SystemCore::heapMark(const char *stage) {
     last = now;
 }
 
-// The registry's pause list, kept in the settings file (2.10d, K38). The
+// The registry's pause list, kept in the settings file (K38). The
 // registry speaks a comma-delimited list of entity ids (EntityRegistry::
 // PauseStore); the file holds entities.<id>.paused = true, an entity that is
 // not paused having no entry.
 namespace {
+// A card added from HA (design/ha-cards.md 2.3) keeps its entity's HA id
+// as "ha", with the device class and unit HA gave when it was added: the
+// entity is made from those at boot, before any page is built.
+void adoptHaCard(const char *cardId, const char *ref, void *ctx) {
+    char dc[ENTITY_SHORT_MAX] = "", unit[ENTITY_SHORT_MAX] = "";
+    Settings::card(cardId, "ha_dc", dc, sizeof(dc));
+    Settings::card(cardId, "ha_unit", unit, sizeof(unit));
+    EntityDescriptor d;
+    if (!haDescriptor(ref, dc, unit, d)) {
+        Serial.printf("[Core] card %s: %s is no kind of card yet\n", cardId, ref);
+        return;
+    }
+    if (!static_cast<EntityRegistry *>(ctx)->adopt(d))
+        Serial.printf("[Core] card %s: no room for %s\n", cardId, ref);
+}
+
 bool listContains(const char *list, const char *id) {
     const size_t n = strlen(id);
     for (const char *p = list; *p; ) {
@@ -146,12 +161,10 @@ bool SystemCore::begin() {
     printIdentity();
 
     // --= 1. I2C =--
-    // This used to happen as a side effect inside DisplayManager::begin() -
-    // the display simply happened to be the first thing that needed the bus.
-    // Touch, the codecs and the IO expanders all need it too, so it is named
-    // here rather than inferred. FleetI2C::begin() is idempotent by design, so
-    // DisplayManager's own call is now a no-op and that component stays usable
-    // on its own.
+    // The display, touch, the codecs and the IO expanders all need the bus, so
+    // it is started here by name. FleetI2C::begin() is idempotent, so
+    // DisplayManager's own call is a no-op and that component stays usable on
+    // its own.
     FleetI2C::begin(bsp_hw.SDA_PIN, bsp_hw.SCL_PIN);
     heapMark("after I2C");
 
@@ -165,7 +178,7 @@ bool SystemCore::begin() {
     }
 #if defined(DISPLAY_ESPLCD) && defined(HAS_MIPI_PANEL)
     // GET /panel: the panel's own status, and its init sequence again
-    // (PanelDebug.h - the 4B's washed-out picture).
+    // (PanelDebug.h).
     PanelDebug::begin(_http, _display);
 #endif
 #ifdef DEBUG_HANG
@@ -209,7 +222,7 @@ bool SystemCore::begin() {
     beginEntityStorage();
     heapMark("after registry");
 
-    // --= 7a. The owner's saved settings (2.10d, Settings.h) =--
+    // --= 7a. The owner's saved settings (Settings.h) =--
     // Before anything reads a setting: the pause restore below, and every page
     // GUIManager builds.
     Settings::begin(_http);
@@ -232,7 +245,7 @@ bool SystemCore::begin() {
         _entities.add(EXTERNAL_ENTITIES[i]);
     }
 
-    // The owner's 18 Home Assistant entities (#43). Same standing as the MQTT
+    // The owner's Home Assistant entities (#43). Same standing as the MQTT
     // block above - someone else owns them, we only read - and registered in
     // the same place for the same reason: HaProvider derives its subscription
     // from the registry, so an entity that is not registered by now is an
@@ -243,29 +256,33 @@ bool SystemCore::begin() {
     for (uint8_t i = 0; i < HA_ENTITY_COUNT; i++) {
         _entities.add(HA_ENTITIES[i]);
     }
+    // ...and the entities of the cards added from HA's catalogue: one
+    // per card entry with "ha", unless the table has it already.
+    {
+        const uint8_t before = _entities.count();
+        Settings::forEachCardWith("ha", adoptHaCard, &_entities);
+        if (_entities.count() > before)
+            Serial.printf("[Core] %u entities for cards added from HA\n", (unsigned)(_entities.count() - before));
+    }
 
     // --= 10. Virtual test entities =--
-    // TEMPORARY scaffolding for milestone 2.4, removed with #44. Registers two
-    // writable switches so the command path has something to command - as of
-    // this milestone nothing else in the fleet is writable at all, and
-    // commandValue() has never run on hardware. Registered last because
-    // nothing else depends on it.
+    // TEMPORARY test scaffolding. Registers two writable switches so the
+    // command path has something to command (one that answers and one that
+    // does not). Registered last because nothing else depends on it.
     _virtProv.begin(&_entities);
 
     // --= 11. Home Assistant websocket session =--
     //
-    // LAST ON PURPOSE, and for a reason that will matter more than it does
-    // today. Right now HaClient only owns the socket, so it could start
-    // anywhere after the link and the registry exist. But #43's next piece
-    // subscribes to exactly the entities the registry holds - one
-    // subscribe_trigger naming all of them - so the session must not open
-    // before the registry is fully populated, or the subscription is built
-    // from a half-filled list and silently misses whatever registered late.
+    // LAST ON PURPOSE. HaProvider subscribes to exactly the entities the
+    // registry holds - one subscribe_trigger naming all of them - so the
+    // session must not open before the registry is fully populated, or the
+    // subscription is built from a half-filled list and silently misses
+    // whatever registered late.
     //
     // Starting it here costs nothing: begin() does not connect. It allocates
     // the reassembly buffer and moves to LINK_IDLE, and the first connection
     // attempt happens on the first loop() where Fleet_Connectivity reports
-    // online. A board with no network boots exactly as fast as before.
+    // online. A board with no network boots as fast as without it.
     _ha.begin(&_conn, &_entities);
 
     // Registers itself as the session's message handler and, once a session is
@@ -274,21 +291,20 @@ bool SystemCore::begin() {
     // setMessageHandler only stores a pointer and the order is not load-bearing.
     _haRest.begin(&_entities);
     _haProv.begin(&_entities, &_ha, &_haRest);
+    if (_haCat.begin()) _haProv.setCatalog(&_haCat);   // what HA offers the pickers
 
     // --= 12. Outbound commands =--
     //
     // Registers itself as the registry's command sink, so a card tap becomes a
-    // call_service or an MQTT publish. Before this, commandValue() applied a
-    // value optimistically and nothing ever transmitted it - #44 was the half
-    // of the command path that had never been written.
+    // call_service or an MQTT publish (#44).
     //
     // After the transports exist and before the pause restore, which only
     // touches flags.
     _cmdRouter.begin(&_entities, &_mqtt, &_ha);
     // HA's replies to those calls reach the router through the provider, which
-    // receives every message (2.10c): a refused call fails at once.
+    // receives every message: a refused call fails at once.
     _haProv.setResultHook(&CommandRouter::onHaResult, &_cmdRouter);
-    // History's answers are its own, and it sees every message first (2.10e).
+    // History's answers are its own, and it sees every message first.
     _haHist.begin(&_ha);
     _haProv.setRawHook(&HaHistory::onRaw, &_haHist);
 
@@ -298,14 +314,10 @@ bool SystemCore::begin() {
     // that is not in the table yet cannot be marked. Every provider above has
     // now registered, so the table is complete.
     //
-    // Issue #60 - "if I want a card paused I do not want a reboot to unpause
-    // it." A pause that survived the user but not the power cut would be worse
-    // than no pause at all.
-    //
-    // SINCE 2.10d THE PAUSES LIVE IN THE SETTINGS FILE (K38): entities.<id>.
-    // paused, alongside every other saved choice, so one export carries them.
-    // #60's NVS list is imported once and left where it is (older firmware
-    // still finds it).
+    // A pause has to survive a power cut (#60). The pauses live in the
+    // settings file (K38): entities.<id>.paused, alongside every other saved
+    // choice, so one export carries them. The older NVS list is imported once
+    // and left where it is (older firmware still finds it).
     if (!Settings::imported("nvs_paused")) {
         char old[512];
         if (EntityRegistry::readNvsPauseList(old, sizeof(old)) && old[0]) {
@@ -325,11 +337,11 @@ bool SystemCore::begin() {
 
 // Entity storage lives in PSRAM, not internal SRAM.
 //
-// It used to be a fixed array inside EntityRegistry, which put ~21 KB in
-// internal DRAM on every board. CYD_S3_3248 could not afford it: as the
-// fleet's only QSPI panel it is the only board whose LVGL buffers must also
-// be in internal SRAM, and the two together starved the WiFi driver badly
-// enough that softAP() crashed inside ieee80211_hostap_attach.
+// A fixed array inside EntityRegistry would put ~21 KB in internal DRAM on
+// every board. CYD_S3_3248 cannot afford it: as the fleet's only QSPI panel it
+// is the only board whose LVGL buffers must also be in internal SRAM, and the
+// two together starve the WiFi driver badly enough that softAP() crashes
+// inside ieee80211_hostap_attach.
 //
 // PSRAM also removes the ceiling: a build can size the registry for what it
 // actually needs rather than for the worst case across the fleet.
@@ -367,8 +379,7 @@ void SystemCore::mqttEvidence() {
     //
     // It is real evidence rather than a convenient assumption: PubSubClient
     // sends PINGREQ every keepalive interval and tears the session down if no
-    // PINGRESP comes back - which is precisely how the original fault
-    // announced itself ("state=-4 after 6080715 ms"). So a session that is
+    // PINGRESP comes back ("state=-4"). So a session that is
     // still up has completed a round trip to another host recently, which is
     // exactly the question the probe would have asked, already answered by
     // traffic the board was sending anyway.
@@ -411,9 +422,8 @@ void SystemCore::loop() {
     // by SystemCore and borrowed by everything above it" rule from
     // docs/design/startup.md pointed at a new problem.
     //
-    // During the original fault the device printed "broker unreachable" every
-    // few seconds for six hours while ConnectivityManager printed nothing at
-    // all. This is the wire that was missing.
+    // Without it a link fault shows as "broker unreachable" every few seconds
+    // while ConnectivityManager says nothing.
     mqttEvidence();
 
     const uint32_t now = millis();

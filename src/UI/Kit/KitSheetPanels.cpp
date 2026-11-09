@@ -1,4 +1,4 @@
-// The sheet's two folder panels (2.12 P4, moved from the card window's PopupPanels.cpp): SETTINGS
+// The sheet's two folder panels: SETTINGS
 // on the right and the view's own panel on the left - built (Kit::folder()), slid up and down,
 // dragged, and gone with the sheet. What their rows are is the client's.
 //
@@ -9,7 +9,7 @@
 // with the window, in the same frame. Opaque and on the screen, like the window, so moving it
 // redraws only it.
 //
-// THE LEFT PANEL (owner, round 7, "I want to see how the tab effect works"): SETTINGS' mirror
+// THE LEFT PANEL: SETTINGS' mirror
 // image in the left half, made by the same Kit::folder(), its tab a millimetre short of SETTINGS'
 // (two tabs side by side read as two). It belongs to a view (K43) - the card window's CHART or
 // ACTIVITY on History, SCENES on Scenes - up with it, gone when it goes.
@@ -17,15 +17,15 @@
 
 namespace Kit {
 
-constexpr uint32_t PEEK_MS = 200;   // the tab peeking up: a small touch the owner liked
-// 260 ms, from 220 (owner, round 7: choppier now that the panel opens further;
-// the page deck's panels take 300). Try 300 if it still stutters.
+constexpr uint32_t PEEK_MS = 200;   // the tab peeking up
+// 260 ms: a panel that opens far looks choppy faster (the page deck's panels take
+// 300). Try 300 if it stutters.
 constexpr uint32_t OPEN_MS = 260;
 
 static void slideExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); }
 
 // ---------------------------------------------------------------------------
-// DRAGGING A PANEL (owner, 2.10d P1b round 2). A panel is a sheet that slides
+// DRAGGING A PANEL. A panel is a sheet that slides
 // up to show itself; rows sliding about inside it broke that. So an open panel
 // taller than the room above the screen's bottom is moved WHOLE by the finger:
 // up, to bring its hidden rows on screen (it stays where it is let go, at most
@@ -47,7 +47,7 @@ static void slideExec(void *var, int32_t v) { lv_obj_set_y((lv_obj_t *)var, v); 
 
 // Where an open panel of height h rests: just tall enough to show its last
 // row, or - taller than the room - its tab's top on the window's top edge
-// (owner, 2026-10-07: never above the window when it opens).
+// (never above the window when it opens).
 static int32_t restY(const Sheet &S, int32_t h) {
     const int32_t sh = lv_obj_get_height(lv_screen_active());
     return LV_MAX(S.winRect.y1, sh - (h - S.panelHide));
@@ -126,7 +126,7 @@ static void trackCb(lv_event_t *ev) {
     const bool left = lv_event_get_user_data(ev) != nullptr;
     SheetPanel &P = left ? S->left : S->right;
     if (!P.track || lv_event_get_target(ev) != P.track) return;
-    // THE CEILING (owner, P1b round 2: D3, D8). LVGL's non-elastic clamp
+    // THE CEILING. LVGL's non-elastic clamp
     // (lv_indev_scroll.c elastic_diff()) holds only one way: for a drag up,
     // `scroll_end - diff < 0` with diff negative is never true, so one step of
     // the finger went past the end - the panel's bottom edge and a gap showed,
@@ -148,8 +148,7 @@ static void trackCb(lv_event_t *ev) {
 // The holder is out of sight: its track goes, and the holder with it.
 static void goneCb(lv_anim_t *a) { lv_obj_delete_async(lv_obj_get_parent((lv_obj_t *)a->var)); }
 
-// A panel going with its sheet - HOW depends on how it was showing (owner,
-// round 9): open, it vanishes with the window in the same frame; showing only
+// A panel going with its sheet - HOW depends on how it was showing: open, it vanishes with the window in the same frame; showing only
 // its tab, the tab slides back down as fast as it came up, on its own, after
 // the window has gone. It is no longer the sheet's then: its track stops
 // answering, its tab stops taking taps, and it deletes itself out of sight. A
@@ -226,7 +225,7 @@ void rightCreate(Sheet &S) {
     const uint8_t n = rightRows(S, r);
     S.right.sig = rowsSig(r, n);
     const int32_t w = lv_area_get_width(&S.winRect);
-    // SETTINGS IN THE RIGHT HALF, ALWAYS (owner, round 9).
+    // SETTINGS IN THE RIGHT HALF, ALWAYS.
     Folder F;
     folder(F, { &S.winRect, false, S.spec->panelTitle, rowsNeedW(r, n), n, w / 2, rightTabCb, trackCb, nullptr });
     take(S.right, F);
@@ -236,9 +235,8 @@ void rightCreate(Sheet &S) {
     S.right.filled = false;
 }
 
-// The pane's rows, BUILT WHEN THE PANEL IS FIRST OPENED (2.10b, owner: try
-// every reasonable saving). Folded, only the tab shows, and the rows were
-// ~5 KB of LVGL's pool that most windows never needed.
+// The pane's rows, BUILT WHEN THE PANEL IS FIRST OPENED. Folded, only the tab
+// shows, and the rows are ~5 KB of LVGL's pool that most windows never need.
 static void rightFill(Sheet &S) {
     if (!S.right.body || S.right.filled) return;
     S.right.filled = true;
@@ -251,7 +249,7 @@ void sheetRightSet(Sheet &S, uint8_t state) {
     if (!P.root) return;
     const uint8_t was = P.state;
     P.state = state;
-    // FOLDING, BACK TO THE TOP (owner, 2.10d): disarming puts a panel dragged
+    // FOLDING, BACK TO THE TOP: disarming puts a panel dragged
     // up back in one piece, so nothing of its rows shows in the tab's strip.
     const int32_t from = disarm(P);
     carets(P);
@@ -274,10 +272,9 @@ void sheetRightOpen(Sheet &S) {
     sheetRightSet(S, PANEL_OPEN);
 }
 
-// SETTINGS FOLLOWS ITS ROWS (K17 testing, owner: "Add as a card" came and
-// went). The panel is sized for its rows when it is made and filled when first
-// opened, so rows that change later - another view, "Added" - were missing or
-// cut off. When the rows are not the ones it was made for, it is made again in
+// SETTINGS FOLLOWS ITS ROWS. The panel is sized for its rows when it is made and
+// filled when first opened, so rows that change later - another view, "Added" -
+// would be missing or cut off. When the rows are not the ones it was made for, it is made again in
 // place: same state, no slide.
 void sheetRightSync(Sheet &S) {
     SheetPanel &P = S.right;
@@ -331,8 +328,8 @@ static void sideCreate(Sheet &S) {
     RowSpec r[ROWS_MAX];
     const uint8_t n = S.left.rows ? S.left.rows(r) : 0;
     const int32_t w = lv_area_get_width(&S.winRect);
-    // The left half; its tab stops a millimetre short of SETTINGS' (owner,
-    // round 7: two tabs side by side read as two).
+    // The left half; its tab stops a millimetre short of SETTINGS' (two tabs side
+    // by side read as two).
     Folder F;
     folder(F, { &S.winRect, true, S.left.title, rowsNeedW(r, n), n, w - w / 2 - UI::mm(UI::shape().S3),
                 sideTabCb, trackCb, (void *)1 });
@@ -354,7 +351,7 @@ void sheetSideSet(Sheet &S, uint8_t state) {
     SheetPanel &P = S.left;
     if (state == PANEL_HIDDEN && !P.root) return;
     // A panel just made has not been laid out: lv_obj_get_y() would say 0, and
-    // the first slide came down from the top of the screen (owner, N9).
+    // the first slide would come down from the top of the screen.
     const bool made = !P.root;
     if (made) sideCreate(S);
     if (state == P.state) return;
@@ -380,7 +377,7 @@ void sheetSideSet(Sheet &S, uint8_t state) {
 
 void sheetSideFold(Sheet &S) { if (S.left.state == PANEL_OPEN) sheetSideSet(S, PANEL_PEEK); }
 
-// With the sheet, or when its view goes (owner, N11): open, it vanishes in the
+// With the sheet, or when its view goes: open, it vanishes in the
 // same frame; showing its tab (or on its way down), it slides out of sight on
 // its own and deletes itself there.
 void sheetSideEnd(Sheet &S) {

@@ -9,11 +9,8 @@
 // ---------------------------------------------------------------------------
 // CardBinder - the one place the registry meets the UI.
 //
-// This is the missing half of a pipe that has been sitting unconnected since
-// milestone 1.7: EntityRegistry::drainDirty() has existed, fully documented,
-// since the registry was written, and until this file NOTHING IN THE TREE
-// CALLED IT. Every entity on the device has been updating a value that no
-// widget was watching.
+// It connects EntityRegistry::drainDirty() to the widgets: it is the only
+// caller of drainDirty() in the tree.
 //
 // The contract it satisfies is EntityRegistry.h's, verbatim:
 //
@@ -24,8 +21,7 @@
 // So there is exactly one of these, it owns exactly one lv_timer, and it is
 // the only caller of drainDirty() in the application. Pages come and go; the
 // binder does not, which is why it is separate from CardPage rather than part
-// of it - milestone 2.6's tileview will have several pages sharing this one
-// pump, and building them apart now costs nothing.
+// of it - several pages share this one pump.
 //
 // Why 100 ms and not every loop(): EntityValue::equals() already suppresses
 // unchanged values, so a topic firing 50 times a second produces no redraws at
@@ -45,8 +41,8 @@ public:
     void begin(EntityRegistry *reg);
 
     // Cards register themselves here, not with a page. A card that is on no
-    // page still gets values, which is what a future off-screen tileview page
-    // needs - and is why add() takes a Card and not a CardPage.
+    // page still gets values, which is what an off-screen page needs - and is
+    // why add() takes a Card and not a CardPage.
     bool add(Card *c);
     void remove(Card *c);
 
@@ -70,7 +66,7 @@ private:
     Card           *_cards[CARD_BINDER_MAX] = {nullptr};
     uint8_t         _n = 0;
 
-    // HA's areas as last applied to the cards' groups (2.10d), and when they
+    // HA's areas as last applied to the cards' groups, and when they
     // last changed: re-applied once they have been still a moment.
     uint32_t        _areaEpoch = 0;
     uint32_t        _areaMs = 0;

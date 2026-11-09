@@ -1,6 +1,6 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// THE SLOTS' PANELS (2.8, D-13): what slides down from a header slot when it is
+// THE SLOTS' PANELS (D-13): what slides down from a header slot when it is
 // tapped. The status slot's is the system panel (Panel_System); these are the
 // other kinds', built into a Kit::Drawer's face each time one opens (it is
 // emptied when it closes). Each starts small - header-slots.md section 3 says
@@ -8,8 +8,7 @@
 //
 //   clock   the time and the date; the next alarm and the warning time (D-21)
 //   page    the pages, to go to one; this page's header, shown or hidden (D-14);
-//           "View hidden cards", when it has some - their own sheet (2.11 round 6,
-//           K66, K96; HiddenSheet)
+//           CARDS: Edit cards and New group (K148, K168)
 //   sensor  its reading, when it last reported, or what went wrong
 //   alarm   the alarm's notice: when, Dismiss, Settings (the clock's panel)
 //
@@ -31,7 +30,9 @@ struct Context {
     uint8_t     pageIndex   = 0;
     bool        headerShown = true;
     uint8_t     hiddenCount = 0;                         // this page's pool (K66, K96)
-    void (*viewHidden)(void *user) = nullptr;            // ...their sheet (round 6)
+    void (*viewHidden)(void *user) = nullptr;            // ...their sheet (/popup?hidden=1 only; no button opens it)
+    void (*addCard)(void *user) = nullptr;               // CARDS' Add card (K140)
+    void (*newCluster)(void *user) = nullptr;            // ...and New group
     const char *entity      = nullptr;   // the sensor slot's
     EntityRegistry *reg     = nullptr;
     void *user = nullptr;                // handed back to those below
@@ -50,6 +51,7 @@ bool build(SlotKind kind, lv_obj_t *face, const Context &c);
 // /popup?hidden=1: as a tap on the page panel's "View hidden cards". False when
 // the page's panel has not been built with it.
 bool viewHiddenDebug();
+bool editCardsDebug();   // CARDS' Edit cards, as a tap
 #endif
 
 }  // namespace SlotPanels

@@ -1,11 +1,11 @@
-// GET /popup?tree=1|page (2.12 P0, split from CardPopup.cpp at P1). Debug builds only.
+// GET /popup?tree=1|page. Debug builds only.
 #include "PopupState.h"
 
 #ifdef DEBUG_POPUP
 namespace popup {
 
 // ---------------------------------------------------------------------------
-// GET /popup?tree=1|page (2.12, P0 - docs/design/ui-foundation.md): LVGL's
+// GET /popup?tree=1|page (docs/design/ui-foundation.md): LVGL's
 // object tree, one line per object, for scripts/ui_golden.py. It is the
 // refactor's safety net: geometry is the same every time for the same state,
 // where a screenshot is not (values and times change minute to minute), so two
@@ -394,7 +394,7 @@ void treeDump(bool page) {
                 " stacked=%d mainRowW=%ld propH=%ld win=%ld,%ld %ldx%ld r%ld pad=%ld title=%ld/%ld/%ld"
                 " deck=%u/%d/%ld side=%u/%u/%ld faces_flat=%lu sparks=%u\n",
                 (unsigned)s.view, (unsigned)s.lightCtl, (unsigned)s.nEnt, s.native ? 1 : 0, s.expanded ? 1 : 0,
-                (unsigned)s.groupN, s.lightHero ? "light" : s.toggleHero ? "toggle" : "disc",
+                (unsigned)s.depth, s.lightHero ? "light" : s.toggleHero ? "toggle" : "disc",
                 s.builtPaused ? "paused" : "live", (long)s.heroW, (long)s.heroH, (long)s.heroR,
                 s.stacked ? 1 : 0, (long)s.mainRowW, (long)s.propH, (long)s.winRect.x1, (long)s.winRect.y1,
                 (long)lv_area_get_width(&s.winRect), (long)lv_area_get_height(&s.winRect), (long)s.winRadius,

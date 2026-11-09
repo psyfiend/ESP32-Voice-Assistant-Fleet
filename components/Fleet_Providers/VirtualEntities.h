@@ -5,18 +5,12 @@
 #include "Entity.h"
 
 // ---------------------------------------------------------------------------
-// TEMPORARY, and more obviously so than the other two tables beside it.
+// A TEST HARNESS for the optimistic-write path (DECISIONS A4).
 //
-// These entities model nothing. They exist because milestone 2.4 has to prove
-// that a tap works, and as of this milestone THERE IS NOT ONE WRITABLE ENTITY
-// ANYWHERE IN THE FLEET - all eight are read-only telemetry and Zigbee sensor
-// readings. EntityRegistry::commandValue() and its optimistic-write reconcile
-// have been written, reviewed and never once executed.
-//
-// They go away when outbound commands (#44) land and a real light can be
-// tapped. Until then this is the only way the command path gets exercised at
-// all, and "coded, reviewed, and never run" is exactly the category that
-// produced #42 the moment someone finally ran it.
+// These entities model nothing. They give EntityRegistry::commandValue() and
+// its reconcile a writable entity that echoes and one that never does, with no
+// network involved. SystemCore does not start VirtualProvider, so they are
+// registered only by a build that begins it.
 //
 //   source     = VIRTUAL  - not a real peripheral, not a topic. MqttProvider
 //                           skips anything that is not EntitySource::MQTT, so
@@ -31,18 +25,16 @@
 // THE PAIR IS THE DESIGN. VirtualProvider echoes one of them back and
 // deliberately never echoes the other, so both halves of the optimistic write
 // are visible on glass at the same time: one card confirms and goes active,
-// the other reverts after the reconcile window and goes loud. Rendering only
-// the failure would have left the success path exactly as untested as it is
-// today.
+// the other reverts after the reconcile window and goes loud. Both halves of
+// the optimistic write are exercised together.
 // ---------------------------------------------------------------------------
 
 #define VIRT_ENT_SWITCH "test_switch"   // echoes. The command takes
 #define VIRT_ENT_STUCK  "test_stuck"    // never echoes. The command is refused
 
-// Four more well-behaved switches, added purely so the larger boards have
-// enough cards to fill more than a row or two. WS_P4_7B derives SEVEN columns
-// at 1024 px, and nine demo cards cannot show what four rows of grid look
-// like. All four echo, like VIRT_ENT_SWITCH.
+// Four lamps of different kinds (see VirtualProvider.cpp), enough cards to fill
+// more than a row or two on the larger boards. All four echo, like
+// VIRT_ENT_SWITCH.
 #define VIRT_ENT_L1     "test_lamp_1"
 #define VIRT_ENT_L2     "test_lamp_2"
 #define VIRT_ENT_L3     "test_lamp_3"
@@ -50,7 +42,7 @@
 
 // How long the obedient one takes to answer. Long enough to actually see the
 // optimistic value land before it is confirmed, short enough that it does not
-// read as a fault. Well inside EntityRegistry's 5 s reconcile window.
+// read as a fault. Well inside EntityRegistry's 3 s reconcile window.
 #define VIRT_ECHO_DELAY_MS 800
 
 inline const EntityDescriptor VIRTUAL_ENTITIES[] = {

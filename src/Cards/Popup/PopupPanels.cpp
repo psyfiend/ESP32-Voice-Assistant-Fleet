@@ -1,5 +1,5 @@
-// The folder panels as the card window uses them (2.12 P1, split from CardPopup.cpp; the sheet's
-// since P4 - KitSheetPanels.cpp builds, slides and drags them). SETTINGS on the right, whose rows
+// The folder panels as the card window uses them (the sheet's:
+// KitSheetPanels.cpp builds, slides and drags them). SETTINGS on the right, whose rows
 // are PopupSettingsRows.cpp; the left panel - CHART, ACTIVITY or SCENES - whose rows are
 // PopupSideRows.cpp, and which this file chooses per view.
 #include "PopupState.h"
@@ -15,14 +15,14 @@ void chartSet(uint8_t state) { Kit::sheetSideSet(s, state); }
 void chartFold()             { Kit::sheetSideFold(s); }
 void chartEnd()              { Kit::sheetSideEnd(s); }
 
-// THE LEFT PANEL IS CHART, ACTIVITY OR SCENES (2.10d, DECISIONS K43; 2.10e).
+// THE LEFT PANEL IS CHART, ACTIVITY OR SCENES (K43).
 // History and Scenes are never showing at once, so one panel in the left half
 // serves both: CHART's rows (or ACTIVITY's) on History, SCENES' on Scenes.
-// CLUSTER (2.11 round 16) is a cluster's Members': what the cluster is called,
-// what its header shows, and the cards that join it.
+// GROUP (SIDE_CLUSTER) is a group's Members': what its header shows, the cards
+// that join it, its area and its face.
 const char *sideTitle(uint8_t side) {
     return side == SIDE_SCENES ? "SCENES" : side == SIDE_ACTIVITY ? "ACTIVITY"
-         : side == SIDE_CLUSTER ? "CLUSTER" : "CHART";
+         : side == SIDE_CLUSTER ? "GROUP" : "CHART";
 }
 
 uint8_t (*sideRows(uint8_t side))(DeckRowSpec *) {
@@ -35,7 +35,7 @@ uint8_t (*sideRows(uint8_t side))(DeckRowSpec *) {
 // right one made; the same view rebuilt (a scene list that changed) keeps its
 // panel, open or not.
 void sideFor(PopupView v) {
-    // History's panel follows its subject (2.10e): CHART for a number, ACTIVITY
+    // History's panel follows its subject: CHART for a number, ACTIVITY
     // for the rest, none where there is no HA history. Another subject (a
     // member's history after the group's) gets its panel made afresh.
     uint8_t side = SIDE_NONE;
@@ -44,7 +44,10 @@ void sideFor(PopupView v) {
         if (histFromHa(s_hv.e)) side = s_hv.chart ? SIDE_CHART : SIDE_ACTIVITY;
     } else if (v == PopupView::VIEW_SCENES) {
         side = SIDE_SCENES;
-    } else if (v == PopupView::VIEW_MEMBERS && s.cluster && !inMember()) {
+    } else if (!inMember() && (s.cluster || s.groupCard) && v != PopupView::VIEW_CLUSTER_ADD) {
+        // A GROUP'S PANEL IN EVERY PRESENTATION (K155) AND ON EVERY VIEW WITHOUT
+        // PANELS OF ITS OWN (K175) - History and Scenes keep
+        // theirs; Edit cards has none.
         side = SIDE_CLUSTER;
     }
     if (s.left.root && s.left.kind != side) chartEnd();

@@ -1,6 +1,6 @@
 #pragma once
 #include <lvgl.h>
-#include "BoardDisplay.h"   // DisplayManager or Fleet_Display, per board (2.9)
+#include "BoardDisplay.h"   // DisplayManager or Fleet_Display, per board
 #include "TouchManager.h"
 #include "UI/UIToolkit.h"
 

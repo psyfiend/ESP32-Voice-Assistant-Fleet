@@ -1,6 +1,5 @@
-// MOVING A CARD, AND ITS ONE WAY BACK (owner, round 2 of the 2.11 follow-ups).
-// Every word on the glass here is the owner's (docs/archive/TEST_2.11_FOLLOWUPS.md,
-// round 2; K137); none is made up here.
+// MOVING A CARD, AND ITS ONE WAY BACK (K137).
+// Every word on the glass here is the owner's (K137); none is made up here.
 //
 //   A cluster's tile   Add to dashboard (a group, Copy or Move) and Change cluster
 //                      (another cluster, Copy or Move)
@@ -14,7 +13,7 @@
 // is deleted, a moved card goes home, a regrouped one takes its group back
 // (CardAdded.h, "One card, one way back").
 //
-// The groups offered are the ones on this page (owner: the rest only exist on
+// The groups offered are the ones on this page (the rest only exist on
 // other pages), its own marked with an asterisk, then New group and None. The
 // clusters offered are this page's that can take it - hidden ones too, marked
 // "(h)" - never one that holds it already.
@@ -45,6 +44,11 @@ char      s_newName[40] = "";          // New group's words, from the keyboard
 int32_t listW() { return lv_area_get_width(&s.winRect) - 2 * s.pad; }
 
 bool isMade(const char *id) { return id && (CardAdded::isAdded(id) || CardAdded::isMember(id)); }
+
+// A COPY OR A MOVE: a made card that names the card it came from ("from"). Since
+// K171 nearly every card is made, so "made" does not mean "a copy": an original
+// treated as one would be deleted by its Restore.
+bool isCopy(const char *id) { return isMade(id) && CardAdded::fromOf(id); }
 
 // --- The clusters -------------------------------------------------------------------
 ClusterCard *s_cl[PICK_MAX] = {};
@@ -98,11 +102,14 @@ const CardSpec *homeCluster(const char *memberId) {
     for (uint8_t c = 0; memberId && p && c < p->count; c++)
         for (uint8_t k = 0; k < p->cards[c].memberCount && p->cards[c].members; k++)
             if (p->cards[c].members[k].id && !strcmp(p->cards[c].members[k].id, memberId)) return &p->cards[c];
+    // A MEMBER MADE HERE (K171: nearly all are): its "in" names its group.
+    char in[CARD_ID_MAX + 1];
+    if (memberId && Settings::card(memberId, "in", in, sizeof(in))) return CardAdded::specOf(in);
     return nullptr;
 }
 
 // It holds the entity as a member already - a tile, a hidden one, a copy - but
-// not one moved out of it, which can come back (owner's 17).
+// not one moved out of it, which can come back.
 bool holds(const ClusterCard &cl, const char *eid) {
     for (uint8_t i = 0; i < cl.memberCount(); i++) {
         const Card *mc = cl.memberAt(i);
@@ -120,7 +127,7 @@ bool holdsSpec(const CardSpec &cs, const char *eid) {
     return CardAdded::inCluster(cs.id, eid);
 }
 
-// ONE LEVEL OF NESTING (K92; the owner, round 2): a group card may be a cluster's
+// ONE LEVEL OF NESTING (K92): a group card may be a cluster's
 // member, but not one whose own members are groups.
 bool nested(const Entity &e) {
     for (uint8_t k = 0; k < e.nMembers && s.reg; k++) {
@@ -230,7 +237,7 @@ void collectGroups() {
         snprintf(s_grpWord[i], sizeof(s_grpWord[0]), own ? "%s *" : "%s", s_grp[i].name);
         s_grpWords[i] = s_grpWord[i];
     }
-    s_grpWords[groupNew()]  = "New group";
+    s_grpWords[groupNew()]  = "New label";   // K158: a page card's colored name
     s_grpWords[groupNone()] = "None";
 }
 
@@ -249,7 +256,7 @@ const char *pickName() {
 }
 
 // --- Words for the dialogs -------------------------------------------------------------
-// A name in the accent (the owner's mock): the dialog's words are recoloured.
+// A name in the accent: the dialog's words are recoloured.
 const char *acc(char *buf, size_t cap, const char *name) {
     snprintf(buf, cap, "#%06lX %s#", (unsigned long)(UI::pal().ACCENT & 0xFFFFFF), name ? name : "");
     return buf;
@@ -295,12 +302,12 @@ bool lastTile() {
     return mine && tiles == 1;
 }
 
-// A card's group changed. A compiled card keeps the one it had (orig_group), and
-// coming back to it leaves nothing to restore.
+// A card's group changed. An original (no "from") keeps the one it had (orig_group),
+// and coming back to it leaves nothing to restore.
 void regroup(const char *id, const char *gid, const char *sheetArea) {
     char cur[48];
     const bool had = Settings::card(id, "group", cur, sizeof(cur));
-    if (!isMade(id)) {
+    if (!isCopy(id)) {
         char was[48];
         if (!Settings::card(id, "orig_group", was, sizeof(was)))
             Settings::setCard(id, "orig_group", had ? cur : "inherit");
@@ -342,7 +349,7 @@ void doDash() {
         nameLike(id, *m.subject);
     } else if (isMade(sid)) {
         // A CARD MADE HERE RELOCATES - unless it is a page card moved in, and going
-        // back to the page is its Restore (owner's 17).
+        // back to the page is its Restore.
         const char *o = CardAdded::fromOf(sid);
         if (CardAdded::isMoveOf(sid) && o && CardAdded::isMoved(o)) {
             char orig[CARD_ID_MAX + 1];
@@ -363,7 +370,7 @@ void doDash() {
         CardAdded::moveToPage(sid, id);
         CardAdded::keepHome(sid, clName(m.from), fromHas ? fg.id : nullptr);
     }
-    if (last) CardAdded::hide(m.from->id());   // an empty cluster hides itself (owner's 15)
+    if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());   // gone (K200), else hidden
     done();
 }
 
@@ -372,14 +379,14 @@ void doCluster() {
     if (m.pick >= s_nTgt || !m.subject) return;
     const Target T = s_tgt[m.pick];
     const char *sid = m.subject->id();
-    // MOVED BACK HOME BY HAND IS A RESTORE (owner's 17).
+    // MOVED BACK HOME BY HAND IS A RESTORE.
     if (m.move && isMade(sid) && CardAdded::isMoveOf(sid)) {
         const CardSpec *hc = homeCluster(CardAdded::fromOf(sid));
         if (hc && !strcmp(hc->id, T.id)) {
             const bool last = lastTile();
             CardAdded::unmake(sid);
             if (T.hidden) CardAdded::restore(T.id);
-            if (last) CardAdded::hide(m.from->id());
+            if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());
             done();
             return;
         }
@@ -402,8 +409,11 @@ void doCluster() {
             CardAdded::moveOut(sid, id);
         }
     }
+    // NEW MEMBERS JOIN UNPINNED (K160; 1.7: Visibility's Add to group too, as Edit
+    // cards does) - joining never moves the page; Pin this card puts it there.
+    Settings::setCard(isMade(sid) && m.move ? sid : id, "hidden", "yes");
     if (T.hidden) CardAdded::restore(T.id);    // a hidden cluster is used again
-    if (last) CardAdded::hide(m.from->id());   // an empty cluster hides itself (owner's 15)
+    if (last && !CardAdded::emptied(m.from->id())) CardAdded::hide(m.from->id());   // gone (K200), else hidden
     done();
 }
 
@@ -422,24 +432,23 @@ void askDash() {
     const char *from = m.from ? clName(m.from) : m.parent ? m.parent->shownName(CardLabel::LBL_NAME) : "";
     lines();
     if (!m.move && m.from)
-        line("This card will be copied from the cluster %s and placed onto the dashboard as a separate card.",
+        line("This card will be copied from the group %s and placed onto the dashboard as a separate card.",
              acc(a, sizeof(a), from));
     else if (!m.move)
         line("This card will be copied from the group card %s and placed onto the dashboard as a separate card.",
              acc(a, sizeof(a), from));
     else
-        line("This card will be removed from the cluster %s and placed onto the dashboard.", acc(a, sizeof(a), from));
+        line("This card will be removed from the group %s and placed onto the dashboard.", acc(a, sizeof(a), from));
+    // K158: the page card's label.
     if (m.pick == groupNone())
-        line("The card will not be a member of any group.");
+        line("The card will have no label.");
     else if (m.pick == s_cur)
-        line(m.move ? "The card will still be a member of the %s group, certain group settings may affect this card."
-                    : "The card will still be a member of the %s group but certain settings can be applied "
-                      "separately to each card.", acc(a, sizeof(a), pickName()));
+        line("The card will keep the label %s.", acc(a, sizeof(a), pickName()));
     else
-        line("The card will become a member of the group %s.", acc(a, sizeof(a), pickName()));
+        line("The card will be labeled %s.", acc(a, sizeof(a), pickName()));
     line(RESTORABLE);
     if (m.move && lastTile())
-        line("The cluster %s will be empty after moving this card. An empty cluster will be hidden automatically "
+        line("The group %s will be empty after moving this card. An empty group will be hidden automatically "
              "but can be used again by adding cards to it.", acc(b, sizeof(b), from));
     confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Add card to dashboard?", s_lines, s_nLines, m.move ? "Move" : "Copy",
                Kit::ButtonRole::BTN_CONFIRM, doDash);
@@ -452,26 +461,26 @@ void askCluster() {
     char a[96], b[96];
     lines();
     if (!m.move && m.from)
-        line("This card will be copied to the cluster %s and a copy will remain in the %s cluster.",
+        line("This card will be copied to the group %s and a copy will remain in the %s group.",
              acc(a, sizeof(a), T.name), acc(b, sizeof(b), clName(m.from)));
     else if (!m.move)
-        line("This card will be copied to the cluster %s and a copy will remain on this page.", acc(a, sizeof(a), T.name));
+        line("This card will be copied to the group %s and a copy will remain on this page.", acc(a, sizeof(a), T.name));
     else if (m.from)
-        line("This card will be removed from the cluster %s and moved to the cluster %s.",
+        line("This card will be removed from the group %s and moved to the group %s.",
              acc(a, sizeof(a), clName(m.from)), acc(b, sizeof(b), T.name));
     else
-        line("This card will be removed from this page and moved to the cluster %s.", acc(a, sizeof(a), T.name));
+        line("This card will be removed from this page and moved to the group %s.", acc(a, sizeof(a), T.name));
     if (!m.move)
         line("The new copy will change its group membership to be a member of %s. Changes made to one copy will "
              "not apply to the other.", acc(a, sizeof(a), T.gname));
     else
-        line("The moved card will become a member of the %s group, and settings applied to that cluster may be "
+        line("The moved card will become a member of the %s group, and settings applied to that group may be "
              "propagated to the new card.", acc(a, sizeof(a), T.gname));
     line(RESTORABLE);
     if (m.move && lastTile())
-        line("The cluster %s will be empty after moving this card. An empty cluster will be hidden automatically "
+        line("The group %s will be empty after moving this card. An empty group will be hidden automatically "
              "but can be used again by adding cards to it.", acc(b, sizeof(b), clName(m.from)));
-    confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Add card to cluster?", s_lines, s_nLines, m.move ? "Move" : "Copy",
+    confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Add card to group?", s_lines, s_nLines, m.move ? "Move" : "Copy",
                Kit::ButtonRole::BTN_CONFIRM, doCluster);
 }
 
@@ -480,15 +489,11 @@ void askGroup() {
     char a[96], b[96];
     lines();
     const bool toNone = m.pick == groupNone();
-    if (s_cur == 0xFF)
-        line("This will add the card to the group %s.", acc(a, sizeof(a), pickName()));
-    else if (toNone)
-        line("This will remove the card from group %s, leaving it with no group.", acc(a, sizeof(a), s_grp[s_cur].name));
-    else
-        line("This will remove the card from group %s and add it to the group %s.",
-             acc(a, sizeof(a), s_grp[s_cur].name), acc(b, sizeof(b), pickName()));
+    // K158: "This card's label will change from A to B."
+    line("This card's label will change from %s to %s.", acc(a, sizeof(a), s_cur == 0xFF ? "None" : s_grp[s_cur].name),
+         acc(b, sizeof(b), toNone ? "None" : pickName()));
     line(RESTORABLE);
-    confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Change group for this card?", s_lines, s_nLines, "Confirm",
+    confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Change label for this card?", s_lines, s_nLines, "Confirm",
                Kit::ButtonRole::BTN_CONFIRM, doGroup);
 }
 
@@ -512,7 +517,7 @@ void next() {
     collectGroups();
     if (m.pick == groupNew()) {
         Kit::KeyboardSpec k = {};
-        k.title  = "New group name";
+        k.title  = "New label name";   // K158
         k.maxLen = sizeof(s_newName) - 1;
         k.save   = named;
         Kit::keyboard(k);
@@ -562,7 +567,7 @@ void nextRow(lv_obj_t *list, bool copyMove, bool copyOnly) {
     Kit::button(row, Kit::ButtonRole::BTN_CONFIRM, "Next", w, Kit::controlH(), nextCb);
 }
 
-// The entity is on the page already, as a card of its own (round 7: no second
+// The entity is on the page already, as a card of its own (K111: no second
 // card of one entity on the dashboard).
 bool onPage(lv_obj_t *o, const char *eid) {
     const uint32_t n = lv_obj_get_child_count(o);
@@ -609,8 +614,8 @@ void visibilityJoinOpen(Card *parent, const Entity *member, Card *memberCard) {
 }
 
 const char *visibilityJoinTitle() {
-    if (m.mode == MoveMode::MOVE_CLUSTER) return m.from ? "Change cluster" : "Add to cluster";
-    return m.mode == MoveMode::MOVE_GROUP ? "Change group" : "Add to dashboard";
+    if (m.mode == MoveMode::MOVE_CLUSTER) return m.from ? "Change group" : "Add to group";
+    return m.mode == MoveMode::MOVE_GROUP ? "Change label" : "Add to dashboard";   // K146
 }
 
 bool visibilityJoinBack() { return false; }
@@ -622,10 +627,10 @@ void buildJoin() {
     if (m.mode == MoveMode::MOVE_CLUSTER) {
         collectTargets();
         if (m.pick >= s_nTgt) m.pick = 0;
-        words(list, KS::KS_LABEL_NAME, "Select target cluster:");
+        words(list, KS::KS_LABEL_NAME, "Select target group:");
         if (s_nTgt) s_grid = Kit::chipGrid(list, listW(), s_tgtWords, s_nTgt, m.pick, gridCb);
-        words(list, KS::KS_LABEL_TAG_DIM, "A card cannot be added to a cluster if that cluster already contains a copy.");
-        if (!s_nTgt) { words(list, KS::KS_LABEL_TAG_DIM, "This card cannot be added to any clusters on this page."); return; }
+        words(list, KS::KS_LABEL_TAG_DIM, "A card cannot be added to a group if that group already contains a copy.");
+        if (!s_nTgt) { words(list, KS::KS_LABEL_TAG_DIM, "This card cannot be added to any groups on this page."); return; }
         nextRow(list, true, false);
         return;
     }
@@ -640,10 +645,10 @@ void buildJoin() {
     }
     collectGroups();
     if (m.pick > groupNone()) m.pick = groupNone();
-    words(list, KS::KS_LABEL_NAME, "Select group for this card:");
+    words(list, KS::KS_LABEL_NAME, "Select label for this card:");   // K158
     s_grid = Kit::chipGrid(list, listW(), s_grpWords, (uint8_t)(s_nGrp + 2), m.pick, gridCb);
-    words(list, KS::KS_LABEL_TAG_DIM, "Select 'New group' to create a new group for this card. Select 'None' to add "
-                                      "the card with no group assigned.");
+    words(list, KS::KS_LABEL_TAG_DIM, "Select 'New label' to create a new label for this card. Select 'None' to add "
+                                      "the card with no label.");
     if (m.mode == MoveMode::MOVE_DASH && member)
         words(list, KS::KS_LABEL_TAG_DIM, "Members of a group card cannot be moved, only copied.");
     nextRow(list, m.mode == MoveMode::MOVE_DASH, member);
@@ -694,7 +699,7 @@ char s_rid[CARD_ID_MAX + 1] = "";
 const char *restoreTarget(const Card *c) {
     if (!c || !c->hasId()) return nullptr;
     if (CardAdded::isMovedToPage(c->id())) return CardAdded::becameOf(c->id());
-    if (isMade(c->id())) return c->id();
+    if (isCopy(c->id())) return c->id();
     char v[48];
     return Settings::card(c->id(), "orig_group", v, sizeof(v)) ? c->id() : nullptr;
 }
@@ -726,8 +731,16 @@ void restoreClosed() {
     CardPopup::close();
 }
 
+// The group a Restore takes a copy out of goes if it was the last one in it.
+void tidyAfter(const char *clusterId) {
+    if (clusterId && clusterId[0]) CardAdded::emptied(clusterId);
+}
+
 void goDelete() {
+    char in[CARD_ID_MAX + 1] = "";
+    if (const char *c = CardAdded::clusterOf(s_rid)) snprintf(in, sizeof(in), "%s", c);
     CardAdded::unmake(s_rid);
+    tidyAfter(in);
     restoreClosed();
 }
 
@@ -745,29 +758,34 @@ void goMove() {
     const char *o = CardAdded::fromOf(s_rid);
     char orig[CARD_ID_MAX + 1];
     snprintf(orig, sizeof(orig), "%s", o ? o : "");
+    char in[CARD_ID_MAX + 1] = "";   // the group it leaves, if it is a member
+    if (const char *c = CardAdded::clusterOf(s_rid)) snprintf(in, sizeof(in), "%s", c);
     const CardSpec *hc = homeCluster(orig);
     if (hc) {
         char hn[48], hg[48], now[48];
         CardAdded::home(orig, hn, sizeof(hn), hg, sizeof(hg));
         clusterNameNow(hc->id, now, sizeof(now));
         if (hn[0] && strcmp(hn, now)) {
-            // RENAMED OR REPURPOSED (owner's 16): onto the dashboard, in its group as
+            // RENAMED OR REPURPOSED: onto the dashboard, in its group as
             // it was, with its name as it was.
             if (CardAdded::isMember(s_rid) && !CardAdded::toPage(s_rid, hc->id, hc->place.priority)) return;
             if (hg[0]) Settings::setCard(s_rid, "group", hg);
             char bn[48];
             builtName(orig, bn, sizeof(bn));
             Settings::setCard(s_rid, "name", bn);
+            tidyAfter(in);
             restoreClosed();
             return;
         }
         const bool hidden = CardAdded::isHidden(hc->id);
         CardAdded::unmake(s_rid);
         if (hidden) CardAdded::restore(hc->id);   // the cluster is used again
+        tidyAfter(in);
         restoreClosed();
         return;
     }
     CardAdded::unmake(s_rid);   // a page card: back on its page
+    tidyAfter(in);
     restoreClosed();
 }
 
@@ -784,16 +802,17 @@ void restoreAsk(const Card *c) {
     char a[96], b[96];
     lines();
     CardGroups::Group g;
-    if (!isMade(s_rid)) {
+    if (!isCopy(s_rid)) {
         // A GROUP CHANGED, NOTHING MOVED: its group back.
         char was[48];
         Settings::card(s_rid, "orig_group", was, sizeof(was));
         const CardSpec *cs = CardAdded::specOf(s_rid);
         const bool has = !strcmp(was, "inherit") ? CardGroups::ofId(nullptr, cs ? cs->area : c->sheetArea(), g)
                        : strcmp(was, "none") ? CardGroups::byId(was, g) : false;
-        if (has) line("This card was originally a member of the %s group.", acc(a, sizeof(a), g.name));
-        else     line("This card was originally not a member of any group.");
-        line("Tap 'Restore' to assign this card back to its original group %s.", acc(a, sizeof(a), has ? g.name : "None"));
+        // K158: a page card's label.
+        if (has) line("This card was originally labeled %s.", acc(a, sizeof(a), g.name));
+        else     line("This card originally had no label.");
+        line("Tap 'Restore' to give this card its original label %s.", acc(a, sizeof(a), has ? g.name : "None"));
         confirmAsk(Kit::DialogRole::DLG_DESTRUCTIVE, RESTORE_TITLE, s_lines, s_nLines, "Restore",
                    Kit::ButtonRole::BTN_DESTRUCTIVE, goGroup);
         return;
@@ -805,9 +824,9 @@ void restoreAsk(const Card *c) {
         if (hc) {
             char now[48];
             clusterNameNow(hc->id, now, sizeof(now));
-            line("This card was originally a member of the %s cluster.", acc(a, sizeof(a), now));
+            line("This card was originally a member of the %s group.", acc(a, sizeof(a), now));
         } else if (o && pageGroup(o, g)) {
-            line("This card was originally a member of the %s group.", acc(a, sizeof(a), g.name));
+            line("This card was originally labeled %s.", acc(a, sizeof(a), g.name));   // a page card's (K158)
         }
         line("The original copy of this card still exists in its original state, tap 'Delete' to confirm you "
              "wish to delete this copy.");
@@ -831,27 +850,28 @@ void restoreAsk(const Card *c) {
         clusterNameNow(hc->id, now, sizeof(now));
         if (!hn[0]) snprintf(hn, sizeof(hn), "%s", now);
         const bool renamed = strcmp(hn, now) != 0;
-        snprintf(l1, sizeof(l1), "This card was originally a member of the %s cluster.%s", acc(a, sizeof(a), hn), nameLine);
+        snprintf(l1, sizeof(l1), "This card was originally a member of the %s group.%s", acc(a, sizeof(a), hn), nameLine);
         line("%s", l1);
         if (renamed) {
             const bool has = hg[0] && CardGroups::byId(hg, g);
             snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the %s group%s.",
                      acc(b, sizeof(b), has ? g.name : hn), nameTail);
             line("%s", l2);
-            line("The original cluster has been renamed or repurposed and the card cannot be restored there.");
+            line("The original group has been renamed or repurposed and the card cannot be restored there.");
         } else {
-            snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the %s cluster%s.",
+            snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the %s group%s.",
                      acc(b, sizeof(b), hn), nameTail);
             line("%s", l2);
             if (CardAdded::isHidden(hc->id))
-                line("The original cluster had become hidden, restoring this card will reactivate the cluster.");
+                line("The original group had become hidden, restoring this card will reactivate the group.");
         }
     } else {
         const bool has = o && pageGroup(o, g);
-        if (has) snprintf(l1, sizeof(l1), "This card was originally a member of the %s group.%s", acc(a, sizeof(a), g.name), nameLine);
-        else     snprintf(l1, sizeof(l1), "This card was originally not a member of any group.%s", nameLine);
+        // A page card's (K158): its label.
+        if (has) snprintf(l1, sizeof(l1), "This card was originally labeled %s.%s", acc(a, sizeof(a), g.name), nameLine);
+        else     snprintf(l1, sizeof(l1), "This card originally had no label.%s", nameLine);
         line("%s", l1);
-        snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the %s group%s.",
+        snprintf(l2, sizeof(l2), "Tap 'Restore' to confirm you wish to restore it to the page with the label %s%s.",
                  acc(b, sizeof(b), has ? g.name : "None"), nameTail);
         line("%s", l2);
     }

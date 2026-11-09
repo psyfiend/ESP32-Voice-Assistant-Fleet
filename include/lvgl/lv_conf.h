@@ -109,10 +109,10 @@
     //
     // ALL OF THAT IS ABOUT THE POOL IN INTERNAL RAM. In PSRAM
     // (-D FLEET_LV_MEM_PSRAM, below) its size costs no internal RAM, so a board
-    // may give it more: -D FLEET_LV_MEM_KB=512 on every P4 since 2026-10-06
-    // (#88, 2.10b) - ~4x the peak a popup reached, and a few percent of the
-    // PSRAM. Measured on WS_P4_5: internal heap free 233 -> 361 KB; full-screen
-    // frames ~10% slower, the popup's opening frame ~2 ms, a card's no change.
+    // may give it more: -D FLEET_LV_MEM_KB=512 on every P4 (A11, #88) - ~4x the
+    // peak a popup reaches, and a few percent of the PSRAM. Measured on WS_P4_5:
+    // internal heap free 233 -> 361 KB; full-screen frames ~10% slower, the
+    // popup's opening frame ~2 ms, a card's no change.
     #if defined(FLEET_LV_MEM_PSRAM) && defined(FLEET_LV_MEM_KB)
         #define LV_MEM_SIZE (FLEET_LV_MEM_KB * 1024U)
     #else
@@ -130,22 +130,20 @@
         #undef LV_MEM_POOL_ALLOC
     #endif
 
-    // THE POOL IN PSRAM - per board, -D FLEET_LV_MEM_PSRAM (2026-09-29).
+    // THE POOL IN PSRAM - -D FLEET_LV_MEM_PSRAM, set for every board (A11:
+    // [P4-options] and [S3-options]).
     //
-    // Everything above is why the pool costs internal RAM: it is a static array
-    // in internal DRAM. With this flag LVGL asks for its pool ONCE, at
-    // lv_init(), from PSRAM instead (lv_mem_core_builtin.c:78). Same size, same
-    // allocator (TLSF), same lv_mem_monitor() - only where the 128 KB lives
-    // changes. It hands 128 KB of internal RAM back to WiFi/LWIP.
+    // Without it the pool is a static array in internal DRAM. With it LVGL asks
+    // for its pool ONCE, at lv_init(), from PSRAM instead
+    // (lv_mem_core_builtin.c:78). Same size, same allocator (TLSF), same
+    // lv_mem_monitor() - only where the pool lives changes, and its size goes
+    // back to WiFi/LWIP. An S3 with the pool internal idles at 12-17 KB internal
+    // free and drops to ~4 KB under HTTP load, enough to lose its HA connection.
+    // NINA's lv_mem_psram.c moves every LVGL allocation to PSRAM through a
+    // custom backend; this keeps LVGL's own allocator and moves only the pool.
     //
-    // First for WS_S3_4B, which idles at 12-17 KB internal free with the pool
-    // internal (the owner's HA free-heap chart) and drops to ~4 KB under HTTP
-    // load - enough to lose its HA connection and, once, to panic. NINA's
-    // lv_mem_psram.c moves every LVGL allocation to PSRAM through a custom
-    // backend; this keeps LVGL's own allocator and moves only the pool.
-    //
-    // THE COST TO MEASURE, not assumed: widgets and styles live in PSRAM, so
-    // every draw reads them through the cache. /bench before and after.
+    // The cost: widgets and styles live in PSRAM, so every draw reads them
+    // through the cache - about 5-10% slower full-screen frames.
     #if defined(FLEET_LV_MEM_PSRAM)
         #define LV_MEM_POOL_INCLUDE <esp_heap_caps.h>
         #define LV_MEM_POOL_ALLOC(size) heap_caps_malloc((size), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
@@ -158,7 +156,7 @@
 
 /** Default display refresh, input device read and animation step period. */
 /* Per-board override: -D FLEET_LV_REFR_PERIOD=16 in an environment's build_flags.
- * Measured 2026-09-26 (display-stack.md s8.8): 16 ms gives WS_P4_4B on esp_lcd ~16
+ * Measured (docs/display/performance.md): 16 ms gives WS_P4_4B on esp_lcd ~16
  * frames per deck-panel swap instead of 10, none late, at no cost per frame; WS_P4_5
  * gains nothing (its swap frame takes ~31 ms). It also sets how often touch is polled
  * and animations step, so it is NOT a free change on the slow S3 boards. No board sets
@@ -302,9 +300,8 @@
          *  LV_DRAW_SW_SHADOW_CACHE_SIZE is the maximum shadow size to buffer, where shadow size is
          *  `shadow_width + radius`.  Caching has LV_DRAW_SW_SHADOW_CACHE_SIZE^2 RAM cost. */
         #define LV_DRAW_SW_SHADOW_CACHE_SIZE 32
-        /* ON since 2026-09-23, 32 (a 1 KB static buffer). Linen's shadows made
-         * the owner's panels visibly chunkier - page switches in single-digit
-         * FPS - and the expensive part of a software shadow is blurring its
+        /* ON, 32 (a 1 KB static buffer). Without it Linen's shadows bring page
+         * switches down to single-digit FPS: the expensive part of a software shadow is blurring its
          * CORNER, which lv_draw_sw_box_shadow.c recomputes on every draw unless
          * cached. The cache is keyed on (width + radius) and radius, NOT on the
          * object's size, so every card sharing a radius and shadow width hits
@@ -633,8 +630,8 @@
 #define LV_COLOR_MIX_ROUND_OFS  0
 
 /** Add 2 x 32-bit variables to each `lv_obj_t` to speed up getting style properties */
-/* Measured 2026-09-25 (display-stack.md s8.3): 2-4% faster drawing for 1.8 KB (CYD) and 2.7 KB
- * (WS_P4_5) of the LV_MEM_SIZE pool - and P4_5's pool is the fleet's fullest. Left off. */
+/* Measured: 2-4% faster drawing for 1.8 KB (CYD) and 2.7 KB (WS_P4_5) of the LV_MEM_SIZE pool,
+ * when the pools were 128 KB. Left off; worth re-measuring now every pool is in PSRAM (A11). */
 #define LV_OBJ_STYLE_CACHE      0
 
 /** Add `id` field to `lv_obj_t` */
@@ -946,10 +943,9 @@
 
     /** 1: Enable grow on press
      *
-     * OFF since 2026-09-23. A pressed button grew 3 px each way, and every
-     * button on this panel sits in a row that clips it - the owner saw the
-     * drawer's buttons with "the top and bottom edges cut off as if clipped"
-     * on every press. The theme's pressed darkening still gives feedback. */
+     * OFF. A pressed button would grow 3 px each way, and every button here
+     * sits in a row that clips it, so its top and bottom edges are cut off on
+     * every press. The theme's pressed darkening still gives feedback. */
     #define LV_THEME_DEFAULT_GROW 0
 
     /** Default transition time in ms. */
@@ -1166,7 +1162,7 @@
 
 /** 1: Enable system monitor component
  *
- * ON since 2026-09-23 for the FPS/CPU overlay the owner asked for, toggled by
+ * ON for the FPS/CPU overlay, toggled by
  * a swipe up from the bottom-right (GUIManager::togglePerf). LVGL creates it
  * SHOWING when the display is made; GUIManager hides and pauses it at boot.
  *

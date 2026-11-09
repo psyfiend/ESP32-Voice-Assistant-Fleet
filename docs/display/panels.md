@@ -9,7 +9,7 @@ Datasheets we hold (gitignored): `reference/datasheets/ST7701S_SPEC_V1.4.pdf`,
 `ST7703_DS_v01_20160128.pdf`. Sources: [ST7701S v1.4 (Espressif)](https://dl.espressif.com/AE/esp-iot-solution/ST7701S_SPEC_%20V1.4.pdf),
 [ST7703 v01 (Pine64)](https://files.pine64.org/doc/datasheet/pinephone/ST7703_DS_v01_20160128.pdf).
 
-## Timing at a glance (BSP values, 2026-09-29)
+## Timing at a glance (BSP values)
 
 | Board | Chip | Pixel clock | H sync / back / front | V sync / back / front | DSI lanes | Refresh (measured) |
 |---|---|---|---|---|---|---|
@@ -49,22 +49,21 @@ blanking is when the panel's own circuitry turns around (gate drivers, row pre-c
 ## ST7703 — `WS_P4_4B` (DSI)
 
 - **Ours runs faster than Waveshare's.** Theirs: 38 MHz, H 20/50/50, V 4/20/20, lanes 480 Mbps =
-  59.2 Hz. Measured (2026-09-26 sweep): **timing changes nothing about speed**; the choice is only
-  about the picture.
+  59.2 Hz. Measured over a sweep of timings: **timing changes nothing about speed**; the choice is
+  only about the picture.
 - **`BAh SETMIPI`** sets the DSI receiver: byte 3 = IHSRX, HS receiver drive x1..x16; `HFP_OSC` /
   `HBP_OSC` = the minimum blanking the IC expects in DSI mode; RTERM. Ours differed from Waveshare's
   driver default in IHSRX (`0x05` vs `0x0F`) and `HBP_OSC` (`0x0E` vs `0x06`).
-- **Test T1 (2026-09-29):** IHSRX -> `0x0F`. 150-min soak PASS, but faint lines remain at the
-  **right** edge on the log page. Next, one at a time: lanes 480 Mbps, a larger HFP, `HBP_OSC 0x06`.
-  #69.
-- Driver `mirror()` is Y only; the board runs rotation 0 (owner, 2026-09-26).
+- **IHSRX `0x0F`** passes a 150-min soak, but faint lines remain at the **right** edge on the log
+  page. Still to try, one at a time: lanes 480 Mbps, a larger HFP, `HBP_OSC 0x06` (#69).
+- Driver `mirror()` is Y only; the board runs rotation 0.
 
 ## EK79007 — `WS_P4_7B` (DSI)
 
 - Matches its vendor timing exactly.
 - **Panel-side 180 degrees does not work.** MADCTL after init with (x=0, y=1) and (x=1, y=0), and
-  0x36 = 0x02 inside the init list: the picture never moved (three builds, owner on glass,
-  2026-09-28). Rotation 2 stays with the PPA.
+  0x36 = 0x02 inside the init list: the picture never moved on glass. Rotation 2 stays with the
+  PPA.
 
 ## JD9165 — `CYD_P4_1060` (DSI)
 
@@ -92,21 +91,20 @@ list must not contain 0x36 or 0x3A.
   - **`C2h` INVSET, second byte = RTNI: minimum clocks per line = 512 + 16 x RTNI.** Our line is
     8+50+480+10 = 548.
   - DOTCLK cycle >= 33 ns (<= 30 MHz); `C3h` selects DE/HV mode and polarities.
-- **Tests on glass (2026-09-29, #69):**
+- **Tests on glass (#69):**
 
-  | Test | Change | Result |
-  |---|---|---|
-  | T1 | `C1 0D 02` -> `1C 0A` (porches matched to the host, as the datasheet says) | **worse**: more lines, reaching further right. Reverted |
-  | **T2** | `C2 31 05` -> `C2 31 02` (RTNI minimum 592 -> 544, under our 548) | **clean** - running, 7-day watch |
+  | Change | Result |
+  |---|---|
+  | `C1 0D 02` -> `1C 0A` (porches matched to the host, as the datasheet says) | **worse**: more lines, reaching further right. Not used |
+  | `C2 31 05` -> `C2 31 02` (RTNI minimum 592 -> 544, under our 548) | **clean**; the BSP value, on a 7-day watch |
 
-  T1 going the wrong way is itself information: the porch registers visibly move the symptom, so the
-  lever is right even though "match the host" was not the answer. `C1`'s VBP may not count the sync
-  pulse (then 20, not 28), untested.
+  The porch registers visibly move the symptom, so they are the right lever even though "match the
+  host" is not the answer. `C1`'s VBP may not count the sync pulse (then 20, not 28); untested.
 
 ## ST7262 — `WS_S3_5B`, `CYD_S3_8048` (RGB)
 
 Plain RGB, no init commands. Waveshare's S3_5B timing and 10-line bounce buffer match ours exactly.
-**Not on esp_lcd yet** - #67's last two boards.
+**Not on esp_lcd yet** (#67).
 
 ## AXS15231B — `CYD_S3_3248` (QSPI)
 

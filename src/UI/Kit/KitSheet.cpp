@@ -1,12 +1,11 @@
-// The sheet's frame (2.12 P4, moved from the card window - CardPopup.cpp, 2.10a-2.10e): where it
-// goes, the window, its header row and stage, the auto-close, the quiet build, the tap catcher,
-// and closing. The panels are KitSheetPanels.cpp, the sparks KitSparks.cpp.
+// The sheet's frame: where it goes, the window, its header row and stage, the auto-close, the
+// quiet build, the tap catcher, and closing. The panels are KitSheetPanels.cpp, the sparks
+// KitSparks.cpp.
 //
-// USABLE FIRST (owner, 2026-10-04 evening). The window used to grow out of the card and land with
-// the dim; every version of that was measured, and the motion was never the slow part - the frame
-// it landed in was (a full-screen redraw for the dim, ~120 ms on Midnight, ~200 ms on Linen, after
-// ~240 ms of growing). A sheet appears complete in the first frame and closes in one. What was
-// learned is in docs/LESSONS.md, "Effects that cover the screen". Nothing is drawn behind it.
+// USABLE FIRST. A sheet appears complete in the first frame and closes in one, and nothing is
+// drawn behind it. A window that grows out of the card and lands with a dim was measured: the
+// motion was never the slow part, the frame it landed in was (a full-screen redraw for the dim,
+// ~120 ms on Midnight, ~200 ms on Linen). See docs/LESSONS.md, "Effects that cover the screen".
 #include "KitSheetInternal.h"
 #include "UI/UIToolkit.h"
 #include "Settings.h"
@@ -31,8 +30,8 @@ Sheet *s_open = nullptr;
 static lv_obj_t *s_catcher = nullptr;
 static bool      s_catcherFolded = false;   // this touch, on the catcher, folded a panel: its click is spent
 
-// THE P4_5 IS THE REFERENCE (owner, 2026-10-05: its toggle "is the perfect
-// size"). Its window is 787 x 545 px with the system header showing; what is
+// THE P4_5 IS THE REFERENCE (its toggle "is the perfect size"). Its window is
+// 787 x 545 px with the system header showing; what is
 // inside a sheet is sized as the same share of the biggest window of THIS shape
 // that fits in it - see propH.
 constexpr float SHEET_REF_ASPECT = 787.0f / 545.0f;
@@ -64,10 +63,9 @@ static bool besideOpen() { return s_beside && s_beside->isOpen && s_beside->isOp
 
 // The catcher's jobs: let presses on the window and its panels through, and
 // close on a tap anywhere else. AND WHILE A PANEL IS OPEN, THE WINDOW IS OUT OF
-// REACH (owner, round 10): the topmost thing on the screen is the panel, so a
-// press anywhere in the window only folds it - it used to fold the panel and
-// also press whatever lay under the finger, the X closing the window before
-// the panel had finished folding, the back arrow leaving the view.
+// REACH: the topmost thing on the screen is the panel, so a press anywhere in
+// the window only folds it. Pressing what lies under the finger as well would
+// close the window before the panel had finished folding, or leave the view.
 static void catcherCb(lv_event_t *ev) {
     Sheet *S = s_open;
     const lv_event_code_t code = lv_event_get_code(ev);
@@ -101,7 +99,7 @@ static void touchCb(lv_event_t *ev) {
     s_open->lastTouchMs = millis();
 }
 
-// A SWIPE NEVER TAPS (owner, after v0.2.19): on a view with nothing to scroll
+// A SWIPE NEVER TAPS: on a view with nothing to scroll
 // LVGL takes a swipe's release as a tap on whatever the finger started on. The
 // input device hears CLICKED before the object does, so a finger that moved
 // further than a hold's slop stops there, while a sheet is open. Drags that
@@ -137,12 +135,11 @@ Sheet *sheetShowing() { return s_open; }
 // --- Where it goes ------------------------------------------------------------
 // Tall: from just under the system header to just above the panels' tabs.
 //
-// WIDE: UP TO TWICE AS WIDE AS TALL, AND NEVER NEAR THE SCREEN'S SIDES (owner,
-// 2026-10-06). Round 1 of 2.10b gave every board the P4_5 window's 787:545
-// shape - itself inherited from the mock, which was drawn for the 4B - and that
-// held the P4_5 to 68 mm on a 110 mm screen, its title ellipsised, with room to
-// spare. Now 2:1, capped so a gap of at least W_SIDE_MIN or 8% of the screen's
-// width stays on each side: P4_5 ~93 mm, the 7" panels ~129 mm, the 4B ~60 mm.
+// WIDE: UP TO TWICE AS WIDE AS TALL, AND NEVER NEAR THE SCREEN'S SIDES. The
+// P4_5 window's 787:545 shape on every board would hold the P4_5 to 68 mm on a
+// 110 mm screen, its title ellipsised, with room to spare. So 2:1, capped so a
+// gap of at least W_SIDE_MIN or 8% of the screen's width stays on each side, and
+// at W_WINDOW_MAX: P4_5 ~93 mm, the 7" panels 100 mm, the 4B ~60 mm.
 // The height used is the one WITH the system header showing, so hiding the
 // header makes the window taller but never wider. The contents stay tied to
 // the height (propH, below).
@@ -153,7 +150,7 @@ void sheetPlace(Sheet &S) {
     const int32_t top    = UIToolkit::systemHeaderPx() + UI::mm(k.S6);
     const int32_t bottom = sh - UI::mm(k.H_TABS) - UI::mm(k.S6);
     const int32_t refH   = bottom - (UIToolkit::systemHeaderFullPx() + UI::mm(k.S6));
-    // AND NEVER WIDER THAN W_WINDOW_MAX, 100 mm (owner, round 5): on a 7" panel
+    // AND NEVER WIDER THAN W_WINDOW_MAX, 100 mm: on a 7" panel
     // the 2:1 window was ~129 mm, and every reach to the X or across the window
     // got longer while the space to tap outside it shrank. 100 mm is the P4_5's
     // window and a little - a hand's span.
@@ -168,15 +165,15 @@ void sheetPlace(Sheet &S) {
     // the P4_5's shape that fits inside this one. The P4_5 itself gives its own
     // height (with the header shown); the 7" panels theirs; the 4B, whose width
     // is capped, less than its height. So the contents are the same share of
-    // the window everywhere (owner), and the 4B's shrink.
+    // the window everywhere, and the 4B's shrink.
     S.propH     = LV_MIN(refH, (int32_t)lroundf((float)w / SHEET_REF_ASPECT));
     S.winRadius = UI::mm(k.R_WINDOW);
-    // 1.2 mm, down from the mock's 2.2: the owner wanted the X "closer to the
-    // corner" (H1). Still clear of the 2.4 mm corner radius.
+    // 1.2 mm: the X sits close to the corner, still clear of the 2.4 mm corner
+    // radius.
     S.pad       = UI::mm(k.S4);
 }
 
-// HOW LONG A WINDOW WAITS, AND WHETHER IT SAYS SO (owner, T6, 2026-10-14):
+// HOW LONG A WINDOW WAITS, AND WHETHER IT SAYS SO (K79):
 // system settings, read as each window opens - "close" in seconds or "off",
 // "bar" "off" to hide the countdown. Set from a PC until the system settings
 // page (Settings.h).
@@ -205,12 +202,24 @@ bool     windowBarShown() { return barSetting(); }
 // window. Created last, so it is above the header, the deck and the drawer; a
 // page rebuild moves only the cards to the back.
 //
-// The scheme's raised surface and border (KS_SHEET_FACE), and THE HALO (D-35,
-// 2.11): every window floats over the page on a black rim fading to clear, in
-// place of the scheme's lift (Linen's shadow). No dim (its cost: a full-screen
-// redraw to open and one to close, 2.10a). No clip_corner: it would cost a
+// The scheme's raised surface and border (KS_SHEET_FACE), and THE HALO (D-35):
+// every window floats over the page on a black rim fading to clear, in place of
+// the scheme's lift (Linen's shadow). No dim (its cost: a full-screen redraw to
+// open and one to close). No clip_corner: it would cost a
 // window-sized layer (card-sheet 8). Clickable, so a tap inside never reaches
 // the catcher.
+//
+// A BARE SHEET LETS ITS CLIENT'S SHADOW OUT (K154): the group view's cluster
+// casts Linen's shadow as it does on the page, and the stage and the window,
+// each exactly its size, would clip it to the rectangle - the shadow gone below
+// it and "mud" left in the rounded corners (as for a card, Card.cpp,
+// UI::unclipShadows()). So while bare, both are overflow-visible with the
+// shadow's margin. Only while bare: a view that scrolls must clip.
+static void bareExtDrawCb(lv_event_t *e) {
+    const Sheet *S = (const Sheet *)lv_event_get_user_data(e);
+    if (S && S->bare) lv_event_set_ext_draw_size(e, UI::shadowReachPx());
+}
+
 static void makeWindow(Sheet &S) {
     S.win = plain(lv_screen_active());
     lv_obj_add_flag(S.win, LV_OBJ_FLAG_CLICKABLE);
@@ -218,9 +227,10 @@ static void makeWindow(Sheet &S) {
     lv_obj_set_size(S.win, lv_area_get_width(&S.winRect), lv_area_get_height(&S.winRect));
     add(S.win, KitStyle::KS_SHEET_FACE);
     haloAttach(S.win);
+    lv_obj_add_event_cb(S.win, bareExtDrawCb, LV_EVENT_REFR_EXT_DRAW_SIZE, &S);
 }
 
-// D6's drag down, on the HEADER ROW only (card-sheet 13): the light's tall
+// K9's drag down, on the HEADER ROW only (card-sheet 13): the light's tall
 // slider would fight a drag that could start anywhere. How the gesture gets
 // here is in buildFrame() - it is not the obvious way.
 static void headerGestureCb(lv_event_t *ev) {
@@ -244,6 +254,7 @@ static void buildFrame(Sheet &S) {
 
     // --- Header row --------------------------------------------------------
     lv_obj_t *hdr = plain(S.win);
+    S.header = hdr;
     lv_obj_set_size     (hdr, lv_pct(100), btn);
     lv_obj_set_flex_flow(hdr, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(hdr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -255,8 +266,8 @@ static void buildFrame(Sheet &S) {
     // PAST every one that has GESTURE_BUBBLE - on by default - and sends it to
     // the first that does not (lv_indev.c, indev_gesture()). With the flag
     // left on, the drag went past this row, the window and the top layer, and
-    // reached nobody. The owner's C3, 2026-10-03. The buttons in the row keep
-    // the flag, so a drag that starts on the X still arrives here.
+    // reached nobody. The buttons in the row keep the flag, so a drag that
+    // starts on the X still arrives here.
     lv_obj_clear_flag(hdr, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_event_cb(hdr, headerGestureCb, LV_EVENT_GESTURE, nullptr);
     if (spec.headerLongCb) lv_obj_add_event_cb(hdr, spec.headerLongCb, LV_EVENT_LONG_PRESSED, nullptr);
@@ -283,8 +294,8 @@ static void buildFrame(Sheet &S) {
     S.lblTitleName = label(title, KitStyle::KS_LABEL_NAME);
     // ONE LINE EACH, ellipsised, at widths sheetLayoutTitle() works out per
     // view. A DOT label with a content height wraps instead of ellipsising,
-    // which is how "Members" ended up on two lines and "All Lamps >" overflowed
-    // the centred row and lost its left half (owner's V3).
+    // so "Members" would sit on two lines and "All Lamps >" would overflow the
+    // centred row and lose its left half.
     const int32_t lh = lv_font_get_line_height(t.NAME);
     lv_label_set_long_mode(S.lblTitleArea, LV_LABEL_LONG_DOT);
     lv_label_set_long_mode(S.lblTitleName, LV_LABEL_LONG_DOT);
@@ -299,6 +310,14 @@ static void buildFrame(Sheet &S) {
         lv_obj_set_ext_click_area(S.lblTitleArea, (btn - lh) / 2);
         lv_obj_set_style_text_color(S.lblTitleArea, UI::c(UI::pal().TEXT), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
         lv_obj_add_event_cb(S.lblTitleArea, spec.crumbCb, LV_EVENT_CLICKED, nullptr);
+    }
+    // The second part a link too, where the client says (a group's name goes
+    // between its two views, K163): it dims while pressed, being lit already.
+    if (spec.nameCb) {
+        lv_obj_add_flag(S.lblTitleName, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_ext_click_area(S.lblTitleName, (btn - lh) / 2);
+        lv_obj_set_style_text_color(S.lblTitleName, UI::c(UI::pal().TEXT_DIM), UI::part(LV_PART_MAIN, LV_STATE_PRESSED));
+        lv_obj_add_event_cb(S.lblTitleName, spec.nameCb, LV_EVENT_CLICKED, nullptr);
     }
 
     lv_obj_t *right = plain(hdr);
@@ -316,6 +335,7 @@ static void buildFrame(Sheet &S) {
     lv_obj_set_flex_grow(S.stage, 1);
     lv_obj_set_flex_flow(S.stage, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(S.stage, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_add_event_cb(S.stage, bareExtDrawCb, LV_EVENT_REFR_EXT_DRAW_SIZE, &S);   // makeWindow()
 
     // --- A floating tab under the right slot (the card window's Scenes) ------
     // Out of the flow, in the corner of the window's contents, a header row
@@ -335,8 +355,8 @@ static void buildFrame(Sheet &S) {
     if (spec.buildFirst) spec.buildFirst();
 }
 
-// THE COUNTDOWN BAR ON THE BOTTOM EDGE (owner, TEST_2.12; #97): H_BAR thin - 2 px
-// at 294 and 255 PPI, 1 px at 170, where it was 6 and 3 - and down on the box's
+// THE COUNTDOWN BAR ON THE BOTTOM EDGE: H_BAR thin - 2 px at 294 and 255 PPI,
+// 1 px at 170 - and down on the box's
 // edge inside its border, so the gap to what the box holds is its whole bottom
 // padding. Between the rounded corners, so it never crosses their curve. Its
 // full width is kept in its user data.
@@ -351,7 +371,7 @@ lv_obj_t *countdownBar(lv_obj_t *box, int32_t boxW) {
     return bar;
 }
 
-// A NEW TIMEOUT OR BAR, AT ONCE (owner, round 4): the wait starts again from
+// A NEW TIMEOUT OR BAR, AT ONCE: the wait starts again from
 // now, and the bar comes or goes with it.
 void sheetRetime(Sheet &S, uint32_t closeMs, bool bar) {
     if (!S.win) return;
@@ -381,9 +401,9 @@ uint32_t sheetLeftMs(const Sheet &S) {
 //  - They fit if the title takes the room beside the left button (a window
 //    with two tabs on the right has a tab's width spare on the left): the
 //    left slot shrinks to its button, and the title sits left of centre
-//    (owner, round 7).
-//  - Neither: THE NAME ALONE (owner, round 7, the 4B: "Offi...Desk" was hard
-//    to read). The link back goes with it; the back arrow still does that job.
+//    (a window with two tabs on the right has a tab's width spare on the left).
+//  - Neither: THE NAME ALONE ("Offi...Desk" is hard to read). The link back
+//    goes with it; the back arrow still does that job.
 void sheetLayoutTitle(Sheet &S) {
     if (!S.lblTitleArea || !S.lblTitleName) return;
     const lv_font_t *f = UI::type().NAME;
@@ -407,7 +427,59 @@ void sheetLayoutTitle(Sheet &S) {
     lv_obj_set_width(S.lblTitleName, nw);
 }
 
-// THE TABS WORK AS TABS (owner, 2026-10-06): shown on every view they belong
+// A BARE SHEET (K154): the header row hidden and the padding gone, so the stage is
+// the window; the window clear, without its border, its corners the client's - what
+// the stage holds draws the surface. Local properties over KS_SHEET_FACE, taken away
+// again. The row padding is the client's per view (the card window sets it), so it
+// is set here only going bare.
+void sheetBare(Sheet &S, bool bare, int32_t radius) {
+    if (!S.win || !S.header) return;
+    if (bare != S.bare) {
+        S.bare = bare;
+        if (bare) {
+            lv_obj_add_flag(S.header, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_pad_all     (S.win, 0, 0);
+            lv_obj_set_style_pad_row     (S.win, 0, 0);
+            lv_obj_set_style_bg_opa      (S.win, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(S.win, 0, 0);
+            lv_obj_set_style_radius      (S.win, radius, 0);
+            S.winRadius = radius;   // the sparks run round these corners
+        } else {
+            S.winRadius = UI::mm(UI::shape().R_WINDOW);   // sheetPlace()'s
+            lv_obj_clear_flag(S.header, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_pad_all(S.win, S.pad, 0);
+            lv_obj_remove_local_style_prop(S.win, LV_STYLE_BG_OPA, 0);
+            lv_obj_remove_local_style_prop(S.win, LV_STYLE_BORDER_WIDTH, 0);
+            lv_obj_remove_local_style_prop(S.win, LV_STYLE_RADIUS, 0);
+        }
+        // Its client's shadow let out while bare, clipped again after (makeWindow()).
+        lv_obj_t *const both[] = { S.win, S.stage };
+        for (lv_obj_t *o : both) {
+            if (!o) continue;
+            if (bare) lv_obj_add_flag(o, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+            else      lv_obj_clear_flag(o, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+            lv_obj_refresh_ext_draw_size(o);
+        }
+    }
+    sheetResized(S);
+}
+
+// THE TITLE AND THE BAR FOLLOW THE WINDOW: the title's room as
+// buildFrame() works it out; the bar as wide as the bottom edge allows between
+// the corners, on that edge - inside a bare window's client's border.
+void sheetResized(Sheet &S) {
+    if (!S.win) return;
+    S.titleW = lv_area_get_width(&S.winRect) - 2 * S.pad - 2 * S.titleSlotW - 2 * UI::mm(UI::shape().S5);
+    if (!S.autoBar) return;
+    const int32_t full = LV_MAX(1, lv_area_get_width(&S.winRect) - 2 * lv_obj_get_style_radius(S.win, LV_PART_MAIN));
+    lv_obj_set_user_data(S.autoBar, (void *)(intptr_t)full);
+    const int32_t inset = S.bare ? UI::met().BORDER_W : 0;
+    lv_obj_align(S.autoBar, LV_ALIGN_BOTTOM_MID, 0, lv_obj_get_style_pad_bottom(S.win, LV_PART_MAIN) - inset);
+    lv_obj_set_width(S.autoBar, 1);   // countdownSet() sets it from the new full width
+    countdownSet(S.autoBar, S);
+}
+
+// THE TABS WORK AS TABS: shown on every view they belong
 // to, the one showing lit (as a chosen selector button is).
 void sheetTabLook(lv_obj_t *tab, bool shown, bool lit) {
     if (!tab) return;
@@ -451,9 +523,9 @@ static void invalidateWindow(Sheet &S) {
 // Built, made modal, its clock started, SETTINGS' tab sliding up and the
 // sparks waiting their turn.
 //
-// BUILT QUIET (2026-10-05). The window's frame took ~77 ms where ~25 was
-// expected, and DEBUG_POPUP showed why: it redrew 0,0..1032,627, not the
-// window. LVGL lays out a new object's SIZE before its POSITION
+// BUILT QUIET. Otherwise the window's frame takes ~77 ms where ~25 is expected:
+// it redraws the whole screen, not the window. LVGL lays out a new object's
+// SIZE before its POSITION
 // (lv_obj_refr_size, then lv_obj_refr_pos), so for one step the full-size
 // window sat at (0,0) and that area was invalidated too; joined with the real
 // one, it covered the cards under the window and the header, and every strip
@@ -502,7 +574,8 @@ static void closeAsync(void *p) {
     S->btnLeft = S->lblLeft = S->floatTab = nullptr;
     for (lv_obj_t *&b : S->tab) b = nullptr;
     S->lblTitleArea = S->lblTitleName = S->titleLeft = nullptr;
-    S->stage = S->autoBar = nullptr;
+    S->stage = S->autoBar = S->header = nullptr;
+    S->bare = false;
     if (s_catcher) lv_obj_clear_flag(s_catcher, LV_OBJ_FLAG_CLICKABLE);
     s_beside = nullptr;
     if (s_open == S) s_open = nullptr;

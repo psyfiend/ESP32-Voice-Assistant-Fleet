@@ -8,7 +8,8 @@
 // ---------------------------------------------------------------------------
 // Card vocabulary. Shaped like EntityTypes.h on purpose: the small enums and
 // plain structs the card layer is built out of, with no LVGL and no logic, so
-// a build sheet (#20) can name these values without pulling the UI in.
+// page specs and the settings file can name these values without pulling the
+// UI in.
 //
 // Everything here is a DECISION already recorded in docs/design/cards.md. If a
 // value below disagrees with that document, that document wins.
@@ -23,11 +24,9 @@
 // that renders ONE derived state. cards.md section 4 already allows it under
 // "Light: groupable by room", so it is not a group card and must not need one.
 //
-// The cost of getting this wrong is asymmetric. Binding one entity in the base
-// class and discovering the aggregate case later means touching every subclass
-// that already exists; carrying a six-pointer array costs 24 bytes against a
-// measured ~715 bytes per card. Same reasoning as issue #15's insistence that
-// spans exist from the first version.
+// Carrying a six-pointer array costs 24 bytes against a measured ~715 bytes
+// per card; binding one entity in the base class would mean touching every
+// subclass to add the aggregate case.
 static constexpr uint8_t CARD_PRIMARY_MAX   = 6;
 
 // TWO secondaries, and this cap IS the hard one from cards.md section 1: a
@@ -53,21 +52,18 @@ enum class CardState : uint8_t {
     ST_PARTIAL,      // SOME of what we commanded did not happen - see below
     ST_PAUSED,       // the user's own choice, so quiet is correct. May dim
 
-    // THE SOURCE SAID SO. Issue #56.
+    // THE SOURCE SAID SO.
     //
-    // Distinct from ST_STALE, and the distinction is the entire point: stale
-    // means "we have not heard from this in a while and are guessing", while
-    // this means "the thing that owns it TOLD us it is not there". One is an
-    // inference from silence, the other is a fact from the horse's mouth, and
-    // a panel that renders them identically throws away the better signal.
+    // Distinct from ST_STALE: stale means "we have not heard from this in a
+    // while and are guessing", while this means "the thing that owns it TOLD us
+    // it is not there". One is an inference from silence, the other is a fact,
+    // and a panel that renders them identically throws away the better signal.
     //
     // It matters most on the HA path, where silence carries no information at
     // all: subscribe_trigger fires on change, so a quiet sensor and a dead one
     // look the same by age. HA sends the word "unavailable" as a state, and
-    // that word is the only reliable evidence available. Without this the
-    // value was simply not written and the card kept displaying its last good
-    // reading for ever - the fourth lying diagnostic in a project that has
-    // already paid for three.
+    // that word is the only reliable evidence available. Without a state for it
+    // the card would keep displaying its last good reading for ever.
     ST_UNAVAILABLE,
 };
 
@@ -88,13 +84,12 @@ inline bool cardStateOwnsBody(CardState s) {
     return s == CardState::ST_REFUSED ||
            s == CardState::ST_STALE   ||
            s == CardState::ST_LONG_STALE ||
-           // UNAVAILABLE MUST TAKE THE BODY, not merely wear a tag. Issue #56.
+           // UNAVAILABLE MUST TAKE THE BODY, not merely wear a tag.
            //
-           // This was nearly missed: adding the state and its colours is not
-           // enough, because stateColor() returns early for anything this
-           // predicate rejects. The card would have kept displaying its last
-           // good reading under a small "N/A" badge - which is precisely the
-           // lie the whole issue exists to remove, just with a label on it.
+           // stateColor() returns early for anything this predicate rejects,
+           // so a state with a colour but no entry here would keep displaying
+           // its last good reading under a small "N/A" badge - the lie the
+           // state exists to remove, with a label on it.
            //
            // The body is the thing the user reads at a glance from across the
            // room. If the source says the sensor is gone, the number has to go
@@ -110,19 +105,16 @@ inline bool cardStateMayDim(CardState s) { return s == CardState::ST_PAUSED; }
 // ---------------------------------------------------------------------------
 // How a card presents its top section.
 //
-// THESE ARE THREE PERMANENT CHOICES, not a comparison to be narrowed later.
-// The owner's call: all three stay, and a build sheet picks one with a single
-// setting. They were briefly treated as a prototype switch with a winner to be
-// declared - that was wrong, and it would have deleted two of them.
+// THERE ARE FOUR PERMANENT CHOICES (below), each picked with a single setting;
+// none is a prototype with a winner to be declared.
 //
 // Every card has a TOP SECTION regardless. It carries two things and always in
-// the same places: the area (or a custom grouping, later) on the left, and the
-// STALE marker on the right. What changes between these three is only how that
+// the same places: the card label (its group) on the left, and the STALE
+// marker on the right. What changes between these three is only how that
 // section is PRESENTED:
 //
-//   HDR_BAND   a filled band inside the card, edge to edge (was HDR_BAR; the
-//              owner named it "band", card-sheet 11.3 - "bar" read like the
-//              system header bar)
+//   HDR_BAND   a filled band inside the card, edge to edge (card-sheet 11.3;
+//              "band" because "bar" reads like the system header bar)
 //   HDR_TAG    a pill hanging OUTSIDE, above the card's top-left corner, with
 //              a second pill on the right when the card needs a STALE marker
 //   HDR_NONE   plain text in the top strip inside the card, no fill
@@ -132,19 +124,16 @@ inline bool cardStateMayDim(CardState s) { return s == CardState::ST_PAUSED; }
 // difference is real and is the reason to pick one.
 //
 // The room a tag needs comes out of the grid's ROW GAP, not out of the card -
-// see CardPage::begin(). Cards are the same size and shape in all three modes,
-// which the owner was explicit about: "in order for this to look good the
-// cards must not differ in shape or size because of the tag."
+// see CardPage::begin(). Cards are the same size and shape in all the modes:
+// they must not differ in shape or size because of the tag.
 // ---------------------------------------------------------------------------
 //
-// HDR_TAG_FLOAT (owner, 2026-10-01, design interview §1): the same pills, but
-// lying ACROSS the card's top corners - half above the card's top edge and
-// sticking out the same amount past its side - so a tag reads as resting on
-// the card and, on Linen, casts its shadow onto it. The owner's new default.
-// It costs the card exactly what HDR_TAG does (one headerHeight()), split
-// between the row above the card and an inset at the top of the body that
-// keeps the corner icon out from under the pill. Appended, so the values
-// already stored as uint8_t keep their meaning.
+// HDR_TAG_FLOAT: the same pills, but lying ACROSS the card's top corners -
+// half above the card's top edge and sticking out the same amount past its
+// side - so a tag reads as resting on the card and, on Linen, casts its shadow
+// onto it. It is the default. It costs the card exactly what HDR_TAG does (one
+// headerHeight()), split between the row above the card and an inset at the
+// top of the body that keeps the corner icon out from under the pill.
 enum class CardHeaderStyle : uint8_t {
     HDR_NONE = 0,   // plain text in the card's top strip
     HDR_BAND,       // a filled band inside the card, edge to edge
@@ -171,11 +160,9 @@ inline const char *cardHeaderName(CardHeaderStyle s) {
 
 // Which unit a temperature is DISPLAYED in, whatever the source reports.
 //
-// The owner's rule, 2026-09-15: "I will always prefer temp in F not C but both
-// should be supported and customizable by users if the source is not in the
-// unit they want." Confirmed against his real Home Assistant, where 34 of 35
-// temperature sensors report Fahrenheit and one reports Celsius - so a fleet
-// with one preference and no conversion would render that one card wrong,
+// The owner prefers Fahrenheit, with both supported and customizable when the
+// source is not in the unit wanted. His Home Assistant has sensors in both, so
+// a fleet with one preference and no conversion would render the odd one wrong,
 // silently, and look exactly like a working card.
 //
 // Conversion is a DISPLAY concern and happens at format time. The registry
@@ -190,7 +177,7 @@ enum class TempUnit : uint8_t {
 };
 
 // ---------------------------------------------------------------------------
-// How a DURATION is rendered (issue #51).
+// How a DURATION is rendered.
 //
 // Deliberately the same shape as TempUnit above, resolved the same way -
 // fleet default, then page, then card - because it is the same problem:
@@ -207,22 +194,20 @@ enum class TempUnit : uint8_t {
 enum class DurationFormat : uint8_t {
     DUR_INHERIT = 0,  // use the page's setting (on a card) or the fleet's
     // Switches by magnitude: "09:12" under an hour, "04:15:33" under a day,
-    // "3d 04:15" beyond. The owner's pick, 2026-09-19, and the default - it is
-    // what a person says out loud, and it keeps the card narrow while a board
-    // is young without lying about a board that has been up for weeks.
+    // "3d 04:15" beyond. The default - it is what a person says out loud, and
+    // it keeps the card narrow while a board is young without lying about a
+    // board that has been up for weeks.
     DUR_AUTO,
     // Always H:MM:SS, hours growing past two digits rather than wrapping.
     // Honest, and wide - three weeks reads "504:00:00".
     DUR_CLOCK,
-    // The raw count with its source unit, exactly as it arrives. What every
-    // duration did before this existed, kept so the change is reversible from
-    // a settings screen rather than from a rebuild.
+    // The raw count with its source unit, exactly as it arrives.
     DUR_SECONDS,
 };
 
 // ---------------------------------------------------------------------------
-// When a card standing for several things is ON. 2.10b (#65), owner
-// 2026-10-05: a group defined on the device behaves as an HA group does, and
+// When a card standing for several things is ON. A group defined on the
+// device behaves as an HA group does, and
 // HA's group helper has exactly this choice - "The group's entity state is only
 // ON if all members are on", off by default. A tap follows the same answer: a
 // group that is on turns every member off; one that is off turns them all on.
@@ -232,20 +217,20 @@ enum class GroupOn : uint8_t {
     GROUP_ON_ALL,       // on only when every member is on
 };
 
-// Which of a light's scenes its window offers (owner, 2026-10-07): the ones
-// not hidden in HA's own UI (its entity registry's hidden_by), all of them,
-// or none. A card setting, kept in RAM until saving arrives (2.10d).
+// Which of a light's scenes its window offers: the ones not hidden in HA's own
+// UI (its entity registry's hidden_by), all of them, or none. A card setting,
+// saved with the card.
 enum class SceneShow : uint8_t {
     SCENES_VISIBLE = 0,   // the default
     SCENES_ALL,
     SCENES_OFF,
 };
 
-// WHAT A TAP DOES (2.10d, DECISIONS K37, K39). A long press always opens the
-// window (K3); this is the tap. TAP_DEFAULT is the card type's own - toggle on
-// a switch, a light or a button, History on anything else (owner, 2.10e round
-// 2; it was nothing) - and is what an unsaved card does. The scenes are the ones the card's window offers (its Scenes
-// setting); Cycle starts from the first after each boot.
+// WHAT A TAP DOES (DECISIONS K37, K39). A long press always opens the window
+// (K3); this is the tap. TAP_DEFAULT is the card type's own - toggle on a
+// switch, a light or a button, History on anything else - and is what an
+// unsaved card does. The scenes are the ones the card's window offers (its
+// Scenes setting); Cycle starts from the first after each boot.
 enum class TapAction : uint8_t {
     TAP_DEFAULT = 0,
     TAP_TOGGLE,
@@ -255,6 +240,7 @@ enum class TapAction : uint8_t {
     TAP_CYCLE_SCENES,   // loads the next scene, with a toast naming it
     TAP_LOAD_SCENE,     // loads one chosen scene ("tap_scene"), with a toast
     TAP_NOTHING,
+    TAP_GROUP,          // a cluster's group view (K154) - its default; saved by name, so last
 };
 
 inline const char *tapActionName(TapAction t) {
@@ -266,17 +252,18 @@ inline const char *tapActionName(TapAction t) {
         case TapAction::TAP_CYCLE_SCENES: return "cycle_scenes";
         case TapAction::TAP_LOAD_SCENE:   return "load_scene";
         case TapAction::TAP_NOTHING:      return "nothing";
+        case TapAction::TAP_GROUP:        return "group";
         default:                          return "default";
     }
 }
 inline bool tapActionFromName(const char *n, TapAction &out) {
     if (!n) return false;
-    for (uint8_t i = 1; i <= (uint8_t)TapAction::TAP_NOTHING; i++)
+    for (uint8_t i = 1; i <= (uint8_t)TapAction::TAP_GROUP; i++)
         if (!strcmp(n, tapActionName((TapAction)i))) { out = (TapAction)i; return true; }
     return false;
 }
 
-// The names these are saved under (2.10d, Settings.h): a saved choice is a
+// The names these are saved under (Settings.h): a saved choice is a
 // NAME, so reordering an enum never changes what it means. A name this
 // firmware does not know reads as "not set".
 inline const char *tempUnitName(TempUnit u) {
@@ -308,16 +295,16 @@ inline bool sceneShowFromName(const char *n, SceneShow &out) {
     if (!n) return false;
     if (!strcmp(n, "visible")) { out = SceneShow::SCENES_VISIBLE; return true; }
     if (!strcmp(n, "all"))     { out = SceneShow::SCENES_ALL;     return true; }
-    // "Off" was dropped (K43): nothing offers it, so a saved one reads as
-    // Visible rather than leaving a card whose scenes nobody can bring back.
+    // "Off" is not offered (K43): a saved one reads as Visible rather than
+    // leaving a card whose scenes nobody can bring back.
     if (!strcmp(n, "off"))     { out = SceneShow::SCENES_VISIBLE; return true; }
     return false;
 }
 
-// What the line under a state card's hero says. Milestone 2.7.
+// What the line under a state card's hero says.
 //
-// The owner, 2026-09-22: state is the icon and the colour, and the NAME is what
-// tells two doors in one area apart - so the name is the default. But a user
+// State is the icon and the colour, and the NAME is what tells two doors in
+// one area apart - so the name is the default. But a user
 // may prefer the state spelled out, or nothing at all. Resolved like TempUnit:
 // fleet default, then page, then card.
 //
@@ -334,11 +321,7 @@ enum class CardLabel : uint8_t {
     LBL_STATE,        // "Open" / "Closed", from the device_class table
     LBL_NONE,         // nothing; the hero stands alone
     LBL_HA,           // "From HA": the source's own name (Entity::sourceName,
-                      // HA's friendly_name), else the card's (2.10d, K40)
-    // A fourth mode, LBL_NO_ICON - name kept, hero and disc dropped - was
-    // built and tried on glass 2026-09-22 and REJECTED by the owner: "We're
-    // not building a minimal dashboard. We're building an awesome dashboard."
-    // Removed rather than left switched off.
+                      // HA's friendly_name), else the card's (K40)
 };
 
 // Saved by name (Settings.h). "inherit" is never saved: it is the absence of
@@ -358,20 +341,20 @@ inline bool cardLabelFromName(const char *n, CardLabel &out) {
     if (!strcmp(n, "state"))  { out = CardLabel::LBL_STATE; return true; }
     if (!strcmp(n, "none"))   { out = CardLabel::LBL_NONE;  return true; }
     if (!strcmp(n, "ha"))     { out = CardLabel::LBL_HA;    return true; }
-    // Saved since K49: a named card's default is Custom, so Inherit is a choice.
+    // Saved (K49): a named card's default is Custom, so Inherit is a choice.
     if (!strcmp(n, "inherit")) { out = CardLabel::LBL_INHERIT; return true; }
     return false;
 }
 
 // ---------------------------------------------------------------------------
-// GROUP CARDS (2.11, DECISIONS K88-K92). A group card stands for a set of
+// GROUP CARDS (DECISIONS K88-K92). A group card stands for a set of
 // entities; its members are cards of their own (an id, their own settings). How
 // it is SHOWN is its presentation (K90, K92 rule 6): one card, or a CLUSTER - a
 // block of its members on the page, each a mini tile (K89). A cluster that
-// cannot fit is shown as its card. A SUMMARY (2.11 round 4, K98): one card of
+// cannot fit is shown as its card. A SUMMARY (K98): one card of
 // members of one kind - one icon, active while any member is, its words naming
 // the active ones ("North", "Both"); a tap opens its Members. The group page
-// (K99) comes later. Saved by name: "present": "card" / "cluster" / "summary".
+// (K99) is not built. Saved by name: "present": "card" / "cluster" / "summary".
 // ---------------------------------------------------------------------------
 enum class GroupPresent : uint8_t { PRESENT_CARD = 0, PRESENT_CLUSTER, PRESENT_SUMMARY };
 inline const char *groupPresentName(GroupPresent p) {
@@ -404,21 +387,16 @@ static constexpr uint8_t CLUSTER_SLOTS_MAX = 4;    // the members a cluster head
 // ---------------------------------------------------------------------------
 // Where a card wants to sit, in grid UNITS.
 //
-// CHANGED AT 2.5, and the change is the unit rather than the fields: these
-// used to be CELLS. ROADMAP Q3b decided sub-grid placement on 2026-09-03 and
-// the reason it is being honoured now rather than later is that document's own
-// warning - it is very expensive to retrofit, because every span already
-// written has to be re-read in the new unit.
+// The unit is a sub-cell (D-4): spans are written in units, so changing the
+// subdivision never means re-reading every span.
 //
 //   A page is authored as N x M CELLS and allocates N*sub x M*sub UNITS.
 //   With the default subdivision of 2, ONE CELL IS 2x2 UNITS, so an ordinary
 //   card is prefSpan 2x2 and the defaults below say so. A quarter-page card on
 //   a 3x3 page is 3x3 units; a half-cell card is 2x1 or 1x2.
 //
-// Issue #15: "MUST carry preferred_span / min_span / priority from the very
-// first version. Retrofitting responsive sizing after 8 card types exist means
-// rewriting all 8." All three are now actually READ - priority by
-// CardPage::plan(), which drops the lowest-priority cards until the rest fit.
+// A card carries preferred span, minimum span and priority; priority is read
+// by CardPage::plan(), which drops the lowest-priority cards until the rest fit.
 //
 // Deliberately NOT on EntityDescriptor. Entity.h says why: keeping size out of
 // the entity is what lets the same temperature reading be a 1x1 tile on one
@@ -436,8 +414,8 @@ struct CardPlacement {
 
     // Explicit placement, in units, or PAGE_FLOW (-1) to be flowed.
     //
-    // ROADMAP Q3b chose "placement at unit granularity, plus a validator" over
-    // a constraint solver, precisely so a layout is predictable: any card may
+    // D-4 chose "placement at unit granularity, plus a validator" over a
+    // constraint solver, so a layout is predictable: any card may
     // be pinned anywhere, and the page REPORTS overlaps and out-of-bounds
     // rather than quietly resolving them. See CardPage::plan().
     int8_t  col = -1;
@@ -462,10 +440,10 @@ struct CardPlacement {
 //               the icon and its colour" - so the icon is the part that cannot
 //               go, and a very small one is a disc and nothing else.
 //
-// VAR_AUTO is the default and resolves at build time by measuring. A build
-// sheet can pin either variant when it disagrees.
+// VAR_AUTO is the default and resolves at build time by measuring. A card can
+// pin either variant.
 // ---------------------------------------------------------------------------
-// An "on" state drawn on a card's edge (2.8 round 4; Card::activeFrame()).
+// An "on" state drawn on a card's edge (D-30 to D-33; Card::activeFrame()).
 // Compound names per CLAUDE.md's macro hazard.
 enum class CardFrame : uint8_t {
     FRAME_NONE = 0,   // the edge restyle() gives

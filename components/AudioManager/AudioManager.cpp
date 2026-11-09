@@ -439,5 +439,5 @@ bool AudioManager::playSeconds(int16_t* buffer, float seconds) {
     return (err == ESP_OK);
 }
 
-// Note: Manual writeReg/readReg helpers removed as they are no longer needed
-// because es8311_codec_init and es8311_set_mic_gain handle register writes.
+// Register writes go through es8311_codec_init and es8311_set_mic_gain; this
+// file has no writeReg/readReg helpers.

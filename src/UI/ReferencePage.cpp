@@ -246,9 +246,8 @@ void show() {
     if (old) lv_obj_delete(old);   // after the load, never before
 
     // Report only once the previous page is gone. Reading used_pct before the
-    // delete counted BOTH pages, which is why the pool appeared to jump from
-    // 36% to 54% on the first rebuild and then sit there - that was peak usage
-    // during a rebuild, not steady state, and not a leak.
+    // delete counts BOTH pages: that is peak usage during a rebuild, not steady
+    // state, and not a leak.
     lv_mem_monitor(&mon);
     Serial.printf("[Ref] %s | %u cards cost %u B of lv_mem (%u B each) | "
                   "pool %u%% used, %u%% frag\n",

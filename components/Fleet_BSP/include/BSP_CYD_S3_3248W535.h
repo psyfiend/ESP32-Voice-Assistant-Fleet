@@ -7,14 +7,14 @@
 
 // -------------------------------------------------------------------------
 // Board: Guition JC3248W535 (ESP32-S3N16R8)
-// Driver: ASX15231B (SPI)
-// Resolution: 324x480
+// Driver: AXS15231B (QSPI)
+// Resolution: 320x480
 // -------------------------------------------------------------------------
 
 #define CYD_S3_3248
-#define BSP_PANEL_DRIVER AXS15231B // panel chip, a bare name: sets PANEL_MODEL; picks the esp_lcd driver from 2.9 step 5 (Fleet_BSP.h)
+#define BSP_PANEL_DRIVER AXS15231B // panel chip, a bare name: sets PANEL_MODEL (Fleet_BSP.h)
 
-// Panel init commands (ASX15231B)
+// Panel init commands (AXS15231B)
 // NOTE: Must stay here, immediately before the structs below - see
 // BSP_WS_P4_TOUCH_LCD_7B.h for why (sizeof() on this array needs its
 // complete type at use-site).
@@ -367,11 +367,11 @@ inline const StorageConfig& bsp_storage = CYD_S3_3248W535_STORAGE;
 
 const LvglConfig CYD_S3_3248W535_LVGL = {
     .DOUBLE_BUFFERING = false,
-    // 20 rows, not the 1/10th of the screen (48 rows) the default computes.
+    // 20 rows; the bus default would be 1/10th of the screen (48 rows).
     // This board has the least internal SRAM to spare in the fleet and its
     // draw buffer must live there, so the buffer is sized deliberately rather
-    // than as a fraction. BUFFER_SIZE_PX below already said 20 rows; nothing
-    // read it. See LVGL_Startup.cpp.
+    // than as a fraction. Only DRAW_BUF_HEIGHT is read; BUFFER_SIZE_PX below
+    // matches it. See LVGL_Flush_Gfx.cpp.
     .DRAW_BUF_HEIGHT  = 20,
     .BUFFER_SIZE_PX   = 320 * 20, // Width x 20 rows
 };

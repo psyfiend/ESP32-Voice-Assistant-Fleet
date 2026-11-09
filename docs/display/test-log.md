@@ -1,8 +1,9 @@
 # Display test log — 2.9 (#67) and after
 
-Was `docs/TEST_2.9.md` until 2026-09-29. The dated record of every display test run: what was
-built, what was measured, and the owner's verdicts on glass. Sections are in the order they were
-written, not by step. **For where things stand now, read [README.md](README.md)**; numbers are
+The record of the display test runs: what was built, what was measured, and the owner's verdicts
+on glass. It is a log, not a description of the current code: sections are in the order they were
+written, and a board named "Arduino_GFX" or an "S3_4B only" setting was true when run. **For where
+things stand now, read [README.md](README.md) and [architecture.md](architecture.md)**; numbers are
 summarised in [performance.md](performance.md). New runs are added at the end.
 
 ---
@@ -314,8 +315,9 @@ through the TCA9554 expander (Espressif's `esp_io_expander` + `esp_lcd_panel_io_
 `Wire`'s bus); the panel is a 16-bit RGB panel with two PSRAM frame buffers and the 20-line bounce
 buffers. **Present mode `DOUBLE_DIRECT`**: LVGL draws straight into those frame buffers - no
 draw buffers, no copy; the flush hands the finished buffer over and waits for the switch. Touch
-reset and the amp enable moved from `DisplayManager` to `Fleet_Display`. **Plus, on this board
-only, `-D FLEET_LV_MEM_PSRAM`**: LVGL's 128 KB pool in PSRAM (`lv_conf.h`) - see below.
+reset and the amp enable moved from `DisplayManager` to `Fleet_Display`. **Plus
+`-D FLEET_LV_MEM_PSRAM`**: LVGL's 128 KB pool in PSRAM (`lv_conf.h`), a setting every S3 has now
+(A11) - see below.
 
 **First light: PASS (owner, 03:00)** - dashboard up, first build. One panic reboot right after the
 first esp_lcd boot, not seen again, backtrace not captured.

@@ -56,10 +56,9 @@ const BoardHardware WS_P4_TOUCH_LCD_5_HARDWARE = {
 
     .SDA_PIN = 7,
     .SCL_PIN = 8,
-    // Vendor GT911 driver uses 400kHz (i2c.h EXAMPLE_I2C_MASTER_FREQUENCY) -
-    // the only value that ever actually reached hardware; the vendor's
-    // separate "general bus" 100kHz field was confirmed dead (never read by
-    // any of their own init code) during this board's bring-up.
+    // Vendor GT911 driver uses 400kHz (i2c.h EXAMPLE_I2C_MASTER_FREQUENCY).
+    // The vendor's separate "general bus" 100kHz field is never read by
+    // any of their own init code.
     .I2C_CLOCK_SPEED = 400000,
 
     // BAT through R12 200K / R15 100K -> GPIO20 = ADC1 ch4 ("BAT_ADC", schematic);
@@ -76,14 +75,12 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
     .WIDTH       = 720,
     .HEIGHT      = 1280,
     // 0 = portrait (USB on bottom), 1 = landscape (USB on right), 2 = inverted
-    // portrait, 3 = inverted landscape. Set to 1 by preference, NOT by vendor
-    // guidance: Waveshare's displays_config.h specifies rotation 0 with swap_xy
-    // and both mirrors clear, so 1 is our own choice and the panel's native
-    // orientation is portrait. UNVERIFIED on hardware as of 2026-09-06 - and
-    // note this board takes the GENERIC branch of TouchManager::mapCoordinates()
-    // (the special case is #ifndef WS_P4_7B), which has never been exercised on
-    // a DSI panel at a non-zero rotation. If touch comes back swapped or
-    // mirrored, that is the thing to look at first.
+    // portrait, 3 = inverted landscape. Landscape is this project's choice;
+    // Waveshare's displays_config.h specifies rotation 0 with swap_xy
+    // and both mirrors clear, and the panel's native orientation is portrait.
+    // This board takes the GENERIC branch of TouchManager::mapCoordinates()
+    // (the special case is #ifndef WS_P4_7B). If touch comes back swapped or
+    // mirrored, look there first.
     .ROTATION    = 1,
     .AUTO_FLUSH  = true,
 
@@ -113,22 +110,15 @@ const DisplayConfig WS_P4_TOUCH_LCD_5_DISPLAY = {
 
     .PREFER_SPEED  = 58000000,
     .LANE_BIT_RATE = 700,
-    // Retired experiment, deliberately left explicit rather than deleted.
-    // IDF_AUTO was tried here while chasing the init hang; the hang turned out to
-    // be reset polarity (.RST_ACTIVE_HIGH below) and the clock source made no
-    // difference either way. Back to DEFAULT so every P4 board in the fleet runs
-    // the library's PLL_F20M on one uniform path and no board carries an
-    // experimental clock setting. The BSP_PHY_CLK_SRC_* mechanism stays in
-    // Arduino_ESP32DSIPanel as the escape hatch for rev3+ silicon, which needs
-    // XTAL and cannot use the library's hardcoded rev<3-only PLL_F20M.
+    // DEFAULT on every P4 board, so the fleet runs the library's PLL_F20M on one
+    // uniform path (IDF_AUTO made no difference on this panel). The
+    // BSP_PHY_CLK_SRC_* mechanism stays in Arduino_ESP32DSIPanel for rev3+
+    // silicon, which needs XTAL and cannot use the library's hardcoded
+    // rev<3-only PLL_F20M.
     .PHY_CLK_SRC = BSP_PHY_CLK_SRC_DEFAULT,
-    // KEPT, and not an experiment. Waveshare's own confirmed-working copy of this
-    // library uses 2 for this panel; the fork defaults to 1. This board has only
-    // ever booted successfully with 2, so 0/1 would be a change to a known-good
-    // config rather than a revert. Note the 1-vs-2 test during bring-up proved
-    // nothing about buffering - it was run against the reset-polarity hang, which
-    // masked everything downstream. Revisit fleet-wide during LVGL buffering
-    // tuning; see FUTURE_IMPROVEMENTS.md "LVGL / Display".
+    // Waveshare's own working copy of this library uses 2 for this panel; the
+    // fork defaults to 1. Arduino_GFX path only. Revisit fleet-wide with LVGL
+    // buffering tuning; see FUTURE_IMPROVEMENTS.md "LVGL / Display".
     .NUM_FB = 2,
 
     // ---= Init Commands =---

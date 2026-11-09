@@ -1,11 +1,9 @@
 #include "UI/Widget_ConnStatus.h"
 #include "UI/UIToolkit.h"
 
-// Colours - semantic: these ARE the information, and since 2.8 round 3 they
-// are the scheme's own (UIPalette SIG_*, D-27). History: the greens were once
-// brighter than the "Fleet Status Glyphs" spec (00FF00 - the spec's looked
-// washed out on the 7B); the owner chose the spec's softer pair again on the
-// round-3 canvas, and Linen has a darker set of its own.
+// Colours - semantic: these ARE the information, and they are the scheme's own
+// (UIPalette SIG_*, D-27): the dark schemes take the "Fleet Status Glyphs"
+// spec's softer greens, and Linen has a darker set of its own.
 
 static const uint32_t POLL_MS = 400;   // 2.5 Hz is plenty for a status icon
 
@@ -130,13 +128,12 @@ void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, LinkHealth he
     stopMotion();
     Kit::strokeGlyphStrike(_g, false, UI::c(p.SIG_OFF), UI::c(p.SIG_OFF));
 
-    // Issue #49 - THE OVERRIDE, and it comes before the switch on purpose.
+    // THE OVERRIDE (issue #49), and it comes before the switch on purpose.
     //
     // A board whose link has been confirmed dead is still sitting in
     // STA_CONNECTED as far as the driver is concerned, so the switch below
-    // would paint it green with full arcs. That is the precise lie this whole
-    // change exists to stop: full bars for six hours while nothing on the LAN
-    // could reach the panel. The evidence outranks the driver's own story.
+    // would paint it green with full arcs: full bars while nothing on the LAN
+    // can reach the panel. The evidence outranks the driver's own story.
     if (health == LinkHealth::LINK_DEAD &&
         (st == ConnState::STA_CONNECTED || st == ConnState::APSTA)) {
         // Bare stalk, red - identical to a frank disconnect, because that is
@@ -185,7 +182,7 @@ void Widget_ConnStatus::applyVisual(ConnState st, SignalBand band, LinkHealth he
         }
         // A link under suspicion keeps its arc COUNT - the radio really is
         // hearing the AP that well - but loses its colour. The count is a
-        // measurement and still true; the green is a reassurance and no longer
+        // measurement and still true; the green is a reassurance that is not
         // earned.
         if (health == LinkHealth::LINK_SUSPECT) c = p.SIG_WEAK;
         setArcs(lit, c);

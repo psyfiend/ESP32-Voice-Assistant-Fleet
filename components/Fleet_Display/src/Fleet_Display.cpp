@@ -1,5 +1,4 @@
-// Fleet_Display - see Fleet_Display.h. Milestone 2.9 (#67): MIPI-DSI from
-// step 2, RGB from step 4 (WS_S3_4B).
+// Fleet_Display - see Fleet_Display.h. MIPI-DSI and RGB (WS_S3_4B) panels.
 #if defined(DISPLAY_ESPLCD)
 
 #include "Fleet_Display.h"
@@ -24,7 +23,7 @@
 #include "esp_io_expander_tca9554.h"
 #include "esp32-hal-i2c.h"      // i2cBusHandle(): the i2c_master bus Arduino's Wire runs on
 #else
-// QSPI arrives at 2.9 step 5. Said at compile time rather than as a dark panel at boot.
+// QSPI is not built. Said at compile time rather than as a dark panel at boot.
 #error "DISPLAY_ESPLCD drives MIPI-DSI and RGB panels so far (2.9 step 5 adds QSPI) - remove it from this environment"
 #endif
 #ifndef BSP_PANEL_DRIVER
@@ -63,7 +62,7 @@ constexpr uint32_t       BL_MAX_DUTY     = 1023;   // 10-bit
 // scanning the buffer we last handed over. IDF refuses to register it unless
 // it is in IRAM (esp_lcd_panel_dpi.c:640).
 //
-// RGB (step 4): on_frame_buf_complete - "the frame buffer can be reused
+// RGB: on_frame_buf_complete - "the frame buffer can be reused
 // safely" - fires when a frame has been read out of PSRAM in full (with bounce
 // buffers, by the bounce ISR). A buffer handed over by present() is read from
 // the next frame on, so from this moment it is the one being scanned, and the
@@ -101,9 +100,9 @@ inline uint32_t expPin(int n) { return 1U << n; }   // expander pin NUMBER -> th
 } // namespace
 
 #if defined(HAS_RGB_PANEL)
-// RGB bring-up (2.9 step 4, WS_S3_4B): the I/O expander, the panel reset on
+// RGB bring-up (WS_S3_4B): the I/O expander, the panel reset on
 // it, the panel (fleet_rgb_panel.c), then the two expander jobs
-// DisplayManager::begin() used to do on this board - the touch controller's
+// DisplayManager::begin() does on the Arduino_GFX path - the touch controller's
 // reset and the power amp's enable. The sequence is Waveshare's S3-4B BSP plus
 // what Arduino_XCA9554SWSPI did on the Arduino_GFX path.
 bool Fleet_Display::beginRgb() {
@@ -113,7 +112,7 @@ bool Fleet_Display::beginRgb() {
 #if defined(HAS_IO_EXPANDER)
     // The TCA9554, on the i2c_master bus Arduino's Wire already runs
     // (FleetI2C::begin() in begin() started it) - one bus, one owner, as
-    // display-stack.md s7 settled.
+    // docs/display/architecture.md.
     auto bus = static_cast<i2c_master_bus_handle_t>(i2cBusHandle(0));
     if (!bus || esp_io_expander_new_i2c_tca9554(bus, bsp_expander.I2C_ADDR, &exp) != ESP_OK) {
         Serial.printf("[Fleet_Display] I/O expander (TCA9554 @0x%02X) not found\n", bsp_expander.I2C_ADDR);

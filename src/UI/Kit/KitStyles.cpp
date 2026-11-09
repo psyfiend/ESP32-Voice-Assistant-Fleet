@@ -1,8 +1,7 @@
-// The kit's shared styles (2.12 P3): filled from the tokens at Kit::begin(), and
-// again on every repaint - a scheme or accent change - after which LVGL restyles
-// every object using them (UI::onRepaint()). Each value is the one the component
-// set locally before it was a component, so moving a component onto these
-// changed no pixel. See include/UI/Kit.h; docs/design/components.md lists them.
+// The kit's shared styles: filled from the tokens at Kit::begin(), and again on
+// every repaint - a scheme or accent change - after which LVGL restyles every
+// object using them (UI::onRepaint()). See include/UI/Kit.h;
+// docs/design/components.md lists them.
 #include "UI/Kit.h"
 #include "UI/UIToolkit.h"
 
@@ -91,7 +90,7 @@ static void fill() {
     flex(drow, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_style_set_pad_top(drow, UI::mm(k.S4));
 
-    // --- The keyboard (2.11, K95): a dialog's box with the accent for its edge,
+    // --- The keyboard (K95): a dialog's box with the accent for its edge,
     // a field like a dropdown's, keys like the window's satin surfaces ---
     lv_style_t *kbox = st(S::KS_KBD_BOX);
     lv_style_set_radius      (kbox, UI::sc(UI::met().RADIUS));
@@ -164,7 +163,7 @@ static void fill() {
     lv_style_set_border_width(list, LV_MAX(1, UI::mm(k.LINE_HAIR)));
     lv_style_set_radius      (list, UI::mm(k.R_CONTROL));
     lv_style_set_shadow_width(list, 0);
-    // EVERY CHOICE IN SIGHT (owner, 2.10d): the default theme caps a list at
+    // EVERY CHOICE IN SIGHT: the default theme caps a list at
     // 260 px, which on the P4_5 and the 4B is five rows. Only the screen limits
     // it (lv_dropdown_open() fits it above or below).
     lv_style_set_max_height  (list, lv_display_get_vertical_resolution(NULL));
@@ -174,7 +173,7 @@ static void fill() {
 
     lv_style_set_text_font  (st(S::KS_CHECK), t.NAME);
     lv_style_set_pad_column (st(S::KS_CHECK), 0);
-    // As tall as a dropdown (owner, S2): the box is the font's line height plus
+    // As tall as a dropdown: the box is the font's line height plus
     // its own padding.
     lv_style_t *box2 = st(S::KS_CHECK_BOX);
     lv_style_set_pad_all     (box2, LV_MAX(0, (ctlH - lv_font_get_line_height(t.NAME)) / 2));
@@ -233,6 +232,25 @@ static void fill() {
     lv_style_set_bg_opa  (item, LV_OPA_COVER);
     lv_style_set_bg_color(item, UI::c(p.SURFACE));
     lv_style_set_bg_color(st(S::KS_ITEM_PRESSED), UI::c(UI::mix(p.SURFACE, p.TEXT, 15)));
+    // Its marks: the red one's edge inside it, its glow outside.
+    lv_style_t *doomed = st(S::KS_ITEM_DOOMED);
+    const int32_t markW = LV_MAX(2, UI::mm(k.LINE_MID));
+    lv_style_set_bg_color      (doomed, UI::c(UI::mix(p.SURFACE, p.ST_BAD, 18)));
+    lv_style_set_outline_width (doomed, markW);
+    lv_style_set_outline_pad   (doomed, -markW);
+    lv_style_set_outline_color (doomed, UI::c(p.ST_BAD));
+    lv_style_set_shadow_width  (doomed, UI::mm(k.S5));
+    lv_style_set_shadow_color  (doomed, UI::c(p.ST_BAD));
+    lv_style_set_shadow_opa    (doomed, LV_OPA_40);
+    lv_style_set_bg_color(st(S::KS_ITEM_COMING), UI::c(UI::mix(p.SURFACE, p.ACCENT, 10)));
+    // CHOSEN is a lit chip's look: KS_CHIP_LIT's tint, its
+    // accent edge as an outline inside the item.
+    lv_style_t *chosen = st(S::KS_ITEM_CHOSEN);
+    const int32_t chipW = LV_MAX(1, UI::mm(k.LINE_MID));
+    lv_style_set_bg_color     (chosen, UI::c(UI::mix(p.SURFACE, p.ACCENT, 25)));
+    lv_style_set_outline_width(chosen, chipW);
+    lv_style_set_outline_pad  (chosen, -chipW);
+    lv_style_set_outline_color(chosen, UI::c(p.ACCENT));
 
     // --- Pills (scene buttons) and swatches ---
     lv_style_t *pill = st(S::KS_PILL);
@@ -292,12 +310,11 @@ static void fill() {
     lv_style_set_bg_color(bar, UI::c(p.ACCENT));
     lv_style_set_bg_opa  (bar, LV_OPA_COVER);
 
-    // --- The finishes (#99) ---
+    // --- The finishes ---
     // Pressed, a finished surface goes down a pixel, its face with it.
     lv_style_set_translate_y(st(S::KS_SINK), 1);
 
-    // --- The page header (2.8) ---
-    // The bar's look is the one Panel_Header set locally before it had slots.
+    // --- The page header ---
     const UIHeader &h = UI::hdr();
     lv_style_t *hb = st(S::KS_HDR_BAR);
     lv_style_set_bg_color    (hb, UI::c(p.SURFACE_ALT));
@@ -307,7 +324,7 @@ static void fill() {
     lv_style_set_border_color(hb, UI::c(p.ACCENT));
     lv_style_set_radius      (hb, 0);
     lv_style_set_pad_all     (hb, 0);
-    // No flex: where each slot stands is the header plan's (round 2) - the
+    // No flex: where each slot stands is the header plan's - the
     // sides at the ends, the middle on the centre.
     // A slot reaches FRAME_R past the bar's foot (Kit::headerSlot()): the bar
     // clips it there, so an open slot's rounded corners show only at its top.
@@ -383,7 +400,7 @@ static void fill() {
     lv_style_set_radius  (st(S::KS_GLYPH_CIRCLE), LV_RADIUS_CIRCLE);
 
     // The page's dots. This page's is larger and filled, the others smaller
-    // rings: told apart by shape and size, never by colour alone (the owner).
+    // rings: told apart by shape and size, never by colour alone.
     lv_style_t *don = st(S::KS_HDR_DOT_ON);
     lv_style_set_width   (don, UI::sc(h.DOT_ON));
     lv_style_set_height  (don, UI::sc(h.DOT_ON));
@@ -410,12 +427,12 @@ static void fill() {
     lv_style_set_text_align(mk, LV_TEXT_ALIGN_CENTER);
     lv_style_set_pad_top   (mk, LV_MAX(0, (UI::sc(h.MARK) - lv_font_get_line_height(UIToolkit::Font_Caption)) / 2));
 
-    // --- A slot's drawer (2.8) ---
-    // THE WRAPPER IS THE PANEL (2.11 round 5): its surface and its edge, every
+    // --- A slot's drawer ---
+    // THE WRAPPER IS THE PANEL: its surface and its edge, every
     // corner rounded - it lies ON the bar (D-35), its top edge the bar's line,
     // its top corners turning down from it. It is what grows and shrinks, so
-    // the top edge and its corners stay whole while the foot moves (the owner:
-    // the walls stay joined to the top's curves until the last frame). It clips
+    // the top edge and its corners stay whole while the foot moves (the walls
+    // stay joined to the top's curves until the last frame). It clips
     // the face riding inside it; no clip_corner (a layer the wrapper's size,
     // the trap that froze the P4_5 - LESSONS).
     lv_style_t *dr = st(S::KS_DRAWER);
@@ -442,7 +459,7 @@ static void fill() {
     flex(df, LV_FLEX_FLOW_COLUMN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_style_t *di = st(S::KS_DRAWER_ITEM);
     lv_style_set_width     (di, lv_pct(100));
-    lv_style_set_height    (di, UI::mm(UI::shape().H_ROW));   // a panel's row (round 14: the pages closer)
+    lv_style_set_height    (di, UI::mm(UI::shape().H_ROW));   // a panel's row
     lv_style_set_pad_hor   (di, UI::sc(h.DRAWER_PAD));
     lv_style_set_pad_column(di, UI::sc(h.SLOT_GAP));
     flex(di, LV_FLEX_FLOW_ROW, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -451,9 +468,8 @@ static void fill() {
     fillCards();
 }
 
-// CARDS (2.11 round 1): each value the one Card, StateCard and ValueCard set
-// locally before they had roles, so moving them changed no pixel. The surface's
-// colour stays the card's (a paused card mixes it toward the ground).
+// CARDS: the values Card, StateCard and ValueCard share. The surface's colour
+// stays the card's (a paused card mixes it toward the ground).
 static void fillCards() {
     const UIPalette &p = UI::pal();
     const UIMetrics &m = UI::met();
@@ -523,12 +539,12 @@ static void fillCards() {
     lv_style_set_line_opa    (dg, LV_OPA_60);
     lv_style_set_line_rounded(dg, true);
 
-    // --- A cluster (2.11): its frame is a card's surface (KS_CARD_SURFACE) ---
+    // --- A cluster: its frame is a card's surface (KS_CARD_SURFACE) ---
     // One line, the name on the left and the values on the right (the header's
     // planner places them); a rule under it in the border's colour - a light
     // scheme draws no card border, so the rule has a hairline of its own.
     lv_style_t *ch = st(S::KS_CLUSTER_HDR);
-    lv_style_set_bg_color    (ch, UI::c(p.SURFACE_ALT));   // a faint band, as the page header's (round 10)
+    lv_style_set_bg_color    (ch, UI::c(p.SURFACE_ALT));   // a faint band, as the page header's
     lv_style_set_bg_opa      (ch, LV_OPA_COVER);
     lv_style_set_border_side (ch, LV_BORDER_SIDE_BOTTOM);
     lv_style_set_border_width(ch, LV_MAX(1, UI::mm(k.LINE_HAIR)));
@@ -543,7 +559,7 @@ static void fillCards() {
     lv_style_set_bg_opa(sw, LV_OPA_COVER);
     text(S::KS_CLUSTER_VALUE, t.NAME, p.TEXT);
     // The page header's glyph frames at the cluster header's size: four fifths of
-    // its height, the page header's tint (round 11, K115).
+    // its height, the page header's tint (K115).
     for (S f : { S::KS_CLUSTER_GLYPH_SQUARE, S::KS_CLUSTER_GLYPH_CIRCLE }) {
         lv_style_t *g = st(f);
         lv_style_set_width (g, UI::mm(k.C_HDR_H) * 4 / 5);
@@ -555,10 +571,10 @@ static void fillCards() {
     lv_style_set_radius(st(S::KS_CLUSTER_GLYPH_SQUARE), UI::mm(k.C_HDR_H) / 5);
     lv_style_set_radius(st(S::KS_CLUSTER_GLYPH_CIRCLE), LV_RADIUS_CIRCLE);
     lv_style_t *tl = st(S::KS_TILE);
-    // A FAINT PANEL EACH (round 11, the owner's E - K116): between the cluster's
-    // surface and SURFACE_ALT, so the off disc (SURFACE_ALT) and the header's
-    // band still stand apart from it - and a small step toward the text (round
-    // 12b, the owner: "barely visible" at none, too bright at 6%; 3% between).
+    // A FAINT PANEL EACH (K116): between the cluster's surface and SURFACE_ALT, so
+    // the off disc (SURFACE_ALT) and the header's band still stand apart from it -
+    // and a small step toward the text (3 %: "barely visible" with none, too
+    // bright at 6 %).
     lv_style_set_bg_color    (tl, UI::c(UI::mix(UI::mix(p.SURFACE, p.SURFACE_ALT, 50), p.TEXT, 3)));
     lv_style_set_bg_opa      (tl, LV_OPA_COVER);
     lv_style_set_border_width(tl, 0);

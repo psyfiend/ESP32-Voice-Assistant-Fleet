@@ -15,7 +15,7 @@ other projects' code and what it teaches.
 |---|---|---|
 | `ha-dashboard` (Tommzn) | **MIT** | Reuse with attribution |
 | `esphome-modular-lvgl-buttons` (Andrew Gillis) | **MIT** | Reuse with attribution |
-| `ESP32-P4-NINA-Display` (chvvkumar) | **no file; permission granted for non-commercial use** | The author answered the owner's request on 2026-10-06 ([chvvkumar/ESP32-P4-NINA-Display#326](https://github.com/chvvkumar/ESP32-P4-NINA-Display/issues/326)): "go ahead and use what you need as long as it is not for a commercial product". Reuse with credit. **The condition travels with whatever is taken**: a commercial use of this project, or a licence for it that allows one, would need the author's agreement again for any NINA-derived code |
+| `ESP32-P4-NINA-Display` (chvvkumar) | **no file; permission granted for non-commercial use** | The author answered the owner's request ([chvvkumar/ESP32-P4-NINA-Display#326](https://github.com/chvvkumar/ESP32-P4-NINA-Display/issues/326)): "go ahead and use what you need as long as it is not for a commercial product". Reuse with credit. **The condition travels with whatever is taken**: a commercial use of this project, or a licence for it that allows one, would need the author's agreement again for any NINA-derived code |
 | `ESP32-P4-Allsky-Display` (chvvkumar) | **none** | Read only |
 | `espcontrol` | **PolyForm Noncommercial 1.0.0** | Read only — see below |
 | `esp-registry/waveshare__esp_lcd_hx8394-v2.1.0` | **MIT** (`license.txt`) | Reuse with attribution |
@@ -24,7 +24,7 @@ other projects' code and what it teaches.
 | `esp-registry/waveshare__esp32_s3_touch_lcd_4b-v2.0.0` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 | `esp-registry/espressif__esp_lcd_st7701-v2.0.2_2`, `..._esp_lcd_panel_io_additions-v1.0.1_1`, `..._esp_lcd_ek79007-v2.0.2`, `..._esp_lcd_jd9165-v2.0.2` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 | `esp-registry/waveshare__esp_lcd_st7703-v2.0.0` | **MIT** | Reuse with attribution |
-| `esp-registry/espressif__esp_io_expander-v1.2.1`, `..._esp_io_expander_tca9554-v2.0.3` | **Apache-2.0** | Reuse with attribution + NOTICE rules (2.9 step 4, fetched 2026-09-29) |
+| `esp-registry/espressif__esp_io_expander-v1.2.1`, `..._esp_io_expander_tca9554-v2.0.3` | **Apache-2.0** | Reuse with attribution + NOTICE rules (used by the WS_S3_4B display bring-up) |
 | `esp-registry/espressif__esp_display_present-v1.0.2`, `..._esp_lv_present-v0.1.0`, `esp-iot-solution__lvgl_present_benchmark` | **Apache-2.0** | Reuse with attribution + NOTICE rules |
 
 The registry's web page lists the last two as "Custom"; the `LICENSE` file inside each says Apache-2.0.
@@ -118,6 +118,11 @@ alignment and capability requirements, and the cache discipline.
 
 Patterns transfer; code mostly does not, being ESP-IDF C against our Arduino C++.
 
+**Check its upstream at the start of each milestone** (the owner's rule): the author keeps adding
+well-thought-out pieces (the toast queue and its dismissing, the navigation arbiter, the clocks).
+Pull `reference/ESP32-P4-NINA-Display`, skim the commits since the last look, and note here what is
+worth borrowing.
+
 ### The page/view/grid back-end — the most valuable part for our actual purpose
 
 `main/ui/page_registry.h` is the piece to read first.
@@ -149,7 +154,7 @@ lock; the arbiter takes it internally" versus "all ops are called with the displ
 held". Given ROADMAP §4.2 calls threading our biggest trap, this per-API convention is worth
 adopting wholesale.
 
-### `time_parse.c/h` — taken as a pattern (2.10e, 2026-10-11)
+### `time_parse.c/h` — taken as a pattern
 
 One pure module (no ESP-IDF), and a duration enum whose every value names the exact text it writes
 (`FMT_DUR_HM_COMPACT` "2h 05m", ...), negatives clamped to zero. The fleet's `TimeFormat.h/.cpp`
@@ -196,7 +201,7 @@ built.
 
 ## `esphome-modular-lvgl-buttons` (Andrew Gillis) — MIT, ESPHome + LVGL
 
-Added 2026-09-10. **The only reference project whose structure maps onto ours almost exactly, and
+**The only reference project whose structure maps onto ours almost exactly, and
 one we may legally borrow from.**
 
 Its `ui/<type>/` layout gives every entity type three files:
@@ -212,7 +217,7 @@ local/remote split is our `advertise` flag by another name (entities we own vs. 
 else owns). Worth reading `ARCHITECTURE.md` before finalising the `Card` base class in #15,
 specifically for how it decides which types get a detail page and which do not.
 
-**Borrowed, 2026-09-24 (#58): `components/lvgl_screenshot/`.** This is agillis/esphome-lvgl-screenshot
+**Borrowed (#58): `components/lvgl_screenshot/`.** This is agillis/esphome-lvgl-screenshot
 (MIT), which is itself a port of an older component. Two separate things came from it, under two
 licences:
 - **`stb_image_write.h`** (Sean Barrett, MIT *or* public domain, your choice) is vendored verbatim
@@ -230,7 +235,7 @@ evidence that it is legible.
 
 ## `espcontrol` — PolyForm Noncommercial, ESPHome, and the density evidence
 
-Added 2026-09-10. Deliberately plain, and effective *because* it is plain: at a glance you can see
+Deliberately plain, and effective *because* it is plain: at a glance you can see
 what is happening. Its value to us is the per-device grid definitions in
 `devices/*/device/lvgl.yaml`, which are real shipped numbers rather than estimates:
 
@@ -257,8 +262,8 @@ than one of them.
 
 ## `HomeTiles` (Sebastian) — MIT, Arduino, tiles dashboard with an HA-side Bridge
 
-In `reference/Examples and related projects/HomeTiles`, cloned by the owner 2026-10-05; **not yet
-read beyond `ARCHITECTURE.md`**. A tile dashboard for ESP32 boards (P4 among them) talking MQTT to
+In `reference/Examples and related projects/HomeTiles`, cloned by the owner; **read only as far as
+`ARCHITECTURE.md`**. A tile dashboard for ESP32 boards (P4 among them) talking MQTT to
 a **Bridge integration installed in Home Assistant**, which also installs automations, scripts and
 helpers that exist only to serve the panels. The owner: "a terrific concept" - the HA side doing
 work for the panel instead of the panel doing everything over the websocket. Worth reading for:
@@ -267,9 +272,9 @@ the Bridge's entity metadata and indexes (`src/network/bridge/`), its popups per
 (`src/tiles/config/`, before 2.10d), and `lvgl_psram_alloc.*` (its LVGL memory in PSRAM). MIT:
 reusable with attribution.
 
-## `esp-registry/` — Espressif component-registry sources for 2.9 step 2
+## `esp-registry/` — Espressif component-registry sources for the esp_lcd display path
 
-Fetched 2026-09-25 with the owner's permission, straight from `components-file.espressif.com`, at
+Fetched with the owner's permission, straight from `components-file.espressif.com`, at
 the versions Waveshare's P4_5 IDF demo pins (`08_lvgl_demo_v9/main/idf_component.yml`). Their own
 dependencies (`i2c_bus`, `esp_codec_dev`, `esp_lcd_touch_gt911`, ...) were NOT fetched.
 
@@ -290,7 +295,7 @@ steps 3-4: the S3-4B BSP 2.0.0 (its ST7701-over-expander bring-up), `esp_lcd_st7
 `esp_lcd_panel_io_additions` (3-wire SPI through an I/O expander), and the three other P4 panel
 drivers - `esp_lcd_ek79007` (7B), `esp_lcd_st7703` (4B), `esp_lcd_jd9165` (CYD_P4_1060).
 
-Added 2026-09-28 (owner's OK), read-only reference, **not buildable here: both declare ESP-IDF
+Added with the owner's OK as a read-only reference, **not buildable here: both declare ESP-IDF
 >= 6.0**, and we are on 5.5.5:
 - **`esp_display_present` 1.0.2** (Apache-2.0) - Espressif's renderer-agnostic "presenter": owns
   the framebuffers, dirty-area repair, rotation (PPA when present), TE sync and panel submission,

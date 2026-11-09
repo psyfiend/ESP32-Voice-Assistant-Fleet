@@ -6,8 +6,9 @@
 #include "SystemReport.h"
 #include "Settings.h"
 #include "Cards/CardGroups.h"
-#include "Cards/CardAdded.h"     // a cluster's members added on the device (2.11, K91)
+#include "Cards/CardAdded.h"     // a cluster's members added on the device (K91)
 #include "Cards/ClusterCard.h"
+#include "Cards/CardPopup.h"     // a card's Long press opens, by name (K156)
 #include "Layout/Cluster.h"
 #include <Arduino.h>
 #ifdef DEBUG_PAGE_TIMING
@@ -29,7 +30,7 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     const UIGrid &g = UI::grid();
 
     const int32_t inset = UI::sc(g.INSET);
-    _gap = UI::sc(g.GAP);
+    _gap = UI::sc(g.GAP) * UI::deviceMarginPct() / 100;   // UI Tweaks' Card margins (K167)
 
     _sub = subdivision ? subdivision : 1;
     if (_sub > 4) _sub = 4;     // thirds are already exotic; quarters are the
@@ -43,23 +44,18 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     lv_obj_set_style_pad_column   (_root, _gap, 0);
     lv_obj_set_style_pad_row      (_root, _gap, 0);
 
-    // A DASHBOARD PAGE DOES NOT SCROLL. The owner, unprompted: "There should
-    // never be any scrolling of cards on any dashboard pages, the cards should
-    // effectively be locked in place. Only when swiping or navigating to a new
-    // page entirely should new entities be on the screen."
+    // A DASHBOARD PAGE DOES NOT SCROLL: the cards are locked in place, and new
+    // entities appear only by swiping or navigating to another page.
     //
-    // So cards that do not fit are not placed at all, and WHICH ones is now
-    // CardPlacement::priority's decision rather than declaration order's.
+    // So cards that do not fit are not placed at all, and WHICH ones is
+    // CardPlacement::priority's decision, not declaration order's.
     lv_obj_clear_flag        (_root, LV_OBJ_FLAG_SCROLLABLE);
     // NOT CLICKABLE either, so a tap on the gap between two cards falls
     // through to the screen instead of stopping here.
     //
     // The cards are the interactive things; this is the grid they sit in, and
-    // it was absorbing every tap that missed one. That is invisible until
-    // something wants those taps - 2.6's "tap anywhere else to dismiss" is the
-    // first thing that does, and without this it would work on the header
-    // strip and the margins and nowhere else, which is the kind of half-broken
-    // that gets blamed on the gesture code.
+    // if it took the taps that miss a card, "tap anywhere else to dismiss"
+    // would work on the header strip and the margins and nowhere else.
     //
     // Gestures are unaffected: LV_OBJ_FLAG_GESTURE_BUBBLE is on by default, so
     // a swipe still reaches the screen either way.
@@ -82,21 +78,15 @@ void CardPage::begin(lv_obj_t *parent, CardBinder *binder, uint8_t subdivision) 
     for (uint8_t i = 0; i < _uCols; i++) _colDsc[i] = LV_GRID_FR(1);
     _colDsc[_uCols] = LV_GRID_TEMPLATE_LAST;
 
-    // ROWS ARE NOT DECIDED HERE ANY MORE, and that is the 2.5 fix the owner
-    // found on the glass.
+    // ROWS ARE NOT DECIDED HERE. UI::grid().rows is pure geometry - "how many
+    // rows of roughly this shape fit in this height" - and the page divides the
+    // height by the row count, so a row count taken from it sizes every card
+    // for rows with nothing in them and pushes cards under the compact
+    // threshold.
     //
-    // They used to come straight from UI::grid().rows, which is pure geometry:
-    // "how many rows of roughly this shape fit in this height". With 13 cards
-    // on a 7-column board that asked for FOUR rows, and since the page then
-    // divides the height by the row count, every card was sized for a row that
-    // had nothing in it - which on the 7B pushed all of them under the
-    // compact threshold. Hiding the deck made it WORSE, because the extra
-    // height bought a fifth row rather than taller cards.
-    //
-    // His rule, and it is the right one: "there is no reason to create an
-    // additional row if all the cards can be made to fit". So the page records
-    // the height it has to spend and decides the row count in commit(), once
-    // it knows what it is being asked to place.
+    // The rule: no additional row if all the cards can be made to fit. So the
+    // page records the height it has to spend and decides the row count in
+    // commit(), once it knows what it is being asked to place.
     lv_obj_update_layout(_root);   // _root was created a moment ago; without
                                    // this its content height is still zero
     _availH = (int32_t)lv_obj_get_content_height(_root);
@@ -166,7 +156,7 @@ void CardPage::useRows(uint8_t cellRows) {
     // The ASPECT ceiling is a guard against a two-card page making each card
     // as tall as the screen. It does NOT apply when a row count was demanded -
     // there the tall card is what was asked for, and quietly refusing to give
-    // it would make the button feel broken in exactly the way the old one did.
+    // it would make the control feel broken.
     if (!_rowsOverride && !_arranged) {   // the arranger chose its rows for the whole height
         const int32_t capH = ((int32_t)UI::grid().cellW * UI::grid().ASPECT_PCT) / 100;
         if (capH > 0 && cellH > capH) cellH = capH;
@@ -201,9 +191,9 @@ int32_t CardPage::widthOf(uint8_t spanX) const {
 }
 
 // ---------------------------------------------------------------------------
-// Placement - Layout's flow engine (2.12 P5). The rules, and why each is what
-// it is - pins first, the widest span at the first free spot, the lowest
-// priority dropped - moved to src/Layout/Layout.cpp unchanged.
+// Placement - Layout's flow engine. The rules, and why each is what it is -
+// pins first, the widest span at the first free spot, the lowest priority
+// dropped - are in src/Layout/Layout.cpp.
 // ---------------------------------------------------------------------------
 
 // The cards as the engine sees them. A card commit() freed is an empty slot.
@@ -277,8 +267,8 @@ void CardPage::commit() {
     // genuinely cannot fit them. Dropping cards is the LAST resort, after the
     // page has already grown to every row it could carry.
     if (_arranged) {
-        // THE ARRANGER'S PAGE (2.11): its grid of units, every block pinned - and
-        // drawn where the finish put it (v9), so the page lays nothing out itself.
+        // THE ARRANGER'S PAGE: its grid of units, every block pinned - and
+        // drawn where the finish put it, so the page lays nothing out itself.
         useUnits(_arrCols, _arrRows);
         plan();
         lv_obj_set_layout(_root, LV_LAYOUT_NONE);
@@ -311,9 +301,8 @@ void CardPage::commit() {
                   (unsigned)_maxRows,
                   (long)UI::grid().cellW, (long)heightOf(_sub));
 
-    // ONE TILE HEIGHT A PAGE (round 12b, the owner: the 1060's Kitchen tiles
-    // stood taller than the other rooms', just under the near-square limit):
-    // the shortest tiles any cluster draws, handed to each (it draws halfway).
+    // ONE TILE HEIGHT A PAGE: the shortest tiles any cluster draws, handed to
+    // each (it draws halfway), so no room's tiles stand taller than the others'.
     {
         int32_t tileH = 0;
         for (uint8_t pass = 0; pass < 2; pass++)
@@ -328,9 +317,7 @@ void CardPage::commit() {
                 const int32_t h = cl->tileHeight();
                 if (h > 0 && (!tileH || h < tileH)) tileH = h;
             }
-        // AND A SOLO CARD'S BODY NO TALLER THAN THOSE TILES (round 13, K126, the
-        // owner: the 4B's Doors and Thermo stood taller than the tiles beside
-        // them - "closer in size to the tiles ... makes a huge difference"), centred
+        // AND A SOLO CARD'S BODY NO TALLER THAN THOSE TILES (K126), centred
         // where the finish put it, its card label on top; its value in their face.
         for (uint8_t i = 0; tileH > 0 && _arranged && i < _n && i < Layout::ARR_BLOCKS_MAX; i++) {
             Card *c = _cards[i];
@@ -353,11 +340,9 @@ void CardPage::commit() {
 
         // THE CARD IS TOLD ITS REAL HEIGHT BEFORE IT IS BUILT.
         //
-        // Card::resolveVariant() used to derive this from UI::grid() and its
-        // own row span, which was right only while a row was a whole cell. It
-        // is not, now that rows are units - and it was already fragile, since
-        // the grid it read is global state that any other page can move. The
-        // page knows the answer exactly; handing it over removes the guess.
+        // Card::resolveVariant() cannot derive this from UI::grid() and its own
+        // row span: rows are units, and the grid is global state that any other
+        // page can move. The page knows the answer exactly.
         if (_arranged) {
             placeArranged(c, i);
         } else {
@@ -384,17 +369,16 @@ void CardPage::commit() {
                   (long long)tPlan, (unsigned)_placed, (long long)tBuild, worst,
                   (long long)tWorst, (long long)tBind);
 #endif
-    // THE PAGE'S HERO (round 4): a solo 1x1 card's disc and icon, measured now
-    // it is built, and every cluster's tiles drawn again to match it where they
-    // have the room - a tile's icon and a card's are the same size.
-    // UNLESS THE CARD IS SQUEEZED (round 6, the owner: "the icons get smaller and
-    // smaller the more rows are added", the clusters roomy around them): a card
-    // whose icon had to step down from the full face sets nothing, and the tiles
-    // size themselves - as large as a solo card's at most. Giving solo cards their
-    // room is the arranger's (layout-engines.md, v8).
-    // ON AN ARRANGED PAGE (round 9) nothing is copied: the arranger has made every
-    // entity one size, so a tile and a card each fill their own room alike - and a
-    // card a pin squeezed must not shrink every tile (the 1060's Thermo).
+    // THE PAGE'S HERO: a solo 1x1 card's disc and icon, measured once it is
+    // built, and every cluster's tiles drawn again to match it where they have
+    // the room - a tile's icon and a card's are the same size.
+    // UNLESS THE CARD IS SQUEEZED: a card whose icon had to step down from the
+    // full face sets nothing, and the tiles size themselves - as large as a
+    // solo card's at most. Giving solo cards their room is the arranger's
+    // (layout-engines.md).
+    // ON AN ARRANGED PAGE nothing is copied: the arranger has made every entity
+    // one size, so a tile and a card each fill their own room alike - and a card
+    // a pin squeezed must not shrink every tile.
     {
         int32_t disc = 0;
         const lv_font_t *face = nullptr;
@@ -419,11 +403,9 @@ void CardPage::commit() {
 
     // CARDS THAT DID NOT MAKE THE PAGE ARE FREED, not kept around.
     //
-    // The owner asked directly: "is the device holding the cards not on the
-    // page in memory?" It was. An unplaced card was never built, so it held no
-    // LVGL widgets - but the object itself, its bound entity pointers and its
-    // label buffers stayed alive for the life of the page. Small, and on the
-    // board where this matters there is nothing to spare.
+    // An unplaced card was never built, so it holds no LVGL widgets - but the
+    // object itself, its bound entity pointers and its label buffers would stay
+    // alive for the life of the page, and there is no memory to spare.
     //
     // Deleted here rather than in the destructor because they can never come
     // back: placement has already been decided, and a card that was not placed
@@ -454,7 +436,7 @@ void CardPage::commit() {
 }
 
 // A block on an arranged page, built at the size the finish gave it and put
-// there (v9): its rectangle in the page's content area.
+// there: its rectangle in the page's content area.
 void CardPage::placeArranged(Card *c, uint8_t i) {
     const Layout::ArrRect &a = _arrRect[i < Layout::ARR_BLOCKS_MAX ? i : 0];
     c->setCellHeightPx(a.h);
@@ -484,12 +466,17 @@ void CardPage::relayout() {
 
 void CardPage::applySpec(const PageSpec &spec, EntityRegistry &reg) {
     Card::setShowAreaDefault(spec.showArea);
+    _spec = spec;   // makeGroup(): the card window's groups, made again from it
+    _reg  = &reg;
 
     for (uint8_t i = 0; i < spec.count; i++) {
         const CardSpec &cs = spec.cards[i];
-        // A group card made on the device (2.11): a cluster, or its one card.
-        Card *c = (cs.memberCount && cs.members) ? makeGroupCard(cs, spec, reg)
-                                                 : makeCard(cs, spec, reg, i);
+        // A group card made on the device: a cluster, or its one card.
+        // ...or one made here with no compiled members: a cluster spec with
+        // no entity of its own, its members all added on the device.
+        const bool madeCluster = cs.present == GroupPresent::PRESENT_CLUSTER && !cs.primaries[0];
+        Card *c = ((cs.memberCount && cs.members) || madeCluster) ? makeGroupCard(cs, spec, reg)
+                                                                   : makeCard(cs, spec, reg, i);
         if (c) add(c);
     }
 
@@ -501,7 +488,7 @@ void CardPage::arrangePage(const PageSpec &spec) {
     _arranged = false;
     if (!spec.slug || !_n) return;
     if (_n > Layout::ARR_BLOCKS_MAX) { PageArranger::flowed(spec.slug, "more blocks than the arranger takes"); return; }
-    char off[4];   // system.arranger.off = 1: every page flows, as before 2.11 (to compare)
+    char off[4];   // system.arranger.off = 1: every page flows (to compare)
     if (Settings::system("arranger", "off", off, sizeof(off)) && off[0] == '1') {
         PageArranger::flowed(spec.slug, "the arranger is off");
         return;
@@ -529,7 +516,7 @@ void CardPage::arrangePage(const PageSpec &spec) {
     }
     // The board's own grid is where the search starts (its columns, and the rows
     // the page would flow to); a count the owner PINNED (the system panel's Col /
-    // Row, round 9) is the only one it tries that way.
+    // Row) is the only one it tries that way.
     const UIGrid &g = UI::grid();
     s.recCols = g.cols;
     s.recRows = _rowsOverride ? _rowsOverride : g.rows;
@@ -545,12 +532,12 @@ void CardPage::arrangePage(const PageSpec &spec) {
             b.cluster = true;
             b.tiles   = cl->tileCount();
             // A cluster with a header always (one in a single cell, headerless,
-            // is K103's - sensors only - and not drawn yet).
+            // is K103's - sensors only - and is not built).
             b.hdr     = (uint8_t)LV_MAX(1, cl->headerCount());
             b.members = cl->memberCount();
         } else {
             b.members = 1;
-            // ITS PREFERRED SHAPE (v9): its spec's span, wide over tall - the Fleet
+            // ITS PREFERRED SHAPE: its spec's span, wide over tall - the Fleet
             // page's Free Heap and Uptime ask for 3 x 2 units, 1.5 cells across.
             const CardPlacement &pl = c->placement();
             if (pl.prefSpanX && pl.prefSpanY) b.aspect = (double)pl.prefSpanX / (double)pl.prefSpanY;
@@ -561,7 +548,7 @@ void CardPage::arrangePage(const PageSpec &spec) {
     Layout::ArrResult r;
     if (!PageArranger::kept(in, r)) { PageArranger::start(in); return; }
     // Each block pinned to its trimmed box in units (the page's bookkeeping - what
-    // is placed), drawn where the finish put it (_arrRect, v9), a cluster with
+    // is placed), drawn where the finish put it (_arrRect), a cluster with
     // its tiles across.
     for (uint8_t i = 0; i < _n; i++) {
         CardPlacement p = _cards[i]->placement();
@@ -619,8 +606,8 @@ Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistr
         Card *c = made ? made : cardForEntity(first);
         if (made) made->bindPrimary(first);
         if (!c) {
-            // A real EntityKind with no card type yet - NUMBER, TEXT, CLIMATE,
-            // WEATHER. Saying so beats rendering it as something it is not.
+            // A real EntityKind with no card type - NUMBER, TEXT, WEATHER.
+            // Saying so beats rendering it as something it is not.
             Serial.printf("[Cards] spec %u: no card type for \"%s\"\n",
                           (unsigned)i, cs.primaries[firstIdx]);
             return nullptr;
@@ -637,7 +624,7 @@ Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistr
 
         if (cardIdUsable(cs.id)) c->setId(cs.id);
         if (cs.label) c->setLabel(cs.label);
-        // THE CARD LABEL (2.10d, K44): the dashboard's area is the card's
+        // THE CARD LABEL (K46): the dashboard's area is the card's
         // group unless the owner chose another - CardGroups applies it, with
         // the group's colour (its colour-by-name unless one was saved, so two
         // cards in one area always agree and the colour survives a reboot).
@@ -651,7 +638,7 @@ Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistr
         c->setPlacement(cs.place);
         c->setTempUnit(cs.tempUnit == TempUnit::TEMP_INHERIT ? spec.tempUnit
                                                              : cs.tempUnit);
-        // A NAMED CARD SAYS CUSTOM (owner, 2026-10-09, K49): a name the
+        // A NAMED CARD SAYS CUSTOM (K49): a name the
         // dashboard gives ("Desk" for HA's "Office") is a custom name, and
         // the Entity label row says so. A card it does not name inherits.
         CardLabel lmDef = cs.labelMode == CardLabel::LBL_INHERIT ? spec.labelMode : cs.labelMode;
@@ -659,9 +646,9 @@ Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistr
         c->setLabelMode(lmDef);
         c->setGroupOn(cs.groupOn);
 
-        // The owner's saved changes, over the spec (2.10d, Settings.h): the
-        // file is the top layer. Read every time the page is built, which is
-        // what makes a choice survive a page swipe as well as a reboot.
+        // The owner's saved changes, over the spec (Settings.h): the file is
+        // the top layer. Read every time the page is built, which is what makes
+        // a choice survive a page swipe as well as a reboot.
         if (c->hasId()) {
             char v[ENTITY_NAME_MAX];
             GroupOn g;
@@ -679,170 +666,19 @@ Card *CardPage::makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistr
             }
             TapAction ta;
             if (Settings::card(c->id(), "tap", v, sizeof(v)) && tapActionFromName(v, ta)) c->setTapAction(ta);
-            TempUnit tu;   // SETTINGS' Units row (2.10e round 2)
+            uint8_t lo;    // SETTINGS' Long press opens (K156)
+            if (Settings::card(c->id(), "long", v, sizeof(v)) && CardPopup::openViewFromName(v, lo)) c->setLongOpen(lo);
+            TempUnit tu;   // SETTINGS' Units row
             if (Settings::card(c->id(), "units", v, sizeof(v)) && tempUnitFromName(v, tu)) c->setTempUnit(tu);
             char ref[ENTITY_TOPIC_MAX];
             if (Settings::card(c->id(), "tap_scene", ref, sizeof(ref))) c->setTapScene(ref);
-            CardVariant cv;   // Card UI's Card density (2.8 round 3, D-28)
+            CardVariant cv;   // Card UI's Card density (D-28)
             if (Settings::card(c->id(), "density", v, sizeof(v)) && cardVariantFromName(v, cv)) c->setVariant(cv);
         }
         if (cs.longStaleMs) c->setLongStaleMs(cs.longStaleMs);
         if (cs.paused)      c->setPaused(true);
         return c;
     }
-}
-
-// A GROUP CARD MADE ON THE DEVICE (2.11, K88-K92): its presentation is the
-// saved "present", else the dashboard's. As a CLUSTER its members become mini
-// tiles (the visible ones) and header values (the `slots`); it asks for as many
-// cells as its tiles need (Layout::clusterSpan(), until the arranger). A cluster
-// that cannot fit on this board is shown as its ONE CARD (K92 rule 6): the
-// members that switch together - lights and switches (rule 5) - behind one tile
-// whose tap acts on them all.
-Card *CardPage::makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg) {
-    char v[64];
-    const bool hasId = cardIdUsable(cs.id);
-    GroupPresent pres = cs.present;
-    if (hasId && Settings::card(cs.id, "present", v, sizeof(v))) groupPresentFromName(v, pres);
-
-    // ITS MEMBERS: the dashboard's, then those added on the device (K91; CardAdded).
-    const CardSpec *mem[GROUP_MEMBERS_MAX];
-    uint8_t nMem = 0;
-    for (uint8_t k = 0; k < cs.memberCount && nMem < GROUP_MEMBERS_MAX; k++) mem[nMem++] = &cs.members[k];
-    if (hasId) nMem += CardAdded::membersIn(cs.id, mem + nMem, (uint8_t)(GROUP_MEMBERS_MAX - nMem));
-
-    // The header's members, by id, highest priority first: the saved list, else the dashboard's.
-    const char *slotIds[CLUSTER_SLOTS_MAX] = {nullptr};
-    char saved[CLUSTER_SLOTS_MAX * (CARD_ID_MAX + 1) + 1] = "";
-    if (hasId && Settings::card(cs.id, "slots", saved, sizeof(saved))) {
-        uint8_t k = 0;
-        for (char *p = saved; *p && k < CLUSTER_SLOTS_MAX;) {
-            slotIds[k++] = p;
-            char *comma = strchr(p, ',');
-            if (!comma) break;
-            *comma = '\0';
-            p = comma + 1;
-        }
-    } else {
-        for (uint8_t k = 0; k < CLUSTER_SLOTS_MAX; k++) slotIds[k] = cs.slots[k];
-    }
-    // A MEMBER MOVED OUT TO THE PAGE ("hidden": "moved", the sprint after round
-    // 7): its card is on the page now, so it is no tile, no header value, and
-    // not behind the one card - still a member, so Members lists it.
-    auto movedOut = [&](const CardSpec &m) { return cardIdUsable(m.id) && CardAdded::isMovedToPage(m.id); };
-    auto slotOf = [&](const char *id) -> int8_t {
-        if (id && cardIdUsable(id) && CardAdded::isMovedToPage(id)) return -1;
-        for (uint8_t k = 0; k < CLUSTER_SLOTS_MAX; k++)
-            if (id && slotIds[k] && !strcmp(slotIds[k], id)) return (int8_t)k;
-        return -1;
-    };
-    // A member's tile: shown unless it is in the header (K92 rule 7); "hidden"
-    // saved on it says otherwise either way (K104's Visible).
-    auto tileOf = [&](const CardSpec &m) -> bool {
-        bool tile = slotOf(m.id) < 0;
-        char h[8];
-        if (cardIdUsable(m.id) && Settings::card(m.id, "hidden", h, sizeof(h))) {
-            if (strcmp(h, "no")) tile = false;   // "yes", or "moved"
-            else                 tile = true;
-        }
-        return tile;
-    };
-
-    if (pres == GroupPresent::PRESENT_CLUSTER) {
-        uint8_t nTiles = 0;
-        for (uint8_t k = 0; k < nMem; k++)
-            if (mem[k]->primaries[0] && reg.find(mem[k]->primaries[0]) && tileOf(*mem[k])) nTiles++;
-        Layout::ClusterGeom g;
-        g.cellW   = widthOf(_sub) > 0 ? widthOf(_sub) : (int32_t)UI::grid().cellW;
-        g.cellH   = (int32_t)UI::grid().cellH;
-        g.gap     = _gap;
-        g.chromeW = ClusterCard::chromeW();
-        g.chromeH = ClusterCard::chromeH();   // whole cells: no tag's room (round 4, below)
-        g.tileGap = UI::mm(UI::shape().C_TILE_GAP);
-        g.minTile = UI::mm(UI::shape().C_TILE_MIN);
-        const uint8_t cellCols = _uCols / _sub ? _uCols / _sub : 1;
-        const Layout::ClusterSpan sp = Layout::clusterSpan(nTiles, g, cellCols, _maxRows);
-        if (sp.fits) {
-            ClusterCard *cl = new ClusterCard();
-            for (uint8_t k = 0; k < nMem; k++) {
-                Card *m = makeCard(*mem[k], spec, reg, k);
-                if (!m) continue;
-                m->setMini(true);
-                m->setHeaderStyle(CardHeaderStyle::HDR_NONE);
-                cl->addMember(m, tileOf(*mem[k]), slotOf(mem[k]->id));
-            }
-            if (hasId) cl->setId(cs.id);
-            if (cs.label) cl->setLabel(cs.label);
-            cl->setSheetArea(cs.area);
-            CardGroups::apply(*cl, spec.areaColor);
-            // A CLUSTER FILLS ITS CELLS (owner, round 4): Float and Tag take room
-            // from a solo card for its label, and a cluster has none - its header
-            // names it. Round 1 kept the tag's room above it to line its top up
-            // with its neighbours', and the owner saw its tiles shrink for it.
-            cl->setHeaderStyle(CardHeaderStyle::HDR_NONE);
-            cl->setShowArea(false);
-            CardPlacement pl = cs.place;
-            pl.prefSpanX = pl.minSpanX = (uint8_t)(sp.cols * _sub);
-            pl.prefSpanY = pl.minSpanY = (uint8_t)(sp.rows * _sub);
-            cl->setPlacement(pl);
-            // The header's style (K102): the cluster's own, else the page's, else the spec's.
-            ClusterStyle st = spec.clusterStyle;
-            if (spec.slug && Settings::page(spec.slug, "cl_style", v, sizeof(v))) clusterStyleFromName(v, st);
-            if (hasId && Settings::card(cs.id, "cl_style", v, sizeof(v))) clusterStyleFromName(v, st);
-            cl->setStyle(st);
-            cl->setIcons(!(hasId && Settings::card(cs.id, "cl_icons", v, sizeof(v)) && !strcmp(v, "off")));
-            // ITS TAP (round 6): the one chosen in SETTINGS, read here because a
-            // cluster is not made by makeCard() - it went back to Nothing whenever
-            // the page was built again (the owner). Else Members, which lists every
-            // member, hidden ones too (refines K107: opening a list switches nothing).
-            TapAction ta = TapAction::TAP_MEMBERS;
-            if (hasId && Settings::card(cs.id, "tap", v, sizeof(v))) tapActionFromName(v, ta);
-            cl->setTapAction(ta);
-            cl->setBinder(_binder);
-            Serial.printf("[Cards] cluster %s: %u members, %u tiles, %ux%u cells\n",
-                          cs.label ? cs.label : "?", (unsigned)cl->memberCount(), (unsigned)nTiles,
-                          (unsigned)sp.cols, (unsigned)sp.rows);
-            return cl;
-        }
-        Serial.printf("[Cards] cluster %s: %u tiles do not fit this page - shown as its card\n",
-                      cs.label ? cs.label : "?", (unsigned)nTiles);
-    }
-
-    // AS ONE CARD: the members that switch together (lights and switches),
-    // else every member, behind one tile. AS A SUMMARY (K98): every member -
-    // one of a kind - with each one's name for the words under the icon.
-    CardSpec one = {};
-    one.id    = cs.id;
-    one.label = cs.label;
-    one.area  = cs.area;
-    one.place = cs.place;
-    one.groupOn = cs.groupOn;
-    uint8_t n = 0;
-    if (pres == GroupPresent::PRESENT_SUMMARY) {
-        for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++)
-            if (mem[k]->primaries[0] && reg.find(mem[k]->primaries[0]) && !movedOut(*mem[k]))
-                one.primaries[n++] = mem[k]->primaries[0];
-        if (!n) return nullptr;
-        SummaryCard *sc = new SummaryCard();
-        for (uint8_t k = 0; k < nMem; k++)
-            if (mem[k]->primaries[0] && mem[k]->label) sc->setMemberName(mem[k]->primaries[0], mem[k]->label);
-        Card *c = makeCard(one, spec, reg, 0, sc);
-        // ITS TAP OPENS ITS MEMBERS (K98) - never a door's - unless the owner chose.
-        char t[16];
-        if (c && !(hasId && Settings::card(cs.id, "tap", t, sizeof(t)))) c->setTapAction(TapAction::TAP_MEMBERS);
-        return c;
-    }
-    for (int pass = 0; pass < 2 && !n; pass++)
-        for (uint8_t k = 0; k < nMem && n < CARD_PRIMARY_MAX; k++) {
-            const char *pid = mem[k]->primaries[0];
-            const Entity *e = pid ? reg.find(pid) : nullptr;
-            if (!e || movedOut(*mem[k])) continue;
-            const bool switches = e->desc.writable &&
-                                  (e->desc.kind == EntityKind::LIGHT || e->desc.kind == EntityKind::SWITCH);
-            if (pass == 0 && !switches) continue;
-            one.primaries[n++] = pid;
-        }
-    return n ? makeCard(one, spec, reg, 0) : nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -899,7 +735,7 @@ bool cardIdWellFormed(const char *id) {
 uint8_t checkCardIds(const PageSpec *const *pages, uint8_t n) {
     s_idDupeCount = 0;
     uint8_t problems = 0, total = 0;
-    // Every card id seen so far, a group card's members among them (2.11).
+    // Every card id seen so far, a group card's members among them.
     constexpr uint8_t SEEN_MAX = 128;
     const char *seen[SEEN_MAX];
     uint8_t nSeen = 0;

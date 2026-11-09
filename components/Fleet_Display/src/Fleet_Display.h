@@ -1,12 +1,11 @@
 #pragma once
 //
-// Fleet_Display - the board's display on raw esp_lcd. Milestone 2.9 (#67):
-// docs/archive/display/esplcd-step2.md, whose §7 A is the owner's decision behind this
-// library existing at all.
+// Fleet_Display - the board's display on raw esp_lcd (#67). How it works:
+// docs/display/architecture.md.
 //
 // Built only with -D DISPLAY_ESPLCD. Every other board uses DisplayManager
 // (Arduino_GFX), which this does not touch; include/BoardDisplay.h picks one.
-// Step 6 deletes DisplayManager and leaves this.
+// DisplayManager goes away when the last board moves to this library.
 //
 // For everything above it, the same small surface DisplayManager offers:
 // begin(), setBacklight(), setBrightness(), getBrightness(). The rest is what
@@ -32,8 +31,8 @@ public:
 
     // How frames reach the panel (a BSP_PRESENT_* code, Fleet_BSP.h), decided
     // in begin(): the BSP's override if it sets one, else bspPresentMode()'s
-    // rule. A mode that is not built yet is refused, loudly, in favour of
-    // TRIPLE_PARTIAL - presentModeRequested() keeps what was asked for.
+    // rule. A mode with no flush built for this bus is refused, loudly, in favour
+    // of the bus's own - presentModeRequested() keeps what was asked for.
     uint8_t presentMode() const          { return _mode; }
     uint8_t presentModeRequested() const { return _modeRequested; }
     bool    presentModeFromBsp() const   { return _modeFromBsp; }   // false = the rule
@@ -41,12 +40,11 @@ public:
     uint8_t numFrameBuffers() const      { return _numFbs; }
 
     // The rotation the flush applies between LVGL and the frame buffer (0-3,
-    // the BSP's meaning). Today always the BSP's ROTATION: no panel turns the
-    // picture itself. TRIED 2026-09-28 on WS_P4_7B (EK79007, rotation 2): the
-    // driver's mirror() - MADCTL 0x36 - with both bit pairs after init, and
-    // 0x36 inside the init sequence before sleep-out; the picture never moved.
-    // In DSI video mode this panel ignores MADCTL (docs/LESSONS.md). Kept as
-    // its own value so a panel that CAN do it only has to change this.
+    // the BSP's meaning). Always the BSP's ROTATION: no panel turns the
+    // picture itself. On WS_P4_7B (EK79007) the driver's mirror() and MADCTL
+    // 0x36 in the init sequence do not move the picture: in DSI video mode this
+    // panel ignores MADCTL (docs/LESSONS.md). Kept as its own value so a panel
+    // that CAN do it only has to change this.
     uint8_t softwareRotation() const     { return _swRot; }
 
     // Backlight - identical behaviour to DisplayManager's.
@@ -79,16 +77,15 @@ public:
     uint32_t framesScanned() const { return _frames; }
     int64_t  scanStartUs() const   { return _scanStartUs; }
 
-    // TALKING TO THE PANEL AFTER BOOT (DSI boards; 2.10c round 9). The 4B was
-    // seen twice with the whole picture washed out while its frame buffer was
-    // right - the panel itself showing it wrong, as if its own settings
-    // (gamma, power) had been lost. resendPanelInit() sends the BSP's init
-    // sequence again, exactly as at boot, without a reset: the number of
-    // commands sent; -1 if there is no sequence or one failed. Not from an
+    // TALKING TO THE PANEL AFTER BOOT (DSI boards). The 4B can show the whole
+    // picture washed out while its frame buffer is right, as if the panel's own
+    // settings (gamma, power) were lost. resendPanelInit() sends the BSP's init
+    // sequence again, exactly as at boot, without a reset: it returns the number
+    // of commands sent, or -1 if there is no sequence or one failed. Not from an
     // interrupt.
-    // NEVER READ FROM THE PANEL ONCE IT IS SHOWING A PICTURE. A version that
-    // read DCS 0Ah-0Dh at the end of begin() left all three P4s with the
-    // backlight on and a black screen (2.10c round 9, LESSONS).
+    // NEVER READ FROM THE PANEL ONCE IT IS SHOWING A PICTURE. Reading DCS
+    // 0Ah-0Dh at the end of begin() leaves the P4s with the backlight on and a
+    // black screen (docs/LESSONS.md).
     int  resendPanelInit();
 
     // For the System Doctor: the vendored driver and the link as brought up

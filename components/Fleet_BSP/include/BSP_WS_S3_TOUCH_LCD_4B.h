@@ -11,7 +11,7 @@
 // -------------------------------------------------------------------------
 
 #define WS_S3_4B
-#define BSP_PANEL_DRIVER ST7701   // panel chip, a bare name: sets PANEL_MODEL; picks the esp_lcd driver from 2.9 step 4 (Fleet_BSP.h)
+#define BSP_PANEL_DRIVER ST7701   // panel chip, a bare name: sets PANEL_MODEL; the esp_lcd RGB path picks its driver from it (Fleet_BSP.h)
 
 // Panel init commands (ST7701)
 // NOTE: Must stay here, immediately before the structs below - see
@@ -131,22 +131,22 @@ static const uint8_t ws_s3_touch_lcd_4b_init[] = {
     END_WRITE,
 };
 
-// --- The same panel init for the esp_lcd path (2.9 step 4), two candidates ---
+// --- The same panel init for the esp_lcd path, two candidates ---
 // The ST7701 driver sends MADCTL and COLMOD (from the panel's 18 bpp) itself
 // before whichever list runs; a list may still set them, and the driver adopts
 // what it sends.
 //
-// (a) OURS: the Arduino_GFX stream above, command for command - what this panel
-//     shows today, so the move to esp_lcd compares like with like.
+// (a) OURS (in use): the Arduino_GFX stream above, command for command, except
+//     C2's second byte (0x02 here, 0x05 in the stream).
 static const lcd_init_cmd_t ws_s3_touch_lcd_4b_init_esplcd[] = {
     {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x10}, 5, 0},
     {0xC0, (uint8_t[]){0x3B, 0x00}, 2, 0},
     // C1 PORCTRL = VBP, VFP in lines. DE mode requires these to equal the host's
     // (ST7701S DS v1.4 p.75): host V pulse+back = 8+20 = 28, front = 10.
-    // {0xC1, (uint8_t[]){0x1C, 0x0A}, 2, 0},   // T1 2026-09-29: WORSE on glass - more, longer lines
+    // {0xC1, (uint8_t[]){0x1C, 0x0A}, 2, 0},   // worse on glass - more, longer lines
     {0xC1, (uint8_t[]){0x0D, 0x02}, 2, 0},   // GFX + Waveshare: VBP 13 / VFP 2
     // C2 INVSET byte 2 = RTNI: min clocks per line = 512 + 16 x RTNI; our line is 548.
-    {0xC2, (uint8_t[]){0x31, 0x02}, 2, 0},   // T2 2026-09-29: min 544
+    {0xC2, (uint8_t[]){0x31, 0x02}, 2, 0},   // min 544
     // {0xC2, (uint8_t[]){0x31, 0x05}, 2, 0},   // GFX: min 592 > 548
     {0xCD, (uint8_t[]){0x08}, 1, 0},
     {0xB0, (uint8_t[]){0x00, 0x11, 0x18, 0x0E, 0x11, 0x06, 0x07, 0x08, 0x07, 0x22, 0x04, 0x12, 0x0F, 0xAA, 0x31, 0x18}, 16, 0},
@@ -187,7 +187,7 @@ static const lcd_init_cmd_t ws_s3_touch_lcd_4b_init_esplcd[] = {
 //     esp32_s3_touch_lcd_4b.c, lcd_init_cmds). Differs from ours in C2 (21 08 vs
 //     31 05), page-1 B1 (30 vs 32) and B2 (87 vs 07), a 20 ms settle after C2,
 //     sleep-out FIRST, an explicit MADCTL 00, and no VAP/VAN block. A candidate
-//     to compare on glass (owner, 2026-09-29) - point INIT_CMDS_ESPLCD at it.
+//     to compare on glass - point INIT_CMDS_ESPLCD at it.
 static const lcd_init_cmd_t ws_s3_touch_lcd_4b_init_waveshare[] = {
     {0x11, (uint8_t[]){0x00}, 0, 120},
     {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x10}, 5, 0},
@@ -230,7 +230,7 @@ const BoardHardware WS_S3_TOUCH_LCD_4B_HARDWARE = {
     .device_name  = "Waveshare S3-Touch-LCD-4B",
     .MANUFACTURER = "Waveshare",
     .MODEL        = "ESP32-S3-Touch-LCD-4B",
-    .SI_REV       = "n/a", // ESP32-S3, not P4 - the rev1_3/rev3_x silicon-revision distinction doesn't apply here
+    .SI_REV       = "n/a", // ESP32-S3, not P4 - the P4 silicon-revision field does not apply
 
     .SDA_PIN = 47,    // Header Pin 14
     .SCL_PIN = 48,    // Header Pin 3
@@ -264,7 +264,7 @@ const DisplayConfig WS_S3_TOUCH_LCD_4B_DISPLAY = {
     .AUTO_FLUSH  = true,
 
     .BL_PIN      = 4,
-    .BL_ON_LEVEL = 0, // Active LOW for P4 GPIO
+    .BL_ON_LEVEL = 0, // Active LOW
     .BL_FREQ     = 25000, // WS: 5000 Hz PWM
 
     .RST   = -1,    // EXIO 7
@@ -287,16 +287,12 @@ const DisplayConfig WS_S3_TOUCH_LCD_4B_DISPLAY = {
     .B0 = 40, .B1 = 41, .B2 = 42, .B3 = 2,  .B4 = 1,
 
     // --= RGB Timing =---
-    // Set to match Waveshare's own Arduino demo (06_LVGL_Arduino_v9.ino) exactly.
-    // Confirmed on hardware to fix a ~25px vertical frame shift plus tearing/
-    // flicker that appeared on this board after the arduino-esp32 3.3.4 -> 3.3.11
-    // platform upgrade (pioarduino 55.03.311) - stable across repeated
-    // power-cycle/reflash testing post-fix. Root cause (BSP-value bug vs.
-    // framework-side RGB driver behavior change) is still unconfirmed either
-    // way; these values simply match Waveshare's proven-good reference. Note:
-    // these exact commented-out values were tried once before, pre-upgrade, and
-    // swapped out for a reason not recorded at the time - if a similar-looking
-    // problem resurfaces later, that history is worth revisiting.
+    // Match Waveshare's own Arduino demo (06_LVGL_Arduino_v9.ino) exactly.
+    // With the commented-out values the frame shifts ~25px vertically and
+    // tears/flickers under arduino-esp32 3.3.11; the demo's values do not.
+    // Whether the cause is a wrong BSP value or a framework-side RGB driver
+    // change is unconfirmed. If a similar-looking problem returns, try the
+    // commented-out values again.
     .HSYNC_POL    = 1,
     .VSYNC_POL    = 1,
     .HSYNC_PWIDTH = 8,    // 10,
@@ -320,7 +316,7 @@ const DisplayConfig WS_S3_TOUCH_LCD_4B_DISPLAY = {
     // 480x480 over 4.0" = ~170 PPI, so bspUiScale() = 1.00.
     .DIAGONAL_IN = 40,
 
-    // esp_lcd path (2.9 step 4): candidate (a), ours. (b) is
+    // esp_lcd path: candidate (a), ours. (b) is
     // ws_s3_touch_lcd_4b_init_waveshare, above.
     .INIT_CMDS_ESPLCD       = ws_s3_touch_lcd_4b_init_esplcd,
     .INIT_CMDS_ESPLCD_COUNT = sizeof(ws_s3_touch_lcd_4b_init_esplcd) / sizeof(lcd_init_cmd_t),
@@ -399,7 +395,7 @@ inline const StorageConfig& bsp_storage = WS_S3_TOUCH_LCD_4B_STORAGE;
 
 const LvglConfig WS_S3_TOUCH_LCD_4B_LVGL = {
     .DOUBLE_BUFFERING = true,
-    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
+    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override (the direct flush draws into the framebuffers and does not read it)
     .BUFFER_SIZE_PX   = 480 * 20, // Width x 20 rows
 };
 inline const LvglConfig& bsp_lvgl = WS_S3_TOUCH_LCD_4B_LVGL;

@@ -1,11 +1,10 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// THE PAGE HEADER'S SLOTS (2.8, #19) - docs/design/header-slots.md, DECISIONS
-// D-11 to D-20.
+// THE PAGE HEADER'S SLOTS - docs/design/header-slots.md, DECISIONS D-11 to D-21.
 //
-// The header has three PLACES (D-16, D-18): the left holds the clock and the
-// weather; the middle the page's name and dots, on the bar's centre; the right
-// the status glyphs, the alarm among them. A SLOT is one thing in a place, and
+// The header has three PLACES (D-16): the left holds the clock (with its bell)
+// and the weather; the middle the page's name and dots, on the bar's centre; the
+// right the status glyphs, with the alarm's notice and the AP mast. A SLOT is one thing in a place, and
 // it is DATA: its kind, its place and, where it has one, its entity. Each slot
 // makes a CLAIM on its place's room (D-19): what it shows in each of its forms
 // and how hard each form holds its room - its KEEP. When a side would run into
@@ -13,13 +12,13 @@
 // the PC); a resident never does. A claim whose condition does not hold - the
 // alarm while none is set (D-20) - takes no room at all.
 //
-// A tap on a slot slides down that slot's own panel, joined to it (D-13, D-18);
+// A tap on a slot slides down that slot's own panel, joined to it (D-13, D-23);
 // the status slot's panel is the system panel.
 //
 // A new kind is a SlotKind, a row in HeaderSlots.cpp's table (its name and its
 // keeps), its build and update in Panel_Header.cpp, and a panel in
 // SlotPanels.cpp if it has one. Never layout code in the header itself. A
-// notice (#76) will be another claim.
+// notice (#76, not built) will be another claim.
 //
 // Nothing critical lives only here (D-11): a page may hide its header.
 // ---------------------------------------------------------------------------
@@ -64,15 +63,15 @@ extern const SlotSpec HEADER_DEFAULT[];
 extern const uint8_t  HEADER_DEFAULT_COUNT;
 static constexpr uint8_t HEADER_SLOTS_MAX = Layout::HEADER_CLAIMS_MAX;
 
-// HOW THE BAR'S GLYPHS ARE FRAMED - #19's open question, answered square
-// (D-20). Every glyph in the bar takes it (the status glyphs, the alarm's
-// bell, the sensor's icon); words and numbers never do.
-//   GLYPH_BARE    the glyph alone, as the header drew it before 2.8
-//   GLYPH_SQUARE  a rounded square of a shade behind it (#19's "2+") - the default
+// HOW THE BAR'S GLYPHS ARE FRAMED. Every glyph in the bar takes the style (the
+// status glyphs, the alarm's bell, the sensor's icon); words and numbers never
+// do.
+//   GLYPH_BARE    the glyph alone
+//   GLYPH_SQUARE  a rounded square of a shade behind it - the default
 //   GLYPH_CIRCLE  a circle in the glyph's own colour, the glyph in the bar's
-//                 colour (#19's treatment 4)
-// Saved by NAME (Settings: system.header.glyphs; the default as nothing); the
-// status panel's Glyphs button cycles them, a development tool (D-17).
+//                 colour
+// Saved by NAME (Settings: system.header.glyphs; the default as nothing); UI
+// Tweaks has the switcher (D-25).
 enum class GlyphStyle : uint8_t { GLYPH_BARE, GLYPH_SQUARE, GLYPH_CIRCLE, GLYPH_STYLE_COUNT };
 static constexpr GlyphStyle GLYPH_DEFAULT = GlyphStyle::GLYPH_SQUARE;
 const char *glyphStyleName(GlyphStyle s);    // "bare", "square", "circle"

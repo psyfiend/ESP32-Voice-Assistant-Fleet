@@ -7,17 +7,14 @@
 // ---------------------------------------------------------------------------
 // The second staleness threshold, per data type.
 //
-// cards.md section 9, question 1, answered: it is its OWN field, not a
-// multiple of the first. The reasoning is that the two thresholds answer
-// different questions - "is this still trustworthy" and "is this obviously
-// dead" - and a switch and a thermometer disagree about both independently.
+// cards.md section 9: it is its OWN field, not a multiple of the first. The
+// two thresholds answer different questions - "is this still trustworthy" and
+// "is this obviously dead" - and a switch and a thermometer disagree about
+// both independently.
 //
-// The first threshold is already in the registry as desc.staleAfterMs, set by
-// whoever declared the entity. This file supplies only the second, and only as
-// a DEFAULT: cards.md says any default is overridable from the build sheet
-// (#20), which is exactly the overlay model issue #20 describes. When the build
-// sheet lands it sets Card::setLongStaleMs() and this table stops being
-// consulted for that card.
+// The first threshold is in the registry as desc.staleAfterMs, set by whoever
+// declared the entity. This file supplies only the second, and only as a
+// DEFAULT: Card::setLongStaleMs() overrides it for one card.
 //
 // A header of plain inline functions rather than a table, so adding an
 // EntityKind cannot silently inherit someone else's timing - the switch below

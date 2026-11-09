@@ -10,9 +10,9 @@ class HaClient;
 
 // ---------------------------------------------------------------------------
 // One entity's past, from Home Assistant, for a card window's History view
-// (2.10e). No LVGL here: the window asks, this asks HA, the window draws.
+// No LVGL here: the window asks, this asks HA, the window draws.
 //
-// WHAT IT ASKS, MEASURED AGAINST THE OWNER'S HA ON 2026-10-11 (card-sheet §18):
+// WHAT IT ASKS, AND WHAT THAT COSTS ON THE OWNER'S HA (card-sheet §18):
 //
 //   A CHART (a number): history/history_during_period, minimal and without
 //   attributes - the real changes, as HA's own graph shows them, and small for

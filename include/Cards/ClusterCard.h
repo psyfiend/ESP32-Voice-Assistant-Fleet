@@ -4,17 +4,17 @@
 
 #include "Cards/Card.h"
 #include "Layout/Cluster.h"   // TileGrid
-#include "UI/HeaderSlots.h"   // GlyphStyle (round 11)
+#include "UI/HeaderSlots.h"   // GlyphStyle
 
 class CardBinder;
 
 // ---------------------------------------------------------------------------
-// ClusterCard - a GROUP CARD shown as a CLUSTER (2.11, DECISIONS K88-K92,
+// ClusterCard - a GROUP CARD shown as a CLUSTER (DECISIONS K88-K92,
 // K100-K104; docs/design/group-cards.md §6): one border on the page, a header
 // row, and the members inside it as MINI TILES with no border of their own.
+// On screen it is a group.
 //
-// The seam Card.h kept for "a card that contains other cards". The cluster OWNS
-// its members - each a whole card, built from its own spec with its own id and
+// A card that contains other cards. The cluster OWNS its members - each a whole card, built from its own spec with its own id and
 // settings, registered with the binder like any card - and draws the tiles
 // where Layout::tileGrid() puts them.
 //
@@ -28,8 +28,8 @@ class CardBinder;
 //            sensor's number. A tap is the member's own; a long press opens the
 //            member's own window (K104).
 //   itself   a long press on the header opens the cluster's window on its
-//            Members; a tap there does nothing (the owner, 2026-10-19: so a brush
-//            cannot switch a room off).
+//            Members; a tap there does nothing (K107: so a brush cannot switch a
+//            room off).
 //
 // It has no state of its own: its members show theirs. Its header follows the
 // members it shows (owns() / onSnapshot()).
@@ -46,20 +46,43 @@ public:
     // -1. A member that is neither is still a member - in its window's Members.
     bool addMember(Card *m, bool tile, int8_t slot);
     void setBinder(CardBinder *b) { _binder = b; }
+    CardBinder *binder() const { return _binder; }
+    // A MEMBER NOT PINNED TO THE PAGE, as the group view shows it (K154, K160): a
+    // tile like the rest, after them. Before build().
+    void markHidden(uint8_t i) { if (i < _n) _hidden[i] = true; }
+    bool hiddenAt(uint8_t i) const { return i < _n && _hidden[i]; }
     void setStyle(ClusterStyle s) { _style = s; }
     void setIcons(bool on) { _icons = on; }
-    // The tiles across, as the arranger chose them (v8's tc); 0: Layout::tileGrid()'s rule.
+    // The tiles across, as the arranger chose them (tc); 0: Layout::tileGrid()'s rule.
     void setTileCols(uint8_t c) { _tileCols = c; }
     // Once sized (setCellWidthPx / setCellHeightPx): how tall its tiles are drawn
     // on their own - near square, no taller than C_TILE_TALL their width.
     int32_t tileHeight() const;
-    // ONE TILE HEIGHT A PAGE (round 12b): the page gives every cluster the
+    // ONE TILE HEIGHT A PAGE: the page gives every cluster the
     // shortest any of them draws; a taller one draws halfway down to it. 0: its own.
     void setTileHeightCap(int32_t px) { _tileHCap = px; }
-    // The header values' icons in the page header's glyph style (round 11, K115):
+    // THE GROUP VIEW (K159), before build(): every tile one size, no bigger than
+    // `cap`, the grid centred (Layout::cappedGrid()) - in place of the page's rule;
+    // and its frame's corners `radius` (the window's), the header's following.
+    void setTileCap(const Layout::TileCap &cap) { _cap = cap; _capped = true; }
+    void setFrameRadius(int32_t px) { _frameR = px; }
+    // Is this point (screen coordinates) on its header row?
+    bool headerHas(const lv_point_t &p) const;
+    // THE GROUP VIEW'S HEADER SENSORS (K163), before build(): a tap on any of
+    // them is `cb`'s (its user data this cluster) - the name's stays the card's.
+    void setSlotsTap(lv_event_cb_t cb) { _slotsCb = cb; }
+    lv_obj_t *headerRow() const { return _hdr; }
+    // The header values' icons in the page header's glyph style (K115):
     // framed on a Swatch header, bare on a Band. Every cluster's, from the next build.
     static void setGlyphStyle(GlyphStyle g) { s_glyphs = g; }
 
+    // THE GROUP VIEW'S CARDS STAND ON THE PAGE'S GROUND (K173): its surface the
+    // page's ground once built, so its members drawn as cards read as on the page.
+    void groundSurface();
+    // THE GAP BETWEEN ITS TILES (K167, a group view's Card margins): `px`, or -1
+    // for the token's (C_TILE_GAP). Before build().
+    void    setTileGap(int32_t px) { _gapPx = px; }
+    int32_t gapPx() const;
     uint8_t memberCount() const { return _n; }
     uint8_t tileCount() const;
     uint8_t headerCount() const;   // the members in its header
@@ -89,12 +112,18 @@ private:
     Card       *_m[GROUP_MEMBERS_MAX] = {nullptr};
     bool        _tile[GROUP_MEMBERS_MAX] = {false};
     int8_t      _slotOf[GROUP_MEMBERS_MAX] = {0};
+    bool        _hidden[GROUP_MEMBERS_MAX] = {false};
     uint8_t     _n = 0;
     CardBinder *_binder = nullptr;
     ClusterStyle _style = ClusterStyle::CLSTYLE_SWATCH;
     bool        _icons = true;
     uint8_t     _tileCols = 0;
     int32_t     _tileHCap = 0;
+    Layout::TileCap _cap;
+    bool        _capped = false;
+    int32_t     _gapPx  = -1;      // setTileGap(): a group view's Card margins (K167)
+    int32_t     _frameR = 0;   // 0: a card's corners
+    lv_event_cb_t _slotsCb = nullptr;
 
     lv_obj_t *_room = nullptr;  // the card's body: the header and the tiles stand in it
     // The header: the row, its bar's skirt, the swatch, the name, and a value per slot.

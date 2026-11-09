@@ -78,12 +78,11 @@ void CardBinder::tick() {
         if (_cards[i]) _cards[i]->pollState(now);
     }
 
-    // EVERY CARD'S GROUP AGAIN WHEN HA'S AREAS CHANGE (2.10d). A group's colour
+    // EVERY CARD'S GROUP AGAIN WHEN HA'S AREAS CHANGE. A group's colour
     // depends on every group's (K47: who has which colour first), so the area
-    // of an entity on one card can recolour cards on others. A card re-applied
-    // only its own on its own entity's area - and Kitchen's four cards kept
-    // Garage's green on the P4_5 (2026-10-11) when Garage's area arrived after
-    // theirs. The areas arrive together in one answer: applied once they have
+    // of an entity on one card can recolour cards on others; re-applying only
+    // a card's own group would leave stale colours when one area arrives after
+    // another. The areas arrive together in one answer: applied once they have
     // been still for 300 ms, with the colours worked out afresh.
     const uint32_t ep = _reg->areaEpoch();
     if (ep != _areaEpoch) { _areaEpoch = ep; _areaMs = now; _areaPending = true; }

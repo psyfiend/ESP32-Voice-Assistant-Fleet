@@ -10,8 +10,8 @@
 // EVERY ENUMERATOR IS A COMPOUND NAME ON PURPOSE. esp32-hal-gpio.h defines
 // bare ALL-CAPS macros - DISABLED, CHANGE, HIGH, LOW, OPEN_DRAIN and friends -
 // and a macro applies inside a scoped enum class too, where a same-named
-// enumerator ought to be perfectly safe. `MqttState::DISABLED` was silently
-// rewritten to `MqttState::0x00` and the resulting error cascade pointed at
+// enumerator ought to be perfectly safe. `MqttState::DISABLED` would be
+// rewritten to `MqttState::0x00`, and the resulting error cascade points at
 // esp32-hal-gpio.h and at the USES of the enum, never at the declaration.
 // See CLAUDE.md, "Arduino's global macro namespace will eat your enum".
 //

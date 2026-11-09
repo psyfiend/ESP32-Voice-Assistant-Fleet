@@ -12,7 +12,7 @@ static UiActionCallback _system_close_cb = NULL;
 // Initialize Static Fonts
 const lv_font_t* UIToolkit::Font_Caption = NULL;
 
-// 35, chosen on the glass. The button still cycles it.
+// 35, chosen on the glass.
 uint8_t UIToolkit::systemHeaderH = UIToolkit::SYSTEM_HEADER_FULL_H;
 const lv_font_t* UIToolkit::Font_Label = NULL;
 const lv_font_t* UIToolkit::Font_Button = NULL;
@@ -25,19 +25,26 @@ int32_t UIToolkit::sc(int32_t val) {
 }
 
 // --- Toast Logic ---
+// THE NOTICE QUEUE (K142): waiting notices, oldest first; a full queue
+// drops the newest. The bar under a notice's words runs down its time.
+static constexpr uint8_t NOTICE_Q = 6;
+static char     notice_q[NOTICE_Q][96];
+static uint32_t notice_ms[NOTICE_Q];
+static uint8_t  notice_n = 0;
+static lv_obj_t *toast_bar = NULL;
+static void notice_next();
+
 static void toast_timer_cb(lv_timer_t * t) {
     if (toast_panel) lv_obj_add_flag(toast_panel, LV_OBJ_FLAG_HIDDEN);
     toast_timer_handle = NULL;
+    if (notice_n) notice_next();
 }
 
 void UIToolkit::init() {
 
     // --= FONT MAPPING =--
-    // Threshold chosen so the three boards that carried -D HIGH_DPI_DISPLAY
-    // keep exactly the fonts they had: WS_S3_5B 1.39, WS_P4_4B 1.50,
-    // WS_P4_5 1.73 are above it; CYD_S3_8048 at 1.10 stays below, as it was.
-    // Only sc() changes on those two boards in this commit, never the faces.
-    // These sizes move into the token header in the next commit.
+    // WS_S3_5B (1.39), WS_P4_4B (1.50) and WS_P4_5 (1.73) are above the
+    // threshold; CYD_S3_8048 (1.10) stays below.
     if (bspUiScale() >= 1.3f) {
         // High density
         Font_Caption     = &lv_font_montserrat_16;
@@ -55,7 +62,7 @@ void UIToolkit::init() {
     }
     // The header bar's words: the larger face of the two (UIToolkit.h).
     {
-        const lv_font_t *hdr = UI::type().HEADER;   // TAG's face but on the P4_5 (2.8 round 4)
+        const lv_font_t *hdr = UI::type().HEADER;   // TAG's face, the per-board table's
         Font_Header = (hdr && lv_font_get_line_height(hdr) > lv_font_get_line_height(Font_PanelHeader))
                     ? hdr : Font_PanelHeader;
     }
@@ -67,9 +74,9 @@ void UIToolkit::init() {
     lv_obj_add_style            (toast_panel, UI::paint(UIPaint::PAINT_SURFACE_ALT), 0);
     lv_obj_add_style            (toast_panel, UI::paint(UIPaint::PAINT_LIFT), 0);
     lv_obj_set_style_radius     (toast_panel, sc(30), 0);
-    // A THICK BORDER, locally, overriding the paint's hairline. The owner:
-    // it "used to be much thicker which helped to immediately separate it
-    // from the rest of the screen content". Coloured at show time, below.
+    // A THICK BORDER, locally, overriding the paint's hairline: it separates the
+    // toast at once from the rest of the screen content. Coloured at show time,
+    // below.
     lv_obj_set_style_border_width(toast_panel, sc(3), 0);
     lv_obj_set_style_pad_all    (toast_panel, sc(15), 0);
     lv_obj_add_flag             (toast_panel, LV_OBJ_FLAG_HIDDEN);
@@ -77,7 +84,7 @@ void UIToolkit::init() {
 
     toast_label = lv_label_create(toast_panel);
     lv_label_set_text           (toast_label, "Toast");
-    // TEXT, not white: white on Paper's light SURFACE_ALT was unreadable.
+    // The scheme's TEXT colour: a fixed white is unreadable on a light SURFACE_ALT.
     lv_obj_add_style            (toast_label, UI::paint(UIPaint::PAINT_TEXT), 0);
     lv_obj_set_style_text_font  (toast_label, Font_Hero, 0); // Use semantic font
 }
@@ -93,8 +100,8 @@ void UIToolkit::show_toast(const char* text, uint32_t duration_ms, const char* w
     lv_obj_set_style_border_color(toast_panel, UI::c(UI::pal().ACCENT), 0);
 
     // FIXED WIDTH FOR A READOUT. A slider fires a toast per step, and a text
-    // that changes width re-centres every time - the owner: "the whole string
-    // rapidly shifts ... and it makes the borders on the sides dance around".
+    // that changes width re-centres every time, so the whole string shifts and
+    // the borders dance.
     // Given a template of the WIDEST value it will show ("Brightness: 100%"),
     // the label is sized to that once and its text left-aligned inside it, so
     // neither the words nor the border move; only the digits change.
@@ -108,21 +115,14 @@ void UIToolkit::show_toast(const char* text, uint32_t duration_ms, const char* w
         lv_obj_set_style_text_align (toast_label, LV_TEXT_ALIGN_CENTER, 0);
     }
 
-    // PLACED ON EVERY SHOW, from the display's own resolution.
+    // PLACED ON EVERY SHOW, from the display's own resolution. An alignment
+    // made once in init() would be computed before the display's final
+    // (rotated) geometry is settled. Measuring the toast AFTER its text is set
+    // and centring it by hand does not depend on when anything else was sized.
     //
-    // It used to be aligned once, in init(), and the owner found it in three
-    // different places on five boards: right-hand side on the 7B, half-way
-    // down on WS_S3_4B, correct elsewhere. The alignment was computed before
-    // the display's final (rotated) geometry was settled and never again.
-    // Measuring the toast AFTER its text is set and centring it by hand does
-    // not depend on when anything else was sized. Unverified on the two boards
-    // that showed it - 2026-09-23.
-    //
-    // TOP_LEFT, EXPLICITLY. The first version of this used lv_obj_set_pos(),
-    // but the panel still carried the TOP_MID alignment from init() - and in
-    // LVGL x/y are offsets FROM the alignment point, so "(dw - tw) / 2" was
-    // measured from the centre and put the toast hard against the right edge
-    // on every board. The owner saw exactly that at 2.6.
+    // TOP_LEFT, EXPLICITLY: in LVGL x/y are offsets FROM the alignment point, so
+    // "(dw - tw) / 2" under the TOP_MID alignment from init() would be measured
+    // from the centre and put the toast hard against the right edge.
     lv_obj_update_layout        (toast_panel);
     const int32_t dw = lv_display_get_horizontal_resolution(NULL);
     const int32_t tw = lv_obj_get_width(toast_panel);
@@ -135,6 +135,92 @@ void UIToolkit::show_toast(const char* text, uint32_t duration_ms, const char* w
     }
     toast_timer_handle = lv_timer_create(toast_timer_cb, duration_ms, NULL);
     lv_timer_set_repeat_count   (toast_timer_handle, 1);
+    if (toast_bar) lv_obj_add_flag(toast_bar, LV_OBJ_FLAG_HIDDEN);   // a readout has no bar
+}
+
+static void bar_width_cb(void *bar, int32_t w) { lv_obj_set_width((lv_obj_t *)bar, w); }
+
+static void notice_next() {
+    if (!notice_n) return;
+    char text[96];
+    snprintf(text, sizeof(text), "%s", notice_q[0]);
+    const uint32_t ms = notice_ms[0];
+    memmove(notice_q, notice_q + 1, sizeof(notice_q[0]) * (NOTICE_Q - 1));
+    memmove(notice_ms, notice_ms + 1, sizeof(notice_ms[0]) * (NOTICE_Q - 1));
+    notice_n--;
+    UIToolkit::show_toast(text, ms);
+    if (!toast_panel) return;
+    if (!toast_bar) {
+        toast_bar = lv_obj_create(toast_panel);
+        lv_obj_remove_style_all(toast_bar);
+        lv_obj_add_flag(toast_bar, LV_OBJ_FLAG_FLOATING);
+        lv_obj_clear_flag(toast_bar, (lv_obj_flag_t)(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
+        lv_obj_set_style_bg_opa(toast_bar, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(toast_bar, UI::sc(2), 0);
+    }
+    lv_obj_set_style_bg_color(toast_bar, UI::c(UI::pal().ACCENT), 0);   // the scheme's, now
+    lv_obj_update_layout(toast_panel);
+    const int32_t w = lv_obj_get_width(toast_panel) - UI::sc(30);
+    lv_obj_set_size(toast_bar, w, UI::sc(4));
+    lv_obj_align(toast_bar, LV_ALIGN_BOTTOM_LEFT, 0, UI::sc(10));
+    lv_obj_clear_flag(toast_bar, LV_OBJ_FLAG_HIDDEN);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, toast_bar);
+    lv_anim_set_exec_cb(&a, bar_width_cb);
+    lv_anim_set_values(&a, w, 0);
+    lv_anim_set_duration(&a, ms);
+    lv_anim_start(&a);
+}
+
+// A TOAST THAT STAYS UNTIL TAPPED (K176: the card limit's
+// warning "must be actively dismissed, it does not time out"). A tap on it hides
+// it; the notice queue carries on after.
+static bool toast_sticky = false;
+static void sticky_tap_cb(lv_event_t *) {
+    if (!toast_sticky || !toast_panel) return;
+    toast_sticky = false;
+    lv_obj_add_flag(toast_panel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(toast_panel, LV_OBJ_FLAG_CLICKABLE);
+    if (notice_n) notice_next();
+}
+
+void UIToolkit::show_sticky(const char* text) {
+    if (!toast_panel || !text || !text[0]) return;
+    show_toast(text, 1000);
+    if (toast_timer_handle) { lv_timer_del(toast_timer_handle); toast_timer_handle = NULL; }
+    toast_sticky = true;
+    lv_obj_add_flag(toast_panel, LV_OBJ_FLAG_CLICKABLE);
+    static bool hooked = false;
+    if (!hooked) { lv_obj_add_event_cb(toast_panel, sticky_tap_cb, LV_EVENT_CLICKED, NULL); hooked = true; }
+}
+
+// A TOAST HELD WHILE SOMETHING WORKS: no timer and no bar,
+// hidden by end_held(); notices wait behind it.
+static bool toast_held = false;
+
+void UIToolkit::show_held(const char* text) {
+    if (!toast_panel || !text || !text[0] || toast_sticky) return;
+    show_toast(text, 1000);
+    if (toast_timer_handle) { lv_timer_del(toast_timer_handle); toast_timer_handle = NULL; }
+    toast_held = true;
+}
+
+void UIToolkit::end_held() {
+    if (!toast_held) return;
+    toast_held = false;
+    if (toast_panel && !toast_sticky && !toast_timer_handle) lv_obj_add_flag(toast_panel, LV_OBJ_FLAG_HIDDEN);
+    if (notice_n && !toast_sticky && !toast_timer_handle) notice_next();
+}
+
+void UIToolkit::show_notice(const char* text, uint32_t duration_ms) {
+    if (!text || !text[0]) return;
+    if (notice_n < NOTICE_Q) {
+        snprintf(notice_q[notice_n], sizeof(notice_q[0]), "%s", text);
+        notice_ms[notice_n++] = duration_ms;
+    }
+    // Nothing showing: this one now. Else it waits for the timer (or the tap, or the work).
+    if (!toast_timer_handle && !toast_sticky && !toast_held) notice_next();
 }
 
 // Expanded Accordion Panel Accessor
@@ -222,8 +308,8 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     lv_obj_set_width            (pnl, 0);       // Set base width to 0 so flex takes over completely
     lv_obj_set_height           (pnl, sc(PANEL_COLLAPSED_H));  // taller than the visible strip - see the header
     lv_obj_set_flex_grow        (pnl, 1);       // Tell flex engine to share available space equally (1:1)
-    // A SHARED paint, not a local colour - #64. A local colour is set once and
-    // never revisited, which is why these panels kept the old scheme.
+    // A SHARED paint rather than a local colour: a local colour is set once and
+    // never revisited, so the panel would keep the old scheme.
     lv_obj_add_style            (pnl, UI::paint(UIPaint::PAINT_SURFACE), 0);
     // Deck panels float like cards do on Linen. No unclip needed: the deck's
     // own sc(10) padding is where this shadow lands, inside the deck's box.
@@ -231,7 +317,7 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     lv_obj_set_style_radius     (pnl, sc(12), 0);   // border width: the paint's
     lv_obj_set_style_pad_all    (pnl, 0, 0); 
     lv_obj_set_style_pad_row    (pnl, sc(10), 0);   
-    // CLIP_CORNER IS OFF, and this is the whole reason WS_P4_5 froze on boot.
+    // CLIP_CORNER IS OFF. With it on, WS_P4_5 freezes on boot.
     //
     // clip_corner forces LVGL to render the object to an intermediate LAYER so
     // it can mask the rounded corners, and a layer is a real buffer allocation
@@ -243,7 +329,7 @@ lv_obj_t* UIToolkit::create_collapsible_panel(lv_obj_t* parent, const char* titl
     // Nothing here needs the clip: the header and the content container are
     // both transparent, so no child paints into the corners this was masking.
     // Card::build() already avoids clip_corner for exactly this reason and
-    // says so - the same trap, found twice.
+    // says so.
     // lv_obj_set_style_clip_corner(pnl, true, 0);
     lv_obj_clear_flag           (pnl, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -338,10 +424,9 @@ lv_obj_t* UIToolkit::create_slider_col(lv_obj_t* parent, const char* title, lv_o
     lv_obj_remove_flag          (slider, LV_OBJ_FLAG_SCROLLABLE);
     // A DRAG ON A SLIDER IS NOT A SWIPE. LVGL classifies a quick flick along
     // the track as a gesture and, by default, bubbles it up to the screen -
-    // where the swipe handler used to release the touch and freeze the slider
-    // mid-drag (the owner's report, 2026-09-23). With the bubble cleared the
-    // gesture stays on the slider, which ignores it. It matters more at 2.6:
-    // a horizontal drag here must never turn the page.
+    // where the swipe handler would release the touch and freeze the slider
+    // mid-drag. With the bubble cleared the gesture stays on the slider, which
+    // ignores it: a horizontal drag here must never turn the page.
     lv_obj_remove_flag          (slider, LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // --= Assign Pointers =--

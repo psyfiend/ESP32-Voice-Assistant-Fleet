@@ -8,43 +8,40 @@
 #include "Cards/PageSpec.h"
 #include "EntityRegistry.h"
 #include "Layout/Layout.h"
-#include "Cards/PageArranger.h"   // the arranger's kept answers (2.11 round 2)
+#include "Cards/PageArranger.h"   // the arranger's kept answers
+
+class ClusterCard;
 
 // ---------------------------------------------------------------------------
 // CardPage - a grid of cards, rendered from a PageSpec.
 //
-// MILESTONE 2.5. 2.4 left this class deliberately thin: it derived columns and
-// honoured spans so that issue #15's span fields were exercised rather than
-// merely stored, and it said in this comment what it did not do. This is that
-// list, done:
+// What it does:
 //
 //   - a page is built from DATA (PageSpec), not from imperative calls. The
-//     imperative path still exists for CardDemo's comparison bench, and both
-//     now finish through the same commit(), because a second placement
-//     implementation is exactly the kind of third thing HANDOFF.md warns about.
-//   - SUB-GRID UNITS. ROADMAP Q3b: a page authored as N x M cells allocates
+//     imperative path exists for CardDemo's comparison bench, and both finish
+//     through the same commit(), so there is one placement implementation.
+//   - SUB-GRID UNITS (D-4): a page authored as N x M cells allocates
 //     N*sub x M*sub units and cards span in units, so half- and quarter-cell
 //     cards are expressible. Default subdivision 2.
 //   - EXPLICIT PLACEMENT plus a validator. A card may pin itself to a unit
 //     coordinate; overlaps and out-of-bounds are detected and REPORTED rather
-//     than silently resolved, which is Q3b's "no solver, fully predictable".
+//     than silently resolved: no solver, fully predictable.
 //   - PRIORITY DEGRADATION. When the page runs out of room the lowest-priority
 //     cards are dropped until the rest fit, instead of whatever happened to be
 //     declared last.
 //
 // THE SUBDIVISION IS DIMENSIONALLY TRANSPARENT. Splitting each cell into `sub`
-// tracks with a gap between them leaves a `sub`-unit span exactly the width a
-// whole cell used to be - the arithmetic cancels, which is why no card changes
-// size when the subdivision does. Row heights lose up to (sub-1) px to integer
+// tracks with a gap between them leaves a `sub`-unit span exactly the width of
+// a whole cell - the arithmetic cancels, which is why no card changes size when
+// the subdivision does. Row heights lose up to (sub-1) px to integer
 // division, and commit() hands each card its REAL pixel height so the
 // compact/full decision is made against what the card actually got.
 //
 // The page OWNS its cards and deletes them. It does not own the binder.
 // ---------------------------------------------------------------------------
 
-// Raised from 24 at 2.5. A 7-column board at 3 rows is 21 cells before any
-// half-cell card exists, and the owner's own entity list is around 18 cards -
-// 24 was close enough to bite.
+// A 7-column board at 3 rows is 21 cells before any half-cell card exists, so
+// the limit leaves room for half-cell cards.
 static constexpr uint8_t CARD_PAGE_MAX = 48;
 
 // The unit grid's hard limits. 16 cells across at subdivision 2 is already far
@@ -52,7 +49,7 @@ static constexpr uint8_t CARD_PAGE_MAX = 48;
 static constexpr uint8_t PAGE_MAX_UNIT_COLS = 32;
 static constexpr uint8_t PAGE_MAX_UNIT_ROWS = 48;
 
-// Placement is Layout's flow engine (2.12 P5), so its limits are the page's.
+// Placement is Layout's flow engine, so its limits are the page's.
 static_assert(CARD_PAGE_MAX == Layout::ITEMS_MAX && PAGE_MAX_UNIT_COLS == Layout::COLS_MAX &&
               PAGE_MAX_UNIT_ROWS == Layout::ROWS_MAX,
               "CardPage's limits and Layout's must agree");
@@ -85,18 +82,16 @@ public:
     // Plan, build and place everything added since begin(). Idempotent.
     // Demand an exact row count, or 0 to let the cards decide.
     //
-    // Auto is the right default and stays the default: the page spends as few
-    // rows as its cards need. But "show me two rows" is a legitimate request -
-    // it means FEWER, LARGER cards, and priority already knows how to choose
-    // which ones survive. Expressing that by tuning an aspect ceiling until
-    // the arithmetic happened to land on two was not a user interface, and on
-    // CYD_S3_3248 it could not land on two at all: the cards wanted eight rows
-    // and only four fit, so no ceiling could reduce the count.
+    // Auto is the default: the page spends as few rows as its cards need. But
+    // "show me two rows" is a legitimate request - it means FEWER, LARGER
+    // cards, and priority already knows how to choose which ones survive. An
+    // aspect ceiling cannot express it: on CYD_S3_3248 the cards want eight
+    // rows and only four fit, so no ceiling can reduce the count.
     //
     // Call before commit().
     void setRowsOverride(uint8_t rows) { _rowsOverride = rows; }
 
-    // THE PAGE'S PINNED GRID (2.11 round 9): the system panel's Col / Row, which
+    // THE PAGE'S PINNED GRID: the system panel's Col / Row, which
     // the arranger keeps - columns, rows or both - choosing the rest itself. 0 =
     // not pinned. Call before applySpec().
     void setPin(uint8_t cols, uint8_t rows) { _pinCols = cols; _pinRows = rows; }
@@ -124,8 +119,7 @@ public:
     // landed, and why it is not on screen if it is not.
     void report() const;
 
-    // CARDS CROWDED OFF THE PAGE (the sprint after round 7, the owner: "or they
-    // are easy to forget"): not hidden, not shown - plan() dropped them for room,
+    // CARDS CROWDED OFF THE PAGE: not hidden, not shown - plan() dropped them for room,
     // lowest priority first. Noted at commit(), which frees the cards themselves,
     // so the page's hidden cards can list them.
     struct Crowded {
@@ -138,6 +132,15 @@ public:
     uint8_t        crowdedCount() const { return _nCrowded; }
     const Crowded &crowded(uint8_t i) const { return _crowded[i < CROWDED_MAX ? i : 0]; }
 
+    // A GROUP CARD'S CLUSTER, made again from its spec for the card window
+    // (K154, K155): every member, configured as the page configures it,
+    // NOT BUILT - the caller builds it, or only reads it, and deletes it. `allTiles`:
+    // the group view's - every member a tile but the header's and the moved, the
+    // hidden ones last and marked; else as the page shows it (a solo group card's
+    // GROUP panel reads its members from it). Live (the binder) only with
+    // `allTiles`. Null when this page has no group card of that id.
+    ClusterCard *makeGroup(const char *id, bool allTiles);
+
 private:
     // Where one card ended up: the engine's Place (col, row, spans, placed,
     // pinFail). Held beside the card rather than on it because it is the PAGE's
@@ -145,25 +148,31 @@ private:
     using Slot = Layout::Place;
 
     // One card from its spec, configured, the saved settings over it; null when
-    // its entity is not here. A group card made on the device (2.11): a cluster
+    // its entity is not here. A group card made on the device: a cluster
     // of its members, or - when it cannot fit, or the owner chose it - its card,
     // or its summary (K98). `made`: the card to configure, in place of the one
     // its entity's kind gives (a summary); deleted when the entity is not here.
     Card *makeCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, uint8_t i,
                    Card *made = nullptr);
     Card *makeGroupCard(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg);
+    // The cluster itself, its members in it (makeGroupCard() places it; makeGroup() hands it out).
+    ClusterCard *newCluster(const CardSpec &cs, const PageSpec &spec, EntityRegistry &reg, bool allTiles);
+    // The page as applySpec() was given it, for makeGroup(): its cards are GUIManager's
+    // merged list, which lives as long as this page.
+    PageSpec        _spec = {};
+    EntityRegistry *_reg  = nullptr;
 
-    // THE ARRANGER (2.11, K105, K109): the page's blocks - its cards and
+    // THE ARRANGER (K105, K109): the page's blocks - its cards and
     // clusters - placed by the arranger's kept answer for exactly these blocks:
     // its grid of units and each block's box, pinned. With no such answer the
-    // page flows as before and the arranger is started in the background
+    // page flows through the flow engine and the arranger is started in the background
     // (PageArranger.h); GUIManager builds the page again once its answer is kept.
     void arrangePage(const PageSpec &spec);
     void useUnits(uint8_t cols, uint8_t rows);
     bool    _arranged = false;
     uint8_t _arrCols = 0, _arrRows = 0;   // units
     uint8_t _pinCols = 0, _pinRows = 0;   // cells; 0 = the arranger chooses
-    // Where each block is drawn (v9, round 11): the finish's rectangles, in pixels
+    // Where each block is drawn: the finish's rectangles, in pixels
     // in the page's content area - off the unit grid once spare room is shared out.
     Layout::ArrRect _arrRect[Layout::ARR_BLOCKS_MAX];
     void placeArranged(Card *c, uint8_t i);
@@ -202,8 +211,8 @@ private:
     //
     // The row array is sized for the unit grid's hard limit rather than for
     // the visible rows, and that is not defensive padding - a short row
-    // descriptor is what froze CYD_S3_3248 solid at 2.4. LVGL indexed past the
-    // end and hit LV_ASSERT, which lv_conf.h defines as `while(1);`.
+    // descriptor makes LVGL index past the end and hit LV_ASSERT, which
+    // lv_conf.h defines as `while(1);` (the board freezes).
     lv_coord_t _colDsc[PAGE_MAX_UNIT_COLS + 1];
     lv_coord_t _rowDsc[PAGE_MAX_UNIT_ROWS + 1];
 

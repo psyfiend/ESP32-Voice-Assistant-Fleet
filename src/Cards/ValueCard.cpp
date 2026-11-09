@@ -21,19 +21,15 @@ void ValueCard::buildBody(lv_obj_t *body) {
     if (mini()) { buildMiniBody(body); return; }   // a cluster's tile (MiniTile.cpp)
     // A VERTICAL STACK, not a set of aligned pieces.
     //
-    // Everything here used to be positioned by hand against something else,
-    // and every one of those calls resolved against a position that layout had
-    // not computed yet. The symptoms were all the same bug: a unit beside the
-    // card's name instead of its number, a battery percentage hidden behind
-    // the value, a percentage hanging off the bottom edge of a 3248 card.
+    // Nothing here is positioned by hand against something else: a hand
+    // alignment resolves against a position that layout has not computed yet.
     //
     //     [ icon      ]   its own line, left
     //     [ value+unit]   grows, centred as a group with the name
     //     [ name      ]
     //     [ batt  seen]   the status row, absent in COMPACT
     //
-    // Flex measures after layout rather than during render, so none of those
-    // can come back.
+    // Flex measures after layout rather than during render.
     lv_obj_set_flex_flow (body, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(body, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
                           LV_FLEX_ALIGN_CENTER);
@@ -41,14 +37,11 @@ void ValueCard::buildBody(lv_obj_t *body) {
 
     // THE ICON IS OUT OF FLOW, in the corner, costing the stack nothing.
     //
-    // It used to have a reserved band of its own, and that band is what broke
-    // CYD_S3_3248: moving the name under the value turned three rows into
-    // four, and 22 px is the whole difference on a 121 px card. The owner
-    // noticed the status line had fit perfectly well before.
+    // A reserved band of its own would turn three rows into four, and 22 px
+    // is the whole difference on CYD_S3_3248's 121 px card.
     //
     // It does not need a row. It sits top-left and the value is centred, so
-    // they never contend for the same space - reserving a row for it was
-    // paying for a collision that cannot happen.
+    // they never contend for the same space.
     //
     // Placement is the base class's, shared with StateCard - Card::
     // renderCornerIcon() explains the corner rule.
@@ -57,12 +50,8 @@ void ValueCard::buildBody(lv_obj_t *body) {
     // The middle takes whatever is left and centres the HERO in it - the value
     // only, with the name as a sibling BELOW it.
     //
-    // The name used to live inside here, centred as a group with the value,
-    // while StateCard kept its name outside its own middle. Two different
-    // structures, so the two card types put their names at different heights -
-    // which is exactly what the owner saw: "for cards with value the hero text
-    // is tucked up hard against the value and NOT aligned with the other
-    // cards". Both are the same shape now.
+    // StateCard keeps its name outside its own middle too, so the two card
+    // types put their names at the same height.
     _mid = plain(body);
     lv_obj_set_width     (_mid, lv_pct(100));
     lv_obj_set_flex_grow (_mid, 1);
@@ -70,8 +59,8 @@ void ValueCard::buildBody(lv_obj_t *body) {
     lv_obj_set_flex_align(_mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
     // Keeps the hero clear of the corner icon, which is out of the flow above
-    // it. Half a band rather than a whole one: they sit side by side, and the
-    // owner's only constraint is that they must not touch.
+    // it. Half a band rather than a whole one: they sit side by side and must
+    // not touch.
     lv_obj_set_style_pad_top(_mid, Card::topBandHeight() / 2, 0);
 
     // Value and unit share a bottom edge, which is as close to a shared
@@ -145,8 +134,7 @@ void ValueCard::render() {
     // The HEIGHT decided the face in resolveVariant(); the WIDTH gets a say
     // here, because only now is the text known. A long reading ("1024" lux,
     // "3d 04:15") can overflow a narrow card at VALUE while fitting at
-    // VALUE_SM - the owner's "the values would actually fit if they were
-    // smaller", #62. Measured with the font, not estimated per character.
+    // VALUE_SM. Measured with the font, not estimated per character.
     const lv_font_t *vf = valueFont();
     const int32_t cw = cellWidthPx() > 0
                      ? surfaceWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;
@@ -178,10 +166,9 @@ void ValueCard::render() {
 
     // --- Name, which is the LOCATION, under the value ---------------------
     //
-    // The label setting applies here too - the owner found temperatures
-    // keeping their names under "No lbl" and looking odd as the only cards
-    // that did. For a value card the number already IS the state, so State
-    // shows the name.
+    // The label setting applies here too, so no card keeps its name under "No
+    // lbl". For a value card the number already IS the state, so State shows
+    // the name.
     const CardLabel lbl = cardResolveLabel(labelMode());
     const bool showName = (lbl != CardLabel::LBL_NONE);
     if (showName) lv_obj_clear_flag(_name, LV_OBJ_FLAG_HIDDEN);
@@ -235,38 +222,43 @@ void ValueCard::render() {
         lv_label_set_text          (_battery, b);
         lv_obj_set_style_text_color(_battery, UI::c(tone(p.TEXT_DIM)), 0);
     } else {
-        // Emptied rather than hidden. Hiding it removed it from the row, and
-        // SPACE_BETWEEN with a single child puts that child on the LEFT - which
-        // is why "Seen: now" jumped to the wrong corner on a card with no
-        // battery to report.
+        // Emptied rather than hidden. Hiding it removes it from the row, and
+        // SPACE_BETWEEN with a single child puts that child on the LEFT, so
+        // "Seen: now" would jump to the wrong corner on a card with no battery
+        // to report.
         lv_label_set_text(_battIcon, "");
         lv_label_set_text(_battery,  "");
     }
 
     // LAST-SEEN IS FOR VALUES THAT ARRIVE FROM SOMEWHERE ELSE.
     //
-    // The owner, seeing "Seen: now" on the panel's own RSSI and uptime cards:
-    // "Do local entities (like Panel) need secondary information such as
-    // battery or last seen?" They do not. An entity this board OWNS is read
-    // straight off the hardware every couple of seconds, so its age is always
-    // "now" and the line is pure clutter.
+    // Local entities (the Panel's RSSI and uptime) need no battery or last
+    // seen. An entity this board OWNS is read straight off the hardware every
+    // couple of seconds, so its age is always "now" and the line is clutter.
     //
     // advertise == true is exactly the "we own it" flag - Entity.h calls it
     // "the real difference between the two groups of entity". The staleness
     // machinery still runs: if our own telemetry ever DID stop updating, the
     // card would still raise a STALE tag, which is the part worth keeping.
     //
-    // It also answers the question underneath his: "Seen" is the last time
-    // THIS ENTITY'S VALUE changed, not the last time the device was heard
-    // from. For a Zigbee sensor publishing four values on one topic those are
-    // the same moment; for anything else they are not, and the device-level
-    // question is one only #43's device registry can answer.
+    // "Seen" is the last time THIS ENTITY'S VALUE changed, not the last time
+    // the device was heard from. For a Zigbee sensor publishing four values on
+    // one topic those are the same moment; for anything else they are not, and
+    // the device-level question is one only #43's device registry can answer.
+    // A card with words of its own for this corner says them instead (the
+    // thermostat's "Heat to 68°", K144).
+    char own[40];
+    if (statusWords(*e, own, sizeof(own))) {
+        lv_label_set_text          (_seen, own);
+        lv_obj_set_style_text_color(_seen, UI::c(tone(p.TEXT_DIM)), 0);
+        lv_obj_clear_flag(_seen, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
     if (e->everSet && !e->desc.advertise) {
         char age[12];
         cardFormatAge(millis() - e->lastUpdateMs, age, sizeof(age));
 
-        // "Seen:" rather than "Last seen:" - the owner's call, to buy back the
-        // width. Even so it does not always fit: on a 141 px CYD_S3_3248 card
+        // "Seen:" rather than "Last seen:", to save width. Even so it does not always fit: on a 141 px CYD_S3_3248 card
         // there is no room beside a battery reading, so the prefix drops
         // rather than letting the two collide. Measured, not guessed per board.
         char full[24];
@@ -274,13 +266,10 @@ void ValueCard::render() {
         lv_label_set_text          (_seen, full);
         lv_obj_set_style_text_color(_seen, UI::c(tone(p.TEXT_DIM)), 0);
 
-        // MEASURED FROM THE TEXT, not from layout. This used to call
-        // lv_obj_update_layout() and read widths back - and right after a page
-        // rebuild the layout is not settled, so the same card measured
-        // differently depending on HOW it was last drawn. The owner saw "Seen:"
-        // appear for every card after the Label knob (a repaint, layout
-        // settled) and vanish at random after Auto -> Full (a rebuild, not
-        // settled). The text's own size and the page-supplied width answer the
+        // MEASURED FROM THE TEXT, not from layout: right after a page rebuild
+        // the layout is not settled, so reading widths back from it would
+        // measure the same card differently depending on HOW it was last
+        // drawn. The text's own size and the page-supplied width answer the
         // same question the same way every time.
         const int32_t cw = cellWidthPx() > 0
                          ? surfaceWidthPx() - UI::sc(UI::met().PAD) * 2 : 0;

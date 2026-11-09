@@ -1,11 +1,10 @@
 #pragma once
 //
-// HangWatch - where is the UI thread stuck? (2.10d, -D DEBUG_HANG only)
+// HangWatch - where is the UI thread stuck? (-D DEBUG_HANG only)
 //
-// The owner had WS_P4_5 freeze twice in a card window (2026-10-09): picture
-// stopped mid-animation, /screenshot timing out, the HTTP side alive. That is
-// loopTask - where LVGL runs - either spinning or blocked, and nothing says
-// which or where.
+// A frozen picture with /screenshot timing out and the HTTP side alive means
+// loopTask - where LVGL runs - is either spinning or blocked, and nothing says
+// which or where. This reports it.
 //
 // A watcher task on the other core sees loop() stop beating for STALL_MS, then
 // stops loopTask (vTaskSuspend saves its registers), reads where it was - the

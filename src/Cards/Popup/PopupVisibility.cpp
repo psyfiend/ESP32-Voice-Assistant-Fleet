@@ -1,11 +1,10 @@
-// A CARD'S OPTIONS BY WHERE IT IS (2.11 round 3, K96; the buttons the owner's,
-// round 2 of the 2.11 follow-ups): SETTINGS' Visibility row opens this view, and
+// A CARD'S OPTIONS BY WHERE IT IS (K96, K137): SETTINGS' Visibility row opens this view, and
 // what it offers depends on where the held card is.
 //
 //   On the page    Hide from this page - to the page's pool, after its dialog
 //                  (PopupDialog.cpp); Change group; Add to cluster
-//   In a cluster   Hide from the cluster (or Show in the cluster) - back from the
-//                  cluster's Members; Add to dashboard; Change cluster
+//   In a cluster   Unpin this card (or Pin this card, K160) - on the page or only
+//                  in the group; Add to dashboard; Change group
 //   A group card's Paused, and Add card to dashboard (K17) - a copy
 //   member
 //
@@ -14,7 +13,7 @@
 // where the moves and their dialogs are).
 //
 // A member's own view inside a CLUSTER's window has this view too, the same as
-// its tile's (round 6: one member, one answer); one moved out of the cluster
+// its tile's (one member, one answer); one moved out of the cluster
 // offers only its Restore.
 #include "PopupState.h"
 #include "Cards/ClusterCard.h"
@@ -39,8 +38,7 @@ ClusterCard *clusterOfTile() {
     return nullptr;
 }
 
-// THE VIEWS ARE CHIP TABLES (round 4, the owner: "look more like the Card UI or
-// UI Tweaks sheet"): choices as chip rows, actions as buttons below them.
+// THE VIEWS ARE CHIP TABLES, as Card UI's and UI Tweaks' are: choices as chip rows, actions as buttons below them.
 int32_t listW() { return lv_area_get_width(&s.winRect) - 2 * s.pad; }
 lv_obj_t *s_table = nullptr;
 
@@ -55,6 +53,7 @@ void note(lv_obj_t *list, const char *words) {
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_label_set_text(l, words);
+    Kit::helperNote(l);   // UI Tweaks' Show helper text
 }
 
 void restoreCb(lv_event_t *) {
@@ -62,8 +61,8 @@ void restoreCb(lv_event_t *) {
 }
 
 // Buttons, one to a row, one width - the longest words' - centred. RESTORE ON
-// THE BOTTOM ROW, OFF TO THE RIGHT (owner, round 2): the column as it was, and
-// Restore beside its last button; a row of its own where there is no room.
+// THE BOTTOM ROW, OFF TO THE RIGHT: the column stays centred, and
+// Restore sits beside its last button; a row of its own where there is no room.
 struct Action { const char *words; Kit::ButtonRole role; lv_event_cb_t cb; };
 void actions(lv_obj_t *list, const Action *a, uint8_t n, bool restore) {
     const UIShape &k = UI::shape();
@@ -86,12 +85,16 @@ void actions(lv_obj_t *list, const Action *a, uint8_t n, bool restore) {
     lv_obj_align(r, LV_ALIGN_RIGHT_MID, 0, 0);
 }
 
-// THE SAME WORDS FOR CARDS AND TILES (round 14, the owner's).
+// THE SAME WORDS FOR CARDS AND TILES - a member's without
+// the hidden cards' half (K160: a member is unpinned, never hidden).
 const char *const VIS_NOTE = "Paused cards will not send or receive any updates. Hidden cards can be restored.";
+const char *const VIS_NOTE_MEMBER = "Paused cards will not send or receive any updates.";
 
-// The cluster the subject is in: the held tile's, or the window's own.
+// The cluster the subject is in: the held tile's, or the window's own group's -
+// a cluster's, or a group shown as one card's (K155).
 ClusterCard *clusterOfSubject() {
-    if (s.cluster && inMember()) return static_cast<ClusterCard *>(held());
+    if (inMember())
+        if (ClusterCard *g = heldGroup()) return g;
     return clusterOfTile();
 }
 
@@ -114,19 +117,61 @@ Card *cardWithId(lv_obj_t *o, const char *id) {
     return nullptr;
 }
 
-// Show in the cluster: a hidden member (or one only in the header) a tile again.
-void showTileCb(lv_event_t *) {
+// The group's name as its header says it, for a dialog's words.
+const char *groupWords(const ClusterCard *cl) {
+    if (!cl) return "";
+    return cl->area()[0] ? cl->area() : cl->shownName(CardLabel::LBL_NAME);
+}
+
+// UNPIN AND PIN ASK FIRST (K165): every change to a group's membership says
+// what will happen.
+void unpinGo() { if (s.phase == PopupPhase::PHASE_OPEN) visibilityHideTile(); }
+
+void pinGo() {
+    Card *c = visibilitySubject();
+    ClusterCard *cl = clusterOfSubject();
+    const int8_t i = (cl && c) ? clusterMemberOf(*cl, c->firstEntity()) : -1;
+    if (i < 0 || s.phase != PopupPhase::PHASE_OPEN) return;
+    clusterMemberShow(*cl, (uint8_t)i, true);
+    // THE WINDOW CLOSES AND THE PAGE ARRANGES: a pin changes
+    // the page - a solo card can become a group - so it is shown at once.
+    s_rebuildPage = true;
+    CardPopup::close();
+}
+
+// UNPIN THIS CARD (K160): off the page, still in the group.
+void unpinTileCb(lv_event_t *) {
     lv_async_call([](void *) {
         Card *c = visibilitySubject();
-        ClusterCard *cl = clusterOfSubject();
-        const int8_t i = (cl && c) ? clusterMemberOf(*cl, c->firstEntity()) : -1;
-        if (i < 0 || s.phase != PopupPhase::PHASE_OPEN) return;
-        clusterMemberShow(*cl, (uint8_t)i, true);
-        showView(PopupView::VIEW_VISIBILITY);   // it says so at once; the cluster when the window closes
+        if (!c || s.phase != PopupPhase::PHASE_OPEN) return;
+        // Names in the accent: every card or group name a dialog shows.
+        const unsigned long acc = (unsigned long)(UI::pal().ACCENT & 0xFFFFFF);
+        const char *g = groupWords(clusterOfSubject());
+        static char l1[180], l2[220];
+        snprintf(l1, sizeof(l1), "This will hide the card #%06lX %s# from the group when looking at the page.",
+                 acc, c->shownName(CardLabel::LBL_NAME));
+        snprintf(l2, sizeof(l2), "The card will still be a member of group #%06lX %s# and will be visible on the "
+                                 "'Group view' and the 'Members view'.", acc, g);
+        const char *lines[] = { l1, l2 };
+        confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Unpin this card?", lines, 2, "Confirm",
+                   Kit::ButtonRole::BTN_CONFIRM, unpinGo);
     }, nullptr);
 }
 
-// PAUSED (round 7, the owner: SETTINGS' Paused belongs with Visibility): the
+// PIN THIS CARD (K160): on the page as a tile.
+void showTileCb(lv_event_t *) {
+    lv_async_call([](void *) {
+        if (s.phase != PopupPhase::PHASE_OPEN) return;
+        static char l1[180];
+        snprintf(l1, sizeof(l1), "This will make the card visible from the page as a member of group #%06lX %s#.",
+                 (unsigned long)(UI::pal().ACCENT & 0xFFFFFF), groupWords(clusterOfSubject()));
+        const char *lines[] = { l1 };
+        confirmAsk(Kit::DialogRole::DLG_CONFIRM, "Pin this card?", lines, 1, "Confirm",
+                   Kit::ButtonRole::BTN_CONFIRM, pinGo);
+    }, nullptr);
+}
+
+// PAUSED (it belongs with Visibility, not SETTINGS): the
 // card's own, a tile's, or - in a member's own view - that member's alone.
 const char *const PAUSED_W[] = { "No", "Yes" };
 void pausedChoose(void *p) {
@@ -148,38 +193,50 @@ void pausedChipCb(lv_event_t *ev) {
     lv_async_call(pausedChoose, (void *)(v & 0xFF));
 }
 
-}  // namespace
-
-Card *visibilitySubject() {
-    Card *c = held();
-    if (!(c && s.cluster && inMember())) return c;
-    ClusterCard *cl = static_cast<ClusterCard *>(c);
-    const int8_t i = clusterMemberOf(*cl, s.ent[0]);
-    return i >= 0 ? cl->memberAt((uint8_t)i) : nullptr;
+// A GROUP'S OWN VISIBILITY (K174, K191): a line saying
+// how it is presented, Paused (not for a group itself), and Show as... and Rename
+// group with its buttons. Show as is a flow (PopupShowAs.cpp), never a chip.
+void showAsCb(lv_event_t *) {
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) showAsOpen(); }, nullptr);
+}
+void renameGroupCb(lv_event_t *) {
+    lv_async_call([](void *) { if (s.phase == PopupPhase::PHASE_OPEN) clusterRename(); }, nullptr);
 }
 
-// Hide from the cluster: gone from it when the window closes. From its tile the
-// window closes now; from the cluster's own window it stays, saying so.
+}  // namespace
+
+// In a group's member: that member's own card (K157) - none for one of Desk's
+// lamps, which has no card of its own here.
+Card *visibilitySubject() {
+    Card *c = held();
+    ClusterCard *g = heldGroup();
+    if (!(c && g && inMember())) return c;
+    Card *m = memberCard();
+    for (uint8_t i = 0; m && i < g->memberCount(); i++)
+        if (g->memberAt(i) == m) return m;
+    return nullptr;
+}
+
+// Unpin this card (K160): off the page when the window closes. From its tile the
+// window closes now; from the group's own window it stays, saying so.
 void visibilityHideTile() {
     Card *c = visibilitySubject();
     ClusterCard *cl = clusterOfSubject();
     if (!c || !c->hasId() || !c->mini() || s.phase != PopupPhase::PHASE_OPEN) return;
-    if (s.cluster && inMember()) {
-        const int8_t i = cl ? clusterMemberOf(*cl, c->firstEntity()) : -1;
-        if (i >= 0) clusterMemberShow(*cl, (uint8_t)i, false);
-        showView(PopupView::VIEW_VISIBILITY);
-        return;
-    }
-    Settings::setCard(c->id(), "hidden", "yes");
+    const int8_t i = cl ? clusterMemberOf(*cl, c->firstEntity()) : -1;
+    // UNPIN CLOSES THE WINDOW TOO, as Pin does: the page
+    // arranges at once - a group can become a solo card.
+    if (i >= 0)                           clusterMemberShow(*cl, (uint8_t)i, false);   // out of the header too
+    else if (!(heldGroup() && inMember())) Settings::setCard(c->id(), "hidden", "yes");
     s_rebuildPage = true;
     CardPopup::close();
 }
 
 void buildVisibility() {
     Card *held_ = held();
-    // A GROUP CARD'S MEMBER (Desk's lamp, round 7): its Paused, and Add card to
+    // A GROUP CARD'S MEMBER (Desk's lamp): its Paused, and Add card to
     // dashboard - a copy (PopupMove.cpp says when it cannot be).
-    if (held_ && inMember() && !s.cluster) {
+    if (held_ && inMember() && !heldGroup()) {
         const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
         lv_obj_t *list = table(&paused, 1, pausedChipCb);
         if (s.ent[0] && held_->hasId()) {
@@ -194,38 +251,54 @@ void buildVisibility() {
     ClusterCard *cl = clusterOfSubject();
     // Paused, for anything that is not a cluster itself (K110).
     const bool clusterSelf = s.cluster && !inMember();
+    const bool groupSelf = !inMember() && (s.cluster || s.groupCard);   // K174
     const Kit::ChipRowSpec paused = { "Paused", PAUSED_W, 2, (uint8_t)(aggregate().paused ? 1 : 0) };
-    lv_obj_t *list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
+    lv_obj_t *list;
+    list = clusterSelf ? table(nullptr, 0, nullptr) : table(&paused, 1, pausedChipCb);
+    if (groupSelf) {
+        // How the page shows it now (K191).
+        lv_obj_t *l = Kit::label(list, KS::KS_LABEL_NAME);
+        lv_obj_set_width(l, lv_pct(100));
+        lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+        lv_label_set_text(l, s.cluster ? "Group card being presented as 'Group'"
+                                       : "Group card being presented as 'Solo card'");
+        lv_obj_move_to_index(l, 0);
+    }
     const bool restore = c->hasId() && restoreOffered(c);
-    Action a[3];
+    Action a[5];
     uint8_t n = 0;
+    if (groupSelf && c->hasId()) a[n++] = { "Show as...", Kit::ButtonRole::BTN_CANCEL, showAsCb };       // K191
+    if (groupSelf && c->hasId()) a[n++] = { "Rename group", Kit::ButtonRole::BTN_CANCEL, renameGroupCb };   // K174
     if (cl) {
-        // MOVED OUT (the sprint after round 7): its card is elsewhere now, and its
+        // MOVED OUT: its card is elsewhere now, and its
         // Restore brings it back.
         if (c->hasId() && CardAdded::isMovedToPage(c->id())) {
             actions(list, a, 0, restore);
-            note(list, VIS_NOTE);
+            note(list, VIS_NOTE_MEMBER);
             return;
         }
         const int8_t i = clusterMemberOf(*cl, c->firstEntity());
-        const bool tile = i < 0 || clusterMemberShown(*cl, (uint8_t)i) == MemberShown::SHOWN_TILE;
+        const bool pinned = i < 0 || clusterMemberPinned(*cl, (uint8_t)i);
         if (c->hasId()) {
-            a[n++] = tile ? Action{ "Hide from the cluster", Kit::ButtonRole::BTN_CANCEL, hideTileCb }
-                          : Action{ "Show in the cluster", Kit::ButtonRole::BTN_CANCEL, showTileCb };
+            a[n++] = pinned ? Action{ "Unpin this card", Kit::ButtonRole::BTN_CANCEL, unpinTileCb }   // K160
+                            : Action{ "Pin this card", Kit::ButtonRole::BTN_CANCEL, showTileCb };
             a[n++] = { "Add to dashboard", Kit::ButtonRole::BTN_CANCEL, toDashCb };
-            a[n++] = { "Change cluster", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
+            a[n++] = { "Change group", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
         }
         actions(list, a, n, restore);
-        note(list, VIS_NOTE);
+        note(list, VIS_NOTE_MEMBER);
         return;
     }
-    if (c->hasId()) a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
+    // A BUILT-IN GROUP IS NEVER HIDDEN (K171: the Fleet page's Panel).
+    const CardSpec *spec = c->hasId() ? CardAdded::specOf(c->id()) : nullptr;
+    if (c->hasId() && !(spec && spec->builtIn)) a[n++] = { "Hide from this page", Kit::ButtonRole::BTN_CANCEL, hideCardCb };
     if (c->hasId() && !clusterSelf) {
-        a[n++] = { "Change group", Kit::ButtonRole::BTN_CANCEL, toDashCb };
-        a[n++] = { "Add to cluster", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
+        a[n++] = { "Change label", Kit::ButtonRole::BTN_CANCEL, toDashCb };   // K146
+        a[n++] = { "Add to group", Kit::ButtonRole::BTN_CANCEL, toClusterCb };
     }
     actions(list, a, n, restore && !clusterSelf);
-    note(list, clusterSelf ? "Hidden clusters can be restored from the 'Page' \"View hidden cards\" menu."
+    note(list, clusterSelf ? "Hidden groups can be restored from the page's Edit cards."   // K148; to confirm
                            : VIS_NOTE);
 }
 
@@ -252,7 +325,7 @@ const char *movedWords(const Card *member, char *buf, size_t cap) {
         snprintf(buf, cap, "In %s", k->area()[0] ? k->area() : k->shownName(CardLabel::LBL_NAME));
         return buf;
     }
-    snprintf(buf, cap, "In another cluster");
+    snprintf(buf, cap, "In another group");
     return buf;
 }
 

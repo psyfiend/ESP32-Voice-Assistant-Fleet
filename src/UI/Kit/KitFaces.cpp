@@ -1,15 +1,13 @@
-// FACES DRAWN BY HAND, and the selector's look (2.12 P3, moved from the card
-// window's control deck - owner, round 6, 2026-10-06).
+// FACES DRAWN BY HAND, and the selector's look.
 //
-// LVGL's gradient has two stops and runs straight across; the owner asked for
-// the line between the selector's light and dark halves to CURVE UP in the
-// middle - "a slight raised appearance" - in the upper two fifths, and for
-// the unlit buttons to look like soft DENTS in the surface rather than flat
-// discs. So these faces are images, painted pixel by pixel when a window
+// LVGL's gradient has two stops and runs straight across, but the line between
+// the selector's light and dark halves should CURVE UP in the middle - "a slight
+// raised appearance" - in the upper two fifths, and the unlit buttons should
+// look like soft DENTS in the surface rather than flat discs. So these faces are images, painted pixel by pixel when a window
 // first needs them and kept in PSRAM (a few, ~40 KB each): a raised metal
 // face - light above a curved line, dark below, faint horizontal streaks for
 // a brushed finish, a fine edge - and a dent - darker at the top, fading out
-// downwards, no edge. Black or silver (the owner's four looks); the corners
+// downwards, no edge. Black or silver (the four looks); the corners
 // anti-aliased in the alpha, so no clip_corner and no layer.
 #include "UI/Kit.h"
 #include "Settings.h"
@@ -27,18 +25,16 @@ static int32_t lum(uint32_t hex) {
 }
 
 // ---------------------------------------------------------------------------
-// THE SELECTOR'S LOOK. FOUR, ALL KEPT (owner, round 6: "they all look so
-// good"): Black or Silver, Square or Round. Unchosen, each scheme has its own:
-// Black - Square on Midnight and Fleet, Silver - Round on Linen (owner, round
-// 9). Chosen FOR THE SCHEME SHOWING (owner, round 9: "the selector should
-// follow the scheme"), from the system panel (K45). Schemes are per page, so a
-// page in Linen and a page in Fleet each keep their own.
+// THE SELECTOR'S LOOK. FOUR, ALL KEPT: Black or Silver, Square or Round.
+// Unchosen, each scheme has its own: Black - Square on Midnight and Fleet,
+// Silver - Round on Linen (K27). Chosen FOR THE SCHEME SHOWING ("the selector
+// should follow the scheme"), from UI Tweaks (K45), so each scheme keeps its own.
 // ---------------------------------------------------------------------------
 constexpr uint8_t LOOK_SCHEMES = 4;   // UITokens' schemes, with room for one more
 static int8_t  s_look[LOOK_SCHEMES] = { -1, -1, -1, -1 };   // -1: the scheme's own; else bit 0 round, bit 1 silver
 static uint8_t s_lookLoaded = 0;      // bit per scheme index: read from the settings file yet
 
-// Saved as a setting of the scheme (2.10d, DECISIONS K36): schemes.<name>.
+// Saved as a setting of the scheme (DECISIONS K36): schemes.<name>.
 // selector, by name. The scheme's name is its palette's, lower case ("linen").
 static const char *const LOOK_NAMES[4] = { "black_square", "black_round", "silver_square", "silver_round" };
 
@@ -129,7 +125,7 @@ struct FaceSlot {
     uint8_t *buf = nullptr;
     lv_image_dsc_t dsc = {};
 };
-constexpr uint8_t FACE_SLOTS = 16;   // 12 until #99's satin and glass faces
+constexpr uint8_t FACE_SLOTS = 16;
 static FaceSlot s_faces[FACE_SLOTS];
 static uint32_t s_epoch = 1;        // one per window opened (facesNextWindow())
 static uint32_t s_flat  = 0;        // faces that could not be had and came out flat (debug readout)
@@ -164,12 +160,11 @@ static void paintFace(FaceSlot &f) {
     }
     const uint32_t base = p.SURFACE_ALT;   // a dent is pressed into the window
     const uint32_t rail = UI::mix(selectorColours().ribbon, dk, 25);   // the rail through the lens
-    const uint32_t warm = UI::mix(p.ST_ACTIVE, lt, 40);                // lit glass's light (round 5)
+    const uint32_t warm = UI::mix(p.ST_ACTIVE, lt, 40);                // lit glass's light
 
     // The panels are 16-bit: red and blue in steps of 8, green in steps of 4.
     // A smooth grey ramp truncated to that grid bands, and the bands go pink
-    // and green where green steps and the others do not (seen on glass, round
-    // 7). So each pixel is rounded to the grid itself, by a 4x4 ordered
+    // and green where green steps and the others do not (seen on glass). So each pixel is rounded to the grid itself, by a 4x4 ordered
     // dither, the same threshold for every channel.
     static const uint8_t BAYER[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
 
@@ -203,7 +198,7 @@ static void paintFace(FaceSlot &f) {
                 col = (t < 0.5f) ? lerpHex(UI::mix(base, dk, 45), base, t / 0.5f)
                                  : lerpHex(base, UI::mix(base, lt, 7), (t - 0.5f) / 0.5f);
             } else if (f.kind == FaceKind::FACE_SATIN) {
-                // SATIN (#99, the mock's numbers): light at the top fading by
+                // SATIN (the mock's numbers): light at the top fading by
                 // the middle, a shade growing below it - a faint step between
                 // the two - and a soft edge. A bright colour (the Remove
                 // button's red) carries a stronger light; on a light scheme the
@@ -216,7 +211,7 @@ static void paintFace(FaceSlot &f) {
                 const uint32_t rim = darkScheme ? UI::mix(f.tint, lt, bright ? 22 : 11) : UI::mix(f.tint, dk, 15);
                 if (inside < 1.3f) col = lerpHex(col, rim, 0.75f);
             } else if (f.kind == FaceKind::FACE_LIT) {
-                // LIT GLASS (owner, round 5): "a light shining from within
+                // LIT GLASS: "a light shining from within
                 // refracting through a semi-frosted glass surface". Dark smoked
                 // glass with a warm light behind it, brightest a little below
                 // the middle and fading toward the edges; a faint sheen across
@@ -234,7 +229,7 @@ static void paintFace(FaceSlot &f) {
                 const uint32_t below = lerpHex(botA, botB, (cy - line) / (h - line));
                 const float d = cy - line;   // anti-aliased across one pixel
                 col = d <= -0.5f ? above : d >= 0.5f ? below : lerpHex(above, below, d + 0.5f);
-                // THE RAIL THROUGH THE LENS (owner, #99): the selector magnifies
+                // THE RAIL THROUGH THE LENS: the selector magnifies
                 // what it slides over, so the rail shows through it - taller
                 // than the rail outside, darker and faded (the rail's own
                 // colour, a quarter of the way to the scheme's darkest, half
@@ -267,7 +262,7 @@ static void paintFace(FaceSlot &f) {
     }
 }
 
-// SATIN IS PAINTED IN 16 BITS (#99): no alpha, its corners cut by LVGL
+// SATIN IS PAINTED IN 16 BITS: no alpha, its corners cut by LVGL
 // (the image's radius). Measured on the P4_5, a full redraw of Members with
 // three ARGB8888 rows took 22 ms more than flat rows - an image with alpha is
 // blended pixel by pixel - where an opaque 16-bit one is copied a line at a
@@ -275,10 +270,9 @@ static void paintFace(FaceSlot &f) {
 static bool opaqueFace(FaceKind kind) { return kind == FaceKind::FACE_SATIN; }
 
 // A face of this size and kind in the scheme's colours: found, or painted.
-// TWELVE SLOTS, REUSED (round 8, the 1060 on Linen): each scheme, look and
-// size takes one, and trying the looks in two schemes filled all twelve -
-// after which every face came out flat (a white disc for a lit chip on
-// Linen). A slot is taken back only if no object can be showing it: one
+// SLOTS ARE REUSED: each scheme, look and size takes one, and trying the looks
+// in two schemes would fill them all - after which every face would come out
+// flat (a white disc for a lit chip on Linen). A slot is taken back only if no object can be showing it: one
 // painted in another scheme's colours first (the window that used it has
 // closed - a scheme changes from the dashboard), else the one asked for
 // longest ago by a window that is not this one. Full of this window's own:
@@ -286,7 +280,7 @@ static bool opaqueFace(FaceKind kind) { return kind == FaceKind::FACE_SATIN; }
 static const lv_image_dsc_t *face(int32_t w, int32_t h, int32_t r, FaceKind kind, uint32_t tint, int32_t band) {
     const UIPalette &p = UI::pal();
     // Lit glass's light is painted from ST_ACTIVE, which can change without the
-    // scheme (round 6's /popup?active=) - so its faces are keyed by it too.
+    // scheme (/popup?active=) - so its faces are keyed by it too.
     const uint32_t key = p.GROUND ^ (p.SURFACE << 1) ^ (p.TEXT << 2) ^ (p.SURFACE_ALT << 3) ^
                          (kind == FaceKind::FACE_LIT ? p.ST_ACTIVE << 4 : 0);
     FaceSlot *spare = nullptr;
@@ -372,7 +366,7 @@ lv_obj_t *setFace(lv_obj_t *o, int32_t w, int32_t h, int32_t r, FaceKind kind, u
 }
 
 // ---------------------------------------------------------------------------
-// THE FINISHES (#99, DECISIONS K77): satin for what can be tapped and is not
+// THE FINISHES (DECISIONS K77): satin for what can be tapped and is not
 // chosen, glass - the selector's metal - for what is chosen or active.
 // ---------------------------------------------------------------------------
 
@@ -386,7 +380,7 @@ uint32_t litInk() {
     return UI::mix(UI::darkest(), p.ST_ACTIVE, 20);
 }
 
-// INK ON GLASS (owner, #99 T6): Linen's olive "on" vanished into its silver.
+// INK ON GLASS: a light scheme's "on" colour can vanish into its silver.
 // The metal's middle tone is about a fifth of the way from its own end of the
 // scheme; a colour within 90 of it in lightness is pushed, a tenth at a time,
 // toward the scheme's other end. Midnight's orange on black glass already
@@ -415,7 +409,7 @@ enum : uintptr_t { FIN_NONE = 0, FIN_SATIN = 1, FIN_GLASS = 2 };
 // corner-clipped through a path that drops the clip (lv_draw_sw_img.c:
 // radius_only() wants no recolor, recolor_only() no radius), so a pressed satin
 // face showed square - a box over a header button, a square outline round
-// Remove (owner, #99 T9).
+// Remove.
 static const char VEIL_TAG = 0;
 
 static lv_obj_t *veilIn(lv_obj_t *o) {
@@ -447,7 +441,7 @@ static bool hasCb(lv_obj_t *o, lv_event_cb_t cb) {
 
 void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tint) {
     if (!o || w <= 0 || h <= 0) return;
-    // LIT GLASS (owner, round 5): glass the light comes on behind - press like glass.
+    // LIT GLASS: glass the light comes on behind - press like glass.
     const bool glass = f == Finish::FINISH_GLASS || f == Finish::FINISH_LIT;
     const uint32_t base = tint ? tint : satinBase();
     const FaceKind kind = f == Finish::FINISH_LIT ? FaceKind::FACE_LIT : glass ? metalKind() : FaceKind::FACE_SATIN;
@@ -476,7 +470,7 @@ void finish(lv_obj_t *o, int32_t w, int32_t h, int32_t r, Finish f, uint32_t tin
     }
 }
 
-// A chip lit (round 6: satin while unlit): its face hidden and the background
+// A chip lit (satin while unlit): its face hidden and the background
 // setFace() turned off given back, so its role's own colour shows again.
 void unfinish(lv_obj_t *o) {
     if (!o) return;

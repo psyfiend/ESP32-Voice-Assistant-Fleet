@@ -9,17 +9,16 @@
 // ---------------------------------------------------------------------------
 // Publishes the entities WE own to Home Assistant, over MQTT.
 //
-// Lives in Fleet_Providers rather than Fleet_MQTT. ROADMAP Q9's table lists
-// "HA discovery publishing" under Fleet_MQTT, but doing that would force
-// Fleet_MQTT to include Fleet_Entities and stop being transport-only. This is
-// a bridge between the registry and the broker, which is exactly what a
-// provider is - so it lives with the providers and Q9's table wants a footnote.
+// Lives in Fleet_Providers rather than Fleet_MQTT: publishing discovery from
+// Fleet_MQTT would force it to include Fleet_Entities and stop being
+// transport-only (DECISIONS A6). This is a bridge between the registry and the
+// broker, which is exactly what a provider is.
 //
 // Two jobs, both driven from loop():
 //
 //   DISCOVERY - one retained payload describing every entity with
 //               advertise = true, republished whenever the broker reconnects.
-//               Device-based format (ROADMAP Q5, decided 2026-09-07):
+//               Device-based format (DECISIONS C2, C3):
 //               homeassistant/device/<device_id>/config, with a `cmps` map
 //               rather than one payload per entity.
 //
@@ -45,12 +44,10 @@ public:
 
     // The firmware version to advertise to Home Assistant.
     //
-    // INJECTED rather than read from a macro. It used to use FW_VERSION
-    // directly, which only worked because the version was a global -D on every
-    // translation unit in the build - and that global was rebuilding the entire
-    // tree on every commit (issue #46). A component has no business knowing how
-    // the application derives its version; SystemCore owns device identity and
-    // hands it over.
+    // INJECTED rather than read from a macro: a global -D version on every
+    // translation unit rebuilds the entire tree on every commit (issue #46). A
+    // component has no business knowing how the application derives its
+    // version; SystemCore owns device identity and hands it over.
     void setSwVersion(const char *v) { if (v && *v) _swVersion = v; }
 
 private:
@@ -67,21 +64,25 @@ private:
     bool _discoveryDone = false;
     bool _wasConnected  = false;
 
-    // Last value published per entity, so an unchanged reading is not
-    // republished every cycle. Indexed the same way the registry is.
-    EntityValue _lastPub[ENTITY_MAX];
-    bool        _everPub[ENTITY_MAX] = {};
-
-    // Has this entity's pause already been announced to HA? Issue #60 - the
-    // "unavailable" goes out once on pause, not on every loop.
-    bool        _pauseAnnounced[ENTITY_MAX] = {};
+    // Per registry slot, indexed the same way the registry is; in PSRAM
+    // (begin()). `last` and `ever`: the last value published, so an
+    // unchanged reading is not republished every cycle; `lastMs` its time, for
+    // the heartbeat. `pauseAnn`: this entity's pause already announced to HA?
+    // Issue #60 - the "unavailable" goes out once on pause, not on every loop.
+    // Plain data: calloc's zero is a valid "never published".
+    struct Slot {
+        EntityValue last;
+        uint32_t    lastMs;
+        bool        ever;
+        bool        pauseAnn;
+    };
+    Slot *_slot = nullptr;
 
     // Publishes "unavailable" to one entity's state topic. Issue #60.
     void publishPaused(const Entity &e);
 
     // <base>/<object_id>/set, for entities we own. Issue #44.
     void commandTopicFor(const Entity &e, char *out, size_t outLen) const;
-    uint32_t    _lastPubMs[ENTITY_MAX] = {};
 
     // Republish an unchanged value this often anyway. Cheap insurance: a
     // broker that restarted without persistence has no retained state, and a

@@ -1,4 +1,4 @@
-// Chip tables (2.8 round 5) - see include/UI/Kit.h, "CHIP TABLES". UI Tweaks'
+// Chip tables - see include/UI/Kit.h, "CHIP TABLES". UI Tweaks'
 // rows and a card window's Card UI: an option's name and its chips, one row each.
 #include "UI/Kit.h"
 #include "UI/UITokens.h"
@@ -7,7 +7,7 @@
 namespace Kit {
 
 namespace {
-// UNLIT IS SATIN (owner, round 6): flat, a chip "just looks like a void on the
+// UNLIT IS SATIN: flat, a chip "just looks like a void on the
 // window" on the dark schemes and a white pill lost in it on Linen, where
 // satin's edge is a shade. Lit keeps its role's tint and accent ring.
 void chipFinish(lv_obj_t *b, bool on) {
@@ -31,7 +31,7 @@ lv_obj_t *chipAt(lv_obj_t *line, const char *word, int32_t cw, bool on, lv_event
     return b;
 }
 
-// A SLIDER ROW (2.11 round 4): its words - the value - follow the knob as it
+// A SLIDER ROW: its words - the value - follow the knob as it
 // moves (the row's last child, after the slider); the caller hears it on
 // release, as it hears a chip's tap.
 void sliderWords(lv_obj_t *words, int32_t v, const char *unit) {
@@ -90,7 +90,7 @@ lv_obj_t *checkOf(lv_obj_t *table, uint8_t row) {
 }
 }  // namespace
 
-// THE LAYOUT (owner, round 5): the longest row - name, gap, chips - centred in
+// THE LAYOUT: the longest row - name, gap, chips - centred in
 // the window; every other row's name right-justified against it, its chips
 // left-justified from the same column. A row's chips one width (its longest
 // word and sides, at least two chips' heights - the timeouts a little wider
@@ -113,6 +113,7 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
         total = maxName = maxSpan = 0;
         uint8_t longest = 0;
         for (uint8_t r = 0; r < n; r++) {
+            if (rows[r].section) continue;   // a title across the table: no column of its own
             int32_t widest = 0;
             for (uint8_t i = 0; i < rows[r].n; i++) widest = LV_MAX(widest, textW(rows[r].words[i], UI::type().TAG));
             cw[r]    = LV_MAX(minChip, widest + 2 * side);
@@ -153,6 +154,10 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
     const int32_t sliderW = maxSpan > 0 ? LV_MIN(maxSpan, w) : w / 2;
     for (uint8_t r = 0; r < n; r++) {
         const ChipRowSpec &row = rows[r];
+        if (row.section) {   // the row's place in the list is still its child index
+            drawerTitle(list, row.what);
+            continue;
+        }
         lv_obj_t *line = plain(list);
         lv_obj_t *words = label(line, nameLook);
         lv_label_set_text(words, row.what);
@@ -225,6 +230,10 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
         for (uint8_t i = 0; i < row.n; i++) {
             lv_obj_t *b = chipAt(line, row.words[i], c, i == row.lit, cb, ((uintptr_t)r << 8) | i);
             lv_obj_set_pos(b, x + i * (c + gap), y);
+            if (row.greyed) {   // shown, dim, nothing to tap
+                lv_obj_clear_flag(b, LV_OBJ_FLAG_CLICKABLE);
+                lv_obj_set_style_opa(b, LV_OPA_40, 0);
+            }
         }
     }
     return list;
@@ -234,6 +243,7 @@ lv_obj_t *chipTable(lv_obj_t *parent, int32_t w, const ChipRowSpec *rows, uint8_
 void chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit) {
     lv_obj_t *line = table ? lv_obj_get_child(table, row) : nullptr;
     if (!line || lit == CHIP_SLIDER || lit == CHIP_CHECK) return;
+    if (!lv_obj_check_type(lv_obj_get_child(line, 0), &lv_label_class)) return;   // a section row: a rule first
     if (lv_obj_check_type(lv_obj_get_child(line, 1), &lv_slider_class)) return;   // a slider row
     if (checkOf(table, row)) return;                                              // a check row
     if (lv_obj_get_child_count(line) == 2 && lv_obj_check_type(lv_obj_get_child(line, 1), &lv_label_class))
@@ -242,7 +252,7 @@ void chipTableLit(lv_obj_t *table, uint8_t row, uint8_t lit) {
         lightChip(lv_obj_get_child(line, (int32_t)i), (i - 1) == lit);
 }
 
-// A CHIP GRID (round 14, the owner's group picker): the chips one width - the
+// A CHIP GRID (a group picker): the chips one width - the
 // longest word's - wrapping in rows, centred, the chosen one lit.
 lv_obj_t *chipGrid(lv_obj_t *parent, int32_t w, const char *const *words, uint8_t n, uint8_t lit,
                    lv_event_cb_t cb) {

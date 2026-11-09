@@ -46,7 +46,7 @@ inline uint16_t bspPixelDensity() {
 // than a real panel.
 inline float bspUiScale() {
     const uint16_t ppi = bspPixelDensity();
-    if (ppi == 0) return 1.0f;                 // undeclared - behave as before
+    if (ppi == 0) return 1.0f;                 // undeclared - no scaling
     float s = (float)ppi / BSP_PPI_REFERENCE;
     if (s < 0.8f) s = 0.8f;
     if (s > 2.5f) s = 2.5f;
@@ -61,8 +61,8 @@ inline float bspUiScale() {
 // be the exception. The codes and what each means are in Fleet_BSP.h. The
 // System Doctor prints which mode is running and where it came from.
 //
-// THE RULE is the fleet's measured choices, and it is meant to change as modes
-// are built and measured. Every row that is not "measured" is a plan.
+// THE RULE is the fleet's choices, and it changes as modes are built and
+// measured. A row marked PLAN has no flush built yet.
 // ---------------------------------------------------------------------------
 
 // The rule alone. `why` (optional) gets a short reason for the log.
@@ -70,20 +70,20 @@ inline uint8_t bspPresentModeRule(const char **why = nullptr) {
     const char *w;
     uint8_t m;
 #if defined(HAS_MIPI_PANEL)
-    // MEASURED: WS_P4_5 at rotation 1 and WS_P4_4B at rotation 0 (display-stack.md
-    // s8.5-8.10). A DSI panel has no RAM of its own, so it needs framebuffers,
+    // MEASURED: WS_P4_5 at rotation 1 and WS_P4_4B at rotation 0
+    // (docs/display/performance.md). A DSI panel has no RAM of its own, so it needs framebuffers,
     // and the P4's PPA makes the copy (and any rotation) cheap. Untested for
     // rotation 0: DOUBLE_DIRECT and TRIPLE_FULL, which skip the copy.
     m = BSP_PRESENT_TRIPLE_PARTIAL;
     w = "MIPI-DSI";
 #elif defined(HAS_RGB_PANEL)
-    // PLAN (2.9 step 4): two framebuffers, LVGL drawing straight into them. The
+    // Two framebuffers, LVGL drawing straight into them (DOUBLE_DIRECT is built). The
     // S3 has no PPA, so a rotated RGB panel would need CPU rotation - none of
     // the fleet's RGB boards is rotated.
     m = bsp_display.ROTATION == 0 ? BSP_PRESENT_DOUBLE_DIRECT : BSP_PRESENT_TRIPLE_PARTIAL;
     w = bsp_display.ROTATION == 0 ? "RGB, rotation 0" : "RGB, rotated";
 #elif defined(HAS_QSPI_PANEL)
-    // PLAN (2.9 step 5): the panel keeps its own picture, so no framebuffer is
+    // PLAN: the panel keeps its own picture, so no framebuffer is
     // needed; a wired TE pin lets whole frames be timed to it. GPIO 0 is a
     // strapping pin and never a TE line, so 0 (the zero-fill) reads as "none".
     m = bsp_display.TE > 0 ? BSP_PRESENT_TE_SYNC : BSP_PRESENT_NONE;

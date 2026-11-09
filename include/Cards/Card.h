@@ -19,12 +19,10 @@
 //                 StateCard are genuinely different widget trees; that is the
 //                 two layout families of cards.md section 4.
 //
-// This shape came out of the owner's answer when asked to pick a class shape:
-// he described what varies instead, and it turned out to be two independent
-// axes - how many entities a card binds, and whether a card contains other
-// cards. The first is handled here (CARD_PRIMARY_MAX). The second is a future
-// ContainerCard deriving from Card, which is why nothing below assumes a card
-// is a leaf. Milestone 2.4 builds the seam, not the container.
+// What varies between cards is two independent axes - how many entities a card
+// binds, and whether a card contains other cards. The first is handled here (CARD_PRIMARY_MAX). The second is
+// ClusterCard, which derives from Card, which is why nothing below assumes a
+// card is a leaf.
 //
 // ---------------------------------------------------------------------------
 // THREADING, and the one thing that would break it
@@ -59,7 +57,7 @@ class Card {
 public:
     virtual ~Card();
 
-    // THE PRESS LOOK (2.10a, owner 2026-10-04): how a card looks under a
+    // THE PRESS LOOK: how a card looks under a
     // finger, driven by CardPopup's hold. `toAccent` 0..255 fades the border
     // toward the scheme's ACCENT and widens it; `sink` px presses the card in -
     // its plate draws smaller on every side, and what is attached to its edges
@@ -92,23 +90,22 @@ public:
 
     // The card's REAL height in pixels, handed over by the page before build().
     //
-    // A card used to work this out itself from UI::grid() and its own row
-    // span, which stopped being possible at 2.5: a span is in grid UNITS now,
-    // and only the page knows how tall a unit is. It was already the weaker
-    // arrangement - UI::grid() is global state that any other page can move
-    // out from under a card that is mid-build.
+    // A card cannot work this out itself from UI::grid() and its own row
+    // span: a span is in grid UNITS, and only the page knows how tall a unit
+    // is. UI::grid() is also global state that any other page can move out
+    // from under a card that is mid-build.
     //
     // Zero means nobody said, and the card falls back to one whole cell.
     Card &setCellHeightPx(int32_t px) { _cellPx = px; return *this; }
 
-    // A SOLO CARD BESIDE TILES (2.11 round 13, K126): on a page with clusters
+    // A SOLO CARD BESIDE TILES (K126): on a page with clusters
     // its value is in the tiles' face (VALUE_SM), and the page sizes its body to
     // theirs - labelTakesPx() is what its card label takes from its cell.
     Card &setBesideTiles(bool on) { _besideTiles = on; return *this; }
     int32_t labelTakesPx() const { return tagRowPx() + tagInsetPx(); }
 
-    // And its real WIDTH, for the same reason. Needed since 2.7: the corner
-    // icon's size follows the card's SHORT side, not only its height.
+    // And its real WIDTH, for the same reason. The corner icon's size
+    // follows the card's short side, which can be its width.
     Card &setCellWidthPx(int32_t px) { _cellWPx = px; return *this; }
 
     // Which unit this card renders a temperature in. TEMP_INHERIT defers to
@@ -136,14 +133,31 @@ public:
     const char *id() const { return _id ? _id : ""; }
     bool hasId() const { return _id && *_id; }
 
-    // Its first entity, or null: what a cluster's header shows of a member (2.11).
+    // Its first entity, or null: what a cluster's header shows of a member.
     const Entity *firstEntity() const { return _nPrimary ? _primary[0] : nullptr; }
-    uint8_t entityCount() const { return _nPrimary; }   // one: it can join a cluster (2.11, K91)
+    uint8_t entityCount() const { return _nPrimary; }   // one: it can join a cluster (K91)
+    const Entity *entityAt(uint8_t i) const { return i < _nPrimary ? _primary[i] : nullptr; }   // CardWhere; a member's window (K157)
 
-    // What a tap does (2.10d, TapAction). The scene for Load scene is named
+    // What a tap does (TapAction). The scene for Load scene is named
     // by its source's id ("scene.office_relax"), which outlives a session.
     Card &setTapAction(TapAction t) { _tap = t; return *this; }
     TapAction tapAction() const { return _tap; }
+    // What a long press opens (K156): a CardPopup::OPEN_* view, 0xFF its window's
+    // first. A long press always opens the window, never toggles (K3, K39).
+    Card &setLongOpen(uint8_t v) { _longOpen = v; return *this; }
+    uint8_t longOpen() const { return _longOpen; }
+    // A group card shown as one card (K191): SETTINGS offers Show as and Face.
+    Card &setGroupCard(bool g) { _groupCard = g; return *this; }
+    bool groupCard() const { return _groupCard; }
+    // A group's solo card whose members are not all lights and switches (K188):
+    // its tap toggles nothing - Members by default, and Toggle is not offered.
+    Card &setGroupMixed(bool m) { _groupMixed = m; return *this; }
+    bool groupMixed() const { return _groupMixed; }
+    bool canToggle() const { return tapToggles() && !_groupMixed; }
+    // A GROUP'S SOLO CARD WITH A FACE TOGGLES THE WHOLE GROUP:
+    // every light and switch among its members, on or off as the face shows.
+    // Without a face its primaries are those members already.
+    void addGroupSwitch(const Entity *e);
     Card &setTapScene(const char *ref);
     const char *tapScene() const { return _tapScene; }
     // Does this card's own tap toggle (switch, light, button)? Decides what
@@ -151,11 +165,12 @@ public:
     virtual bool tapToggles() const { return false; }
     // The tap, as the card's setting says. From the card's event handler.
     void tap();
+    void toggleTap();   // onTap(), and the group's switches (addGroupSwitch())
     // The scenes this card's window would offer, in its order: the card's one
     // light, filtered by its Scenes setting. Fills `out`, returns the count.
     uint8_t offeredScenes(const Entity **out, uint8_t cap) const;
 
-    // Which scenes the card's window offers (2.10c). See SceneShow.
+    // Which scenes the card's window offers. See SceneShow.
     Card &setSceneShow(SceneShow v) { _sceneShow = v; return *this; }
     SceneShow sceneShow() const { return _sceneShow; }
 
@@ -165,11 +180,11 @@ public:
     uint8_t activeCount() const;
 
     // Does this member count? A paused member is out of its group - not on,
-    // not off, not commanded - unless every member is paused (2.10b).
+    // not off, not commanded - unless every member is paused (K14).
     bool counts(const Entity *e) const;
     uint8_t liveCount() const;   // the members that count
 
-    // WHAT THE CARD STANDS FOR NOW (2.10c, DECISIONS K14 / K17): its
+    // WHAT THE CARD STANDS FOR (DECISIONS K14 / K17): its
     // primaries - except that a group defined at the source (light.office,
     // whose members the registry learnt) is replaced by its members while ANY
     // of them is paused, so the paused one is out of it exactly as in a group
@@ -197,11 +212,10 @@ public:
     Card &setHeaderStyle(CardHeaderStyle s) { _hdrStyle = s; return *this; }
     CardHeaderStyle headerStyle() const { return _hdrStyle; }
 
-    // Whether this card displays its area (or, later, a custom grouping) at
-    // all. Separate from the header style on purpose - they are two
-    // independent build-sheet settings, and the owner asked for exactly this
-    // split: pick a presentation, and separately decide whether there is
-    // anything to present.
+    // Whether this card displays its area (its group) at all. Separate from
+    // the header style on purpose - they are two independent settings: pick a
+    // presentation, and separately decide whether there is anything to
+    // present.
     //
     // With area off, HDR_TAG has nothing to put in its left pill. The card
     // still reserves the same clearance, because a page of cards where some
@@ -211,12 +225,12 @@ public:
 
     // Colour the header band or tag by AREA rather than by accent, so a group
     // of cards reads as a group before you read a word of it. 0 means "use the
-    // accent". Independent of setShowArea(): the owner wants colour coding
-    // available whether or not the area's NAME is displayed.
+    // accent". Independent of setShowArea(): colour coding is available
+    // whether or not the area's NAME is displayed.
     Card &setAreaColor(uint32_t hex) { _areaColor = hex; return *this; }
     const char *area() const { return _area; }
 
-    // THE CARD LABEL (2.10d, K44, K46; "area" in the code's older words) shows
+    // THE CARD LABEL (K46; "area" in the code's names) shows
     // the card's group (CardGroups.h). The dashboard's area for this card - its
     // group when the owner chose none - is kept so the group can be worked
     // out again: HA's areas arrive after the page is built (onSnapshot()). A
@@ -226,7 +240,7 @@ public:
     Card &setLabelAlways(bool on) { _labelAlways = on; return *this; }
     // Its primary entity's HA area ("" until learnt, or when HA has none).
     const char *haArea() const;
-    // The page's "colour the card label" setting, as it was applied, so the
+    // The page's "colour the card label" setting, as applied, so the
     // window can re-apply a choice the same way.
     Card &setPageAreaColor(bool on) { _pageAreaColor = on; return *this; }
     bool pageAreaColor() const { return _pageAreaColor; }
@@ -235,16 +249,20 @@ public:
     // every card. Same pattern as StateCard::setFill().
     static void setShowAreaDefault(bool v) { s_showArea = v; }
 
-    // A MINI TILE (2.11, K89): a member of a cluster, drawn inside it with no
+    // A MINI TILE (K89): a member of a cluster, drawn inside it with no
     // border, header or card label of its own - its hero and its entity label.
     // Still a whole card: its id and settings, its tap, its window on a long
     // press (K104). Set before build(); the cluster sizes and places it.
+    // A cluster's own card state for its tiles: a StateCardFill, -1 the
+    // device's (UI Tweaks').
+    Card &setOwnFill(int8_t f) { _ownFill = f; return *this; }
+    int8_t ownFill() const { return _ownFill; }
     Card &setMini(bool on) { _mini = on; return *this; }
     bool  mini() const { return _mini; }
 
-    // THE PAGE'S HERO (2.11 round 4, the owner: a tile's icon and a solo card's
-    // "MUST remain the same size"): the disc and icon face a solo 1x1 card has
-    // on the page now, measured by CardPage once the page is built. A mini tile
+    // THE PAGE'S HERO (a tile's icon and a solo card's must be the same size):
+    // the disc and icon face a solo 1x1 card has
+    // on the page, measured by CardPage once the page is built. A mini tile
     // takes exactly these wherever it has the room (Cards/MiniTile.cpp); 0 /
     // null: no solo card to measure, a tile sizes its own.
     static void setPageHero(int32_t discPx, const lv_font_t *face);
@@ -260,7 +278,7 @@ public:
     // the ONE state allowed to go quiet. See cards.md section 3.
     Card &setPaused(bool p);
 
-    // Asked of the entities rather than of this card. Issue #60.
+    // Asked of the entities rather than of this card.
     bool isPaused() const;
 
     // --- Lifecycle --------------------------------------------------------
@@ -282,7 +300,7 @@ public:
     // --- CardBinder hooks. LVGL thread only. ------------------------------
 
     // Does this card render entityId? Used to route a dirty snapshot. Virtual
-    // for a cluster (2.11), whose header shows members it does not bind.
+    // for a cluster, whose header shows members it does not bind.
     virtual bool owns(const char *entityId) const;
 
     // One of our bound entities changed. See the threading note above for why
@@ -295,7 +313,7 @@ public:
     // page every tick just to discover that nothing had changed. Re-deriving
     // one subtraction per binding at 10 Hz is cheaper than that, and it only
     // touches LVGL when the state actually transitions. A cluster has no state
-    // of its own - its members show theirs (2.11).
+    // of its own - its members show theirs.
     virtual void pollState(uint32_t nowMs);
 
     virtual const char *typeName() const = 0;
@@ -329,8 +347,8 @@ public:
     // The height of the header strip, derived rather than declared:
     // UIMetrics::HEADER_H is a floor, and the real value is whichever is
     // larger, that token or the TAG font's line height plus breathing room. A
-    // fixed 14 logical px was a band smaller than its own text once the type
-    // scale grew.
+    // fixed logical px value would be smaller than its own text at a large
+    // type scale.
     //
     // Public because a PAGE needs it: an external tag hangs ABOVE its card, in
     // the grid's row gap, so the page has to reserve that much clearance or
@@ -339,21 +357,20 @@ public:
 
     // What a cell must be TALL ENOUGH FOR, in real pixels, at this board's
     // type scale. Exposed because the page needs the same numbers the card
-    // does - it must not plan more rows than could ever carry a card, and it
-    // was previously duplicating a guess at these.
+    // does - it must not plan more rows than could ever carry a card.
     //
     //   fullCellNeedPx()    a title row, the hero, an optional row and padding
     //   compactCellNeedPx() the hero alone, which is the least a card can be
     //
     // `hero` is the face the hero value would be drawn in; nullptr means
-    // UIType::VALUE. Since #62 a card can pick VALUE_SM, and the question
+    // UIType::VALUE. A card can pick VALUE_SM, and the question
     // "does a full layout fit" has a different answer for each.
     static int32_t fullCellNeedPx(CardHeaderStyle style, const lv_font_t *hero = nullptr);
     static int32_t compactCellNeedPx();
 
     // How far an HDR_TAG pill rises above its card, in real pixels. The PAGE
     // needs this: the clearance comes out of the grid's row gap, not out of
-    // the card. Returns the same value as headerHeight() today and is a
+    // the card. Returns the same value as headerHeight() and is a
     // separate function because they answer different questions and only one
     // of them is the page's business.
     static int32_t tagOverhang() { return headerHeight(); }   // deprecated; see CardPage
@@ -374,18 +391,15 @@ protected:
     // a read-only sensor.
     virtual void onTap() {}
 
-    // Long press opens the card's popup window, on every card type (2.10a,
-    // card-sheet.md section 13). The owner's rule, section 11.2: "I want all
-    // cards to behave as uniformly as possible so you don't need to remember
-    // navigation for every type of card."
-    //
-    // It used to PAUSE the card. Pause now lives in the popup's SETTINGS deck,
-    // so a paused card is still one long press and one tap away.
+    // Long press opens the card's popup window, on every card type (K3,
+    // card-sheet.md section 13): all cards behave uniformly, so there is no
+    // navigation to remember per type. Pause lives in the popup's SETTINGS
+    // deck.
     virtual void onLongPress();
 
     // --- Helpers for subclasses -------------------------------------------
 
-    // THE ACTIVE FRAMES (owner, 2.8 rounds 4-5): an "on" state drawn on the
+    // THE ACTIVE FRAMES (D-30 to D-33): an "on" state drawn on the
     // card's edge in `color`, lit inward - or FRAME_NONE. Drawn in the card's
     // own draw (CardFrame.cpp), never as its border: the layout never moves.
     // Not drawn while the card is held (its window open: the pressed look).
@@ -451,18 +465,15 @@ protected:
 
     // How tall the hero's band actually is on THIS card, from the tokens and
     // the card's own header mode. A hero that sizes itself from its font alone
-    // will overflow a small cell - which is what clipped the disc top and
-    // bottom on CYD_S3_3248, where the band is 55 px and a font-derived disc
-    // wanted 68.
+    // will overflow a small cell (on CYD_S3_3248 the band is 55 px and a
+    // font-derived disc wants 68).
     int32_t cellPx() const;              // the page-supplied cell height
     int32_t midHeight() const;
 
-    // THE CORNER ICON, one implementation for every layout. Milestone 2.7.
-    //
-    // It used to exist only on ValueCard, positioned by code of its own; a
-    // state card had none. cards.md section 11 wants one on every card, and
-    // two copies of "where exactly is the corner" is how the two layouts
-    // would drift apart - the same lesson HaValue.h records for parsing.
+    // THE CORNER ICON, one implementation for every layout. cards.md section
+    // 11 wants one on every card, and two copies of "where exactly is the
+    // corner" is how the two layouts would drift apart - the same lesson
+    // HaValue.h records for parsing.
     //
     // makeCornerIcon() at build time, renderCornerIcon() on every render.
     // Out of the flow, so it costs the vertical stack nothing.
@@ -474,7 +485,7 @@ protected:
     const lv_font_t *cornerFont() const;
 
     // Which face the hero VALUE draws in: VALUE, or VALUE_SM when the cell
-    // cannot seat a full layout at VALUE. Decided in resolveVariant(). #62.
+    // cannot seat a full layout at VALUE. Decided in resolveVariant().
     const lv_font_t *valueFont() const;
 
     // The card's short side in real pixels, from what the page handed over.
@@ -483,17 +494,14 @@ protected:
     // The page-supplied cell width, or 0 if the page never said.
     int32_t cellWidthPx() const { return _cellWPx; }
 
-    // THE HERO'S SIZE, shared by both layouts. Moved up from StateCard at 2.7
-    // round two so a value card can place its name exactly where a state
-    // card's goes - the owner has twice caught the two types disagreeing about
-    // where a name sits. heroIconFace() steps LG -> MD -> SM to fit the band;
+    // THE HERO'S SIZE, shared by both layouts so a value card places its name
+    // exactly where a state card's goes. heroIconFace() steps LG -> MD -> SM to fit the band;
     // heroDiscPx() is the disc drawn behind it, never taller than the band.
     const lv_font_t *heroIconFace() const;
     int32_t heroDiscPx() const;
 
     // COMPACT: how far to shift the name so it sits centred between the
-    // hero's bottom edge and the card's bottom edge - the owner's rule, from
-    // a photo where it sat "a little low". Returned as a translate, applied
+    // hero's bottom edge and the card's bottom edge. Returned as a translate, applied
     // without disturbing the flex layout. 0 outside compact.
     int32_t compactNameShiftPx() const;
 
@@ -511,8 +519,8 @@ protected:
     int32_t tagInsetPx() const;
 
     // How far a floating tag sticks out past the card's LEFT side, and so how
-    // much narrower than its cell the card is. The owner, on glass 2026-10-01:
-    // the gap between cards is measured from the tag, so it must be equal on
+    // much narrower than its cell the card is. The gap between cards is
+    // measured from the tag, so it must be equal on
     // all sides - a tag sticking out sideways comes out of the card's width,
     // exactly as one sticking out upwards comes out of its height. 0 in every
     // other mode.
@@ -550,8 +558,7 @@ private:
     // reason: HDR_TAG bolts a tag to the top edge OUTSIDE the border, and
     // LVGL clips children to their parent, so the tag cannot be a child of the
     // thing it sits above. Making the wrapper unconditional keeps all three
-    // header treatments one code path instead of two, which matters while both
-    // are still being compared on glass.
+    // header treatments one code path instead of two.
     lv_obj_t *_root     = nullptr;
     lv_obj_t *_surface  = nullptr;
     lv_obj_t *_body     = nullptr;
@@ -574,9 +581,8 @@ private:
     lv_obj_t *_badge    = nullptr;   // STALE / FAILED / PARTIAL
     lv_obj_t *_diagonal = nullptr;   // ST_LONG_STALE: corner to corner
 
-    // The state tag has TWO HOMES, and that is the owner's correction: it used
-    // to live only in the header, so choosing HDR_NONE silently disabled the
-    // FAILED indicator. A failure signal must never depend on a cosmetic
+    // The state tag has TWO HOMES, so that choosing HDR_NONE cannot disable the
+    // FAILED indicator: a failure signal must never depend on a cosmetic
     // choice. With a header the tag sits in its right-hand slot, exactly as
     // cards.md section 2 lays out; without one it floats at the card's
     // top-right. Same object, reparented at build time.
@@ -608,18 +614,23 @@ private:
     CardLabel       _labelMode   = CardLabel::LBL_INHERIT;
     GroupOn         _groupOn     = GroupOn::GROUP_ON_ANY;
     SceneShow       _sceneShow   = SceneShow::SCENES_VISIBLE;
-    // NO _paused HERE. Issue #60 moved it onto Entity, because pausing is a
-    // property of the thing and not of the view - the same reasoning that put
-    // cmdFailed on the entity. Two cards on one switch used to be able to
-    // disagree; now they cannot.
+    // NO _paused HERE: pausing is a property of the entity, not of the view -
+    // the same reasoning that put cmdFailed on the entity. Two cards on one
+    // switch cannot disagree.
     bool            _showArea    = s_showArea;
-    bool            _mini        = false;   // a cluster's mini tile (2.11)
+    bool            _mini        = false;   // a cluster's mini tile
+    int8_t          _ownFill     = -1;      // its cluster's card state; -1 the device's
     bool            _forced      = false;   // debugForceState()
     bool            _dimmed      = false;   // paused, mixed not opa'd
 
     char _label[ENTITY_NAME_MAX] = {0};
     const char *_id = nullptr;   // CardSpec::id, when usable
     TapAction   _tap = TapAction::TAP_DEFAULT;
+    uint8_t     _longOpen = 0xFF;    // K156
+    bool        _groupCard = false;  // K191
+    bool        _groupMixed = false; // K188
+    const Entity *_groupSwitch[CARD_LIVE_MAX] = {};   // addGroupSwitch()
+    uint8_t     _nGroupSwitch = 0;
     char        _tapScene[ENTITY_TOPIC_MAX] = {0};   // as EntityDescriptor::externalRef
     char _area[ENTITY_SHORT_MAX] = {0};
     uint32_t _areaColor = 0;   // 0 = use the accent
@@ -628,11 +639,10 @@ private:
     bool _labelAlways  = false;
     bool _pageAreaColor = true;
 
-    // Refusal detection lives on the ENTITY now, not here - see
-    // Entity::cmdFailed and deriveState(). A card asks the entities it is
-    // bound to whether their last command took; it no longer remembers what it
-    // asked for, which is what makes a parent and a child agree about a switch
-    // they both render.
+    // Refusal detection lives on the ENTITY - see Entity::cmdFailed and
+    // deriveState(). A card asks the entities it is bound to whether their
+    // last command took and does not remember what it asked for, which makes a
+    // parent and a child agree about a switch they both render.
 
     static EntityRegistry *s_reg;
     static bool            s_showArea;

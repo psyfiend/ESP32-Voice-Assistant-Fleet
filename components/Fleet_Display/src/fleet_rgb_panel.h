@@ -1,7 +1,7 @@
 #pragma once
 //
-// fleet_rgb_panel - RGB (parallel) panel bring-up on raw esp_lcd. Milestone
-// 2.9, step 4: WS_S3_4B's ST7701. The RGB counterpart of fleet_dsi_panel.
+// fleet_rgb_panel - RGB (parallel) panel bring-up on raw esp_lcd, for
+// WS_S3_4B's ST7701. The RGB counterpart of fleet_dsi_panel.
 //
 // C, like fleet_dsi_panel, for the same reason: the panel drivers' config
 // macros are designated initialisers C++ rejects. Fleet_Display.cpp reads the

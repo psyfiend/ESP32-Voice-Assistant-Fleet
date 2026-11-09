@@ -1,6 +1,6 @@
-// GUIManager - the header's slots and their panels (2.8). Split from
-// GUIManager.cpp, which was already past the structure check's 1,000 lines;
-// the class is one, its header-slot half is here. See UI/HeaderSlots.h for the
+// GUIManager - the header's slots and their panels. The class is one; its
+// header-slot half is here, apart from GUIManager.cpp to keep that file under
+// the structure check's 1,000 lines. See UI/HeaderSlots.h for the
 // slots, UI/SlotPanels.h for what their panels hold.
 #include "GUIManager.h"
 
@@ -10,9 +10,14 @@
 #include <time.h>
 #include "Alarms.h"
 #include "Cards/CardAdded.h"   // this page's hidden cards (K66, K96)
-#include "Cards/CardTypes.h"   // ...and its clusters' (GroupPresent, round 7)
+#include "Cards/CardTypes.h"   // ...and its clusters' (GroupPresent)
 #include "Cards/PageSpec.h"
-#include "UI/HiddenSheet.h"    // ...in their own sheet (round 6)
+#include "UI/HiddenSheet.h"    // ...in their own sheet
+#include "UI/EditCardsSheet.h" // CARDS' Edit cards
+#include "UI/NewClusterSheet.h" // ...and New group
+#include "Cards/Card.h"
+#include "Cards/CardIcons.h"   // cardStateWord(), cardFormatValue(): a row's state
+#include "Cards/CardPopup.h"   // CARD_SURFACE_FLAG: the page's cards
 #include "Settings.h"
 #include "UI/SlotPanels.h"
 #include "UI/TweaksSheet.h"
@@ -51,7 +56,7 @@ void GUIManager::openSlotPanel(uint8_t slot) {
         g->closeSlotPanel(false);
         g->goToPage(p);
     };
-    // Show / Hide leaves the panel open (owner, round 4): the header is always
+    // Show / Hide leaves the panel open (D-30): the header is always
     // visible while a header panel is open, and the choice shows once the
     // panel has closed (headerPanelsClosed()).
     c.setHeaderShown = [](void *user, bool shown) {
@@ -71,14 +76,27 @@ void GUIManager::openSlotPanel(uint8_t slot) {
         if (s >= 0) g->openSlotPanel((uint8_t)s);
     };
     c.refreshHeader = [](void *user) { ((GUIManager *)user)->_header.refresh(); };
-    // THIS PAGE'S HIDDEN CARDS (2.11, K66, K96): how many, and a button to their
-    // own sheet (round 6) - the panel goes first.
+    // THIS PAGE'S HIDDEN CARDS (K66, K96): how many, and their own sheet. No
+    // button opens the sheet now (Edit cards has the Hidden list, K148); only
+    // /popup?restore=-2 reaches it, through viewHidden. The panel goes first.
     if (_header.slotKind(slot) == SlotKind::SLOT_PAGE && _pages[_curPage].spec) {
         c.hiddenCount = hiddenCount();
         c.viewHidden  = [](void *user) {
             GUIManager *g = (GUIManager *)user;
             g->closeSlotPanel(true);
             g->openHiddenSheet();
+        };
+        // CARDS' Edit cards (K148) - the panel goes first.
+        c.addCard = [](void *user) {
+            GUIManager *g = (GUIManager *)user;
+            g->closeSlotPanel(true);
+            g->openEditCards();
+        };
+        c.newCluster = [](void *user) {
+            GUIManager *g = (GUIManager *)user;
+            g->closeSlotPanel(true);
+            const PageSpec *ps = g->_pages[g->_curPage].spec;
+            NewClusterSheet::open(ps && ps->title ? ps->title : nullptr);
         };
     }
     if (!SlotPanels::build(_header.slotKind(slot), _slotDrawer.face, c)) return;
@@ -94,11 +112,11 @@ void GUIManager::openSlotPanel(uint8_t slot) {
 }
 
 namespace {
-// WHAT A PAGE HAS HIDDEN (round 7, the owner: a card is in the page's hidden
-// cards only because someone hid it with "Hide from this page" - never because
-// it was moved into a cluster). The page's pool, then the cards crowded off it.
-// A member hidden from its cluster is not here (round 13, K125): the cluster's
-// Members list shows it and restores it.
+// WHAT A PAGE HAS HIDDEN: a card is in the page's hidden cards only because
+// someone hid it with "Hide from this page" - never because it was moved into
+// a cluster. The page's pool, then the cards crowded off it. A member hidden
+// from its cluster is not here (K125): the cluster's Members list shows it and
+// restores it.
 struct Hidden {
     char id[CARD_ID_MAX + 1];
     char name[ENTITY_NAME_MAX + 32];
@@ -122,7 +140,7 @@ uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, const Car
         snprintf(h.where, sizeof(h.where), "%s", pool[i].area);
         nameOf(reg, pool[i].label, pool[i].entity, pool[i].id, h.name, sizeof(h.name));
     }
-    // CROWDED OFF THE PAGE (the sprint after round 7): not hidden, not shown -
+    // CROWDED OFF THE PAGE: not hidden, not shown -
     // the page had no room, and dropped the lowest priority first. Listed so they
     // are not forgotten; they come back when there is room.
     for (uint8_t i = 0; built && i < built->crowdedCount() && n < cap; i++) {
@@ -131,7 +149,7 @@ uint8_t collectHidden(const PageSpec &page, const EntityRegistry &reg, const Car
         h = Hidden{};
         snprintf(h.id, sizeof(h.id), "%s", k.id);
         snprintf(h.where, sizeof(h.where), "%s", k.area);
-        snprintf(h.name, sizeof(h.name), k.cluster ? "%s cluster" : "%s", k.name);
+        snprintf(h.name, sizeof(h.name), k.cluster ? "%s group" : "%s", k.name);
         h.crowded = true;
     }
     // Two cards called the same say where each is from ("Office Right (Office)").
@@ -153,8 +171,8 @@ uint8_t GUIManager::hiddenCount() {
     return collectHidden(*_pages[_curPage].spec, _core.entities(), _page, s_count, HiddenSheet::MAX);
 }
 
-// THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET (2.11 round 6): each goes back to
-// the page, which is built again under the sheet as each one is.
+// THE PAGE'S HIDDEN CARDS, IN THEIR OWN SHEET: each goes back to the page,
+// which is built again under the sheet as each one is.
 void GUIManager::openHiddenSheet() {
     if (_curPage >= _nPages || !_pages[_curPage].spec) return;
     static Hidden s_items[HiddenSheet::MAX];
@@ -185,6 +203,88 @@ void GUIManager::openHiddenSheet() {
     HiddenSheet::open(sp);
 }
 
+// --- Edit cards (K148) -----------------------------------------------------
+namespace {
+// A card's state as its row says it: "On", "Closed", "74.5°F", "Unavailable".
+void entityWords(const Entity &e, char *out, size_t cap) {
+    out[0] = '\0';
+    if (!e.available)                    snprintf(out, cap, "Unavailable");
+    else if (!e.everSet)                 return;
+    else if (e.value.type == ValueType::BOOL) snprintf(out, cap, "%s", cardStateWord(e.desc, e.value.b));
+    else                                 cardFormatValue(e, out, cap, true);
+}
+
+// The page's cards in screen order; a card's own objects hold no more (a
+// cluster's tiles are its own).
+void pageCards(lv_obj_t *o, Card **out, uint8_t &n, uint8_t cap) {
+    const uint32_t k = lv_obj_get_child_count(o);
+    for (uint32_t i = 0; i < k && n < cap; i++) {
+        lv_obj_t *c = lv_obj_get_child(o, (int32_t)i);
+        if (!lv_obj_has_flag(c, CardPopup::CARD_SURFACE_FLAG)) { pageCards(c, out, n, cap); continue; }
+        Card *card = (Card *)lv_obj_get_user_data(c);
+        if (card && !card->mini()) out[n++] = card;
+    }
+}
+}  // namespace
+
+// ON THE PAGE: every card, a group as one row - each to hide, a card made here
+// to remove too (K117).
+uint8_t GUIManager::editFillPage(EditCards::Item *out, uint8_t cap, void *gui) {
+    GUIManager *g = (GUIManager *)gui;
+    if (!g || !g->_page || !g->_page->root()) return 0;
+    static Card *cards[CARD_PAGE_MAX];
+    uint8_t nc = 0;
+    pageCards(g->_page->root(), cards, nc, CARD_PAGE_MAX);
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < nc && n < cap; i++) {
+        const Card *k = cards[i];
+        EditCards::Item &it = out[n++];
+        it = EditCards::Item{};
+        const bool group = !strcmp(k->typeName(), "cluster");
+        snprintf(it.key, sizeof(it.key), "%s", k->id());
+        snprintf(it.name, sizeof(it.name), "%s", group && k->area()[0] ? k->area() : k->shownName(CardLabel::LBL_NAME));
+        if (group) snprintf(it.mark, sizeof(it.mark), "Group");   // K146
+        else if (const Entity *e = k->firstEntity()) entityWords(*e, it.state, sizeof(it.state));
+        it.from = EditCards::From::FROM_PAGE;
+        if (!k->hasId()) continue;   // nothing can be kept for it
+        const CardSpec *spec = CardAdded::specOf(k->id());
+        if (spec && spec->builtIn) { snprintf(it.mark, sizeof(it.mark), "Built in"); continue; }   // K171
+        it.tick = EditCards::Tick::TICK_HIDE;
+        it.canRemove = CardAdded::isAdded(k->id()) && !CardAdded::movedHere(k->id());
+    }
+    return n;
+}
+
+// HIDDEN: the page's pool, each to restore; the cards it had no room for, said so.
+uint8_t GUIManager::editFillHidden(EditCards::Item *out, uint8_t cap, void *gui) {
+    GUIManager *g = (GUIManager *)gui;
+    if (!g || g->_curPage >= g->_nPages || !g->_pages[g->_curPage].spec) return 0;
+    static Hidden s_h[HiddenSheet::MAX];
+    const uint8_t n = collectHidden(*g->_pages[g->_curPage].spec, g->_core.entities(), g->_page, s_h,
+                                    LV_MIN(cap, HiddenSheet::MAX));
+    for (uint8_t i = 0; i < n; i++) {
+        EditCards::Item &it = out[i];
+        it = EditCards::Item{};
+        snprintf(it.key, sizeof(it.key), "%s", s_h[i].id);
+        snprintf(it.name, sizeof(it.name), "%s", s_h[i].name);
+        it.from = EditCards::From::FROM_PAGE;
+        if (s_h[i].crowded) snprintf(it.mark, sizeof(it.mark), "No room");
+        else                it.tick = EditCards::Tick::TICK_RESTORE;
+    }
+    return n;
+}
+
+void GUIManager::openEditCards() {
+    if (_curPage >= _nPages || !_pages[_curPage].spec) return;
+    EditCardsSheet::Spec sp;
+    sp.page     = _pages[_curPage].spec->title;
+    sp.lists[0] = { "On the page", editFillPage, true };   // K145
+    sp.lists[1] = { "Hidden", editFillHidden, false };     // K145
+    sp.nLists   = 2;
+    sp.ctx      = this;
+    EditCardsSheet::open(sp);
+}
+
 // Its tab closes once the drawer has finished closing (slotDrawerClosed()).
 void GUIManager::closeSlotPanel(bool animate) {
     if (_slotPanel < 0) return;
@@ -202,7 +302,7 @@ void GUIManager::slotDrawerClosed() {
     headerPanelsClosed();
 }
 
-// WHAT WAITS FOR NO HEADER PANEL TO BE OPEN (owner, round 4): the header is
+// WHAT WAITS FOR NO HEADER PANEL TO BE OPEN (D-30): the header is
 // always visible while one is open. A Show / Hide chosen meanwhile takes effect
 // now; a peeked header goes on its own timer (peekHeader()). From the next
 // timer pass, so a panel opening straight after another's close is seen first.
@@ -295,8 +395,9 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         if (_pnlSystem.isExpanded()) _pnlSystem.close();
         return "slot: closed";
     }
-    // /popup?dash=1|2 (2.11 round 9): the development Reset - 1 its dialog, over
-    // the system panel; 2 done without asking (Saved). /popup?grid=: the panel's
+    // /popup?dash=1|2: the development Reset - 1 its dialog, over the system
+    // panel (which has no Reset button, so this is its only way in); 2 done
+    // without asking (Saved). /popup?grid=: the panel's
     // Auto (a) and Col / Row (cu, cd, ru, rd) - each Saved, as on the glass.
     if (!strncmp(slotName, "dash", 4)) {
         if (slotName[4] == '2') { resetDashboard(); return "dashboard: reset to the compiled one (saved)"; }
@@ -323,7 +424,7 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         snprintf(out, sizeof(out), "scheme %s (not saved)", UI::pal().name);
         return out;
     }
-    // /popup?cardstate=N (round 4): the cards' active state, 0 Fill .. 3 Corner
+    // /popup?cardstate=N: the cards' active state, 0 Fill .. 3 Corner
     // cut, NOT saved; -1 the owner's again.
     if (!strncmp(slotName, "cs", 2)) {
         const int n = atoi(slotName + 2);
@@ -331,21 +432,21 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
         snprintf(out, sizeof(out), "card state %d (not saved)", n);
         return out;
     }
-    // /popup?active=RRGGBB (round 6): the active colour on glass, NOT saved -
-    // the screenshots' colours are not the panel's (Linen's olive, D-31);
-    // active=0 the scheme's own again, as a scheme change also brings back.
+    // /popup?active=RRGGBB: the active colour on glass, NOT saved - the
+    // screenshots' colours are not the panel's; active=0 the scheme's own
+    // again, as a scheme change also brings back.
     if (!strncmp(slotName, "act", 3)) {
         UI::setActiveColour(strtoul(slotName + 3, nullptr, 16));
         _binder.restyleAll();   // render() reads it; the frames are drawn
         snprintf(out, sizeof(out), "active colour %06lX (not saved)", (unsigned long)UI::pal().ST_ACTIVE);
         return out;
     }
-    // /popup?sensorerr=1|0 (T10): the header's sensor shown failed, RAM only.
+    // /popup?sensorerr=1|0: the header's sensor shown failed, RAM only.
     if (!strcmp(slotName, "sensorerr") || !strcmp(slotName, "sensorok")) {
         _header.pretendSensorError(slotName[6] == 'e');
         return slotName[6] == 'e' ? "sensor: shown as failed (not saved)" : "sensor: as its entity says";
     }
-    // Round 3: UI Tweaks (tweaks=1 comes here as "tweaks"), and a deck panel's
+    // UI Tweaks (tweaks=1 comes here as "tweaks"), and a deck panel's
     // header tapped - deck0, deck1 - as /bench?what=anim does (the deck is up
     // under UI Tweaks, D-25).
     if (!strcmp(slotName, "tweaks")) {
@@ -370,7 +471,7 @@ const char *GUIManager::headerDebug(const char *slotName, int glyphs, int pageHd
     return out;
 }
 
-// The owner's glyph style, else the default (square, D-20).
+// The owner's glyph style, else the default (GLYPH_DEFAULT, square).
 GlyphStyle GUIManager::savedGlyphStyle() {
     char v[12];
     GlyphStyle gs = GLYPH_DEFAULT;

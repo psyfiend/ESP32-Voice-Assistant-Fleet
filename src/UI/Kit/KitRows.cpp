@@ -1,5 +1,4 @@
-// Rows (2.12 P3, from the card window's SETTINGS and left panel - owner,
-// 2026-10-07): a row's words on the left and its control on the right. Choices
+// Rows (the card window's SETTINGS and left panel): a row's words on the left and its control on the right. Choices
 // are DROPDOWNS (a row is shorter than a line of chips, and a list of choices
 // can grow); an on/off is a CHECKBOX; a row that does something is a BUTTON.
 // A row that does not work yet is shown greyed, so the whole list can be seen.
@@ -34,7 +33,7 @@ int32_t controlW(const RowSpec &r) {
     return widestLine(r.opts, f) + 2 * UI::mm(k.S5) + textW(LV_SYMBOL_DOWN, f) + UI::mm(k.S5);
 }
 
-// AS WIDE AS ITS LONGEST ROW (owner): each row's words, a gap, its control -
+// AS WIDE AS ITS LONGEST ROW: each row's words, a gap, its control -
 // and the panel's sides, S7 each.
 int32_t rowsNeedW(const RowSpec *r, uint8_t n) {
     int32_t w = 0;
@@ -83,8 +82,8 @@ lv_obj_t *checkbox(lv_obj_t *parent, const RowSpec &r) {
     return cb;
 }
 
-// A button in a row (2.10e: Entity properties), the dropdown's size and frame.
-// Greyed (K17's "Added"): no accent, dim words, nothing to tap.
+// A button in a row (Entity properties), the dropdown's size and frame.
+// Greyed (a card already added): no accent, dim words, nothing to tap.
 lv_obj_t *rowButton(lv_obj_t *parent, const RowSpec &r) {
     lv_obj_t *b = plain(parent);
     lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);

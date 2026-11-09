@@ -7,7 +7,7 @@
 #include <time.h>
 
 // ---------------------------------------------------------------------------
-// TimeFormat - every time and duration the panel says, in one place (2.10e).
+// TimeFormat - every time and duration the panel says, in one place.
 //
 // The pattern is NINA's time_parse.c/h (chvvkumar/ESP32-P4-NINA-Display, used
 // with the author's permission, non-commercial - docs/REFERENCE_PROJECTS.md):
@@ -28,13 +28,13 @@ enum class TfClock : uint8_t {
 };
 void tfClock(char *out, size_t n, time_t t, TfClock style = TfClock::CLOCK_HM);
 
-// How long ago, in the words of the owner's HA template (2026-10-11).
+// How long ago, in the words of the owner's HA template.
 enum class TfAgo : uint8_t {
     // "A few moments ago", "12 minutes ago", "2 hours ago" (within 15 min of
     // the hour) or "2+ hours ago", "Yesterday", "3 days ago".
     AGO_WORDS,
-    // As AGO_WORDS, with the date past yesterday: "3 days ago - Oct 8" (owner,
-    // round 5 - activity's rows, under the clock time).
+    // As AGO_WORDS, with the date past yesterday: "3 days ago - Oct 8" (the
+    // activity rows, under the clock time).
     AGO_DATED,
 };
 void tfAgo(char *out, size_t n, time_t t, time_t now, TfAgo style = TfAgo::AGO_WORDS);

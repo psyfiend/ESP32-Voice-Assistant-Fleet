@@ -3,11 +3,11 @@
 
 // ESP-IDF's NVS directly, NOT Arduino's Preferences.
 //
-// Preferences is a thin Arduino wrapper over exactly this, and the owner's
-// standing constraint (2026-09-19) is to avoid Arduino-specific libraries so an
-// ESP-IDF port stays straightforward. ConnectivityManager predates that rule and
-// still uses Preferences; new code should not add to the pile. The two
-// interoperate at the namespace level anyway, so this is not a split brain.
+// Preferences is a thin Arduino wrapper over exactly this, and the project
+// avoids Arduino-specific libraries so an ESP-IDF port stays straightforward
+// (DECISIONS W4). ConnectivityManager still uses Preferences; new code should
+// not add to that. The two interoperate at the namespace level, so there is
+// one store.
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -139,11 +139,11 @@ const Entity *EntityRegistry::find(const char *id) const {
 }
 
 // ---------------------------------------------------------------------------
-// Groups defined at the source - 2.10c (#65)
+// Groups defined at the source (#65)
 // ---------------------------------------------------------------------------
 
 // "light.office_lamp" -> "ha_light_office_lamp": stable across reboots, since
-// it is made from the source's own id, so a saved pause (and, at 2.10d, a saved
+// it is made from the source's own id, so a saved pause (and a saved
 // setting) finds the member again. A clash, which needs two refs that differ
 // only after the 36th character, gets a digit.
 static void learntId(const char *ref, char *out, size_t cap) {
@@ -159,6 +159,51 @@ uint8_t EntityRegistry::learnMembers(const char *groupId, const char *const *ref
     Entity &g = _items[gi];
     return learnInto(gi, refs, nullptr, nullptr, n, g.desc.kind, g.desc.valueType,
                      g.members, g.nMembers, ENTITY_MEMBERS_MAX);
+}
+
+const Entity *EntityRegistry::findRef(EntitySource src, const char *ref) const {
+    if (!ref || !ref[0]) return nullptr;
+    std::lock_guard<std::mutex> lk(_mx);
+    for (uint8_t i = 0; i < _count; i++)
+        if (_items[i].desc.source == src && strcmp(_items[i].desc.externalRef, ref) == 0) return &_items[i];
+    return nullptr;
+}
+
+const Entity *EntityRegistry::adopt(const EntityDescriptor &d) {
+    if (!d.externalRef[0]) return nullptr;
+    std::lock_guard<std::mutex> lk(_mx);
+    if (!_items) return nullptr;
+    for (uint8_t i = 0; i < _count; i++)
+        if (_items[i].desc.source == d.source && strcmp(_items[i].desc.externalRef, d.externalRef) == 0) {
+            _items[i].adopted = true;
+            return &_items[i];
+        }
+    if (_count >= _capacity) {
+        ESP_LOGW(ENT_TAG, "table full; %s not added", d.externalRef);
+        return nullptr;
+    }
+    EntityDescriptor n = d;
+    learntId(d.externalRef, n.id, sizeof(n.id));
+    for (uint8_t tries = 0; indexOf(n.id) >= 0 && tries < 9; tries++) {
+        const size_t len = strlen(n.id);
+        if (len >= sizeof(n.id) - 1) n.id[len - 1] = (char)('1' + tries);
+        else { n.id[len] = (char)('1' + tries); n.id[len + 1] = '\0'; }
+    }
+    if (indexOf(n.id) >= 0) return nullptr;
+    if (!n.name[0]) snprintf(n.name, sizeof(n.name), "%s", d.externalRef);
+
+    // The slot is complete before the count admits it - see count().
+    const uint8_t slot = _count;
+    Entity &e = _items[slot];
+    e = Entity{};
+    e.desc       = n;
+    e.value.type = n.valueType;
+    e.learnt     = true;   // its name is the source's (adoptName)
+    e.adopted    = true;   // a card's own: its scenes are asked (1.12)
+    _count.store((uint8_t)(slot + 1), std::memory_order_release);
+    _learnt.store(true);   // pauses and areas are asked again
+    ESP_LOGI(ENT_TAG, "added %s (%s)", n.id, d.externalRef);
+    return &e;
 }
 
 uint8_t EntityRegistry::learnScenes(const char *lightId, const char *const *refs,
@@ -327,8 +372,8 @@ bool EntityRegistry::setSourceArea(const char *id, const char *areaId, const cha
 // like the slider-drag case that motivated that warning. One write per press is
 // the correct cost, and it is bounded.
 //
-// Since 2.10d the list goes through a PauseStore when one is set: SystemCore
-// keeps it in the owner's settings file, written by the settings task. The NVS
+// The list goes through a PauseStore when one is set: SystemCore keeps it in
+// the settings file, written by the settings task. The NVS
 // functions below are the default and the one-time import's source.
 
 static const char *PAUSE_NS  = "fleet_ent";
@@ -371,7 +416,7 @@ static bool savePauseList(const char *list) {
 
 bool EntityRegistry::readNvsPauseList(char *out, size_t cap) { return loadPauseList(out, cap); }
 
-// Through the store SystemCore set, else NVS as before (2.10d).
+// Through the store SystemCore set, else NVS.
 bool EntityRegistry::loadPauses(char *out, size_t cap) const {
     if (_pauseStore.load) return _pauseStore.load(out, cap, _pauseStore.ctx);
     return loadPauseList(out, cap);
@@ -428,8 +473,8 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
 
         // A pause freezes the entity where it stands. Any optimistic write in
         // flight is abandoned rather than left to time out and be reported as
-        // a failure the user did not cause - the owner's rule is that a paused
-        // entity changes no state at all.
+        // a failure the user did not cause - a paused entity changes no state
+        // at all.
         if (paused) {
             e.pending     = false;
             e.attrPending = false;
@@ -445,9 +490,8 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
             // sensor that went busy while we were paused and has stayed busy
             // will not say so again.
             //
-            // The owner found this within minutes: unpaused an occupancy card
-            // he knew was occupied - confirmed on another board and in HA - and
-            // it still read unoccupied.
+            // An unpaused occupancy card would go on reading unoccupied while
+            // the room was occupied.
             //
             // So resuming asks for the current value rather than waiting to be
             // told. The registry does not know HOW - it just says this entity
@@ -461,11 +505,11 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
         e.dirty        = true;
 
         // A GROUP DEFINED AT THE SOURCE IS PAUSED EXACTLY WHEN ALL ITS MEMBERS
-        // ARE (2.10c round 9). Pausing the group pauses its members (K18);
-        // this is the other direction. Without it the group's own flag could
-        // outlive its members' - set from the group's window, then each
-        // member resumed from its own - and the card stayed PAUSED with every
-        // member running (owner). One level: the groups this entity is in.
+        // ARE (K32). Pausing the group pauses its members (K18); this is the
+        // other direction. Without it the group's own flag could outlive its
+        // members' - set from the group's window, then each member resumed
+        // from its own - and the card would stay PAUSED with every member
+        // running. One level: the groups this entity is in.
         for (uint8_t g = 0; g < _count; g++) {
             Entity &G = _items[g];
             if (!G.nMembers) continue;
@@ -489,7 +533,7 @@ bool EntityRegistry::setPaused(const char *id, bool paused, uint32_t nowMs) {
     char list[PAUSE_BLOB_MAX];
     size_t used = 0;
     list[0] = '\0';
-    // A PAUSE FOR AN ENTITY NOT LEARNT YET (2.10c) must survive this rewrite:
+    // A PAUSE FOR AN ENTITY NOT LEARNT YET must survive this rewrite:
     // a member of an HA group is registered only once its group reports, so
     // for the first seconds after boot its id is in the saved list but not in
     // the table. Those ids are carried over from what was saved.
@@ -604,10 +648,10 @@ bool EntityRegistry::setAttrs(const char *id, const EntityAttrs &a) {
     // its first reading: a pause restored at boot reaches the entity before
     // HaRest's fetch, and setValue() takes that fetch's value - so the levels
     // come with it, rather than a paused light that is "on" at no brightness
-    // (2.10c, a paused member of light.office after a reboot).
+    // (a paused member of light.office after a reboot).
     if (e.paused && e.everSet) return false;
 
-    // A LIGHT COMMAND IN FLIGHT (2.10b): only a report carrying the latest
+    // A LIGHT COMMAND IN FLIGHT: only a report carrying the latest
     // commanded levels ends it - the same rule #63 gave the value. Anything
     // else is the source's current word, kept as the fall-back; the screen
     // keeps showing what the finger asked for. The icon and what the light can
@@ -649,25 +693,23 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
 
     // RESOLVE A COMMAND IN FLIGHT - and only a MATCHING echo resolves it. #63.
     //
-    // This used to treat any echo as the verdict: one carrying something other
-    // than what we optimistically applied meant "it did not take". True for an
-    // instant device, and wrong for a TRANSITIONING one. A light fading from
-    // on to off goes on reporting "on" for the whole fade - HA sends a state
-    // event per brightness step - so the first echo after the tap looked like
-    // a refusal, the card said FAILED, and it corrected itself when the fade
-    // finished. The owner's "Desk" group did exactly this.
+    // An echo carrying something other than what we optimistically applied is
+    // not a verdict: a TRANSITIONING device (a light fading from on to off)
+    // goes on reporting "on" for the whole fade - HA sends a state event per
+    // brightness step - so treating the first echo as a refusal would show
+    // FAILED and then correct itself when the fade finished.
     //
-    // So a non-matching echo is no longer evidence. It is recorded as what the
+    // So a non-matching echo is not evidence. It is recorded as what the
     // source currently says (the revert target, should the window expire) and
     // the command stays pending. Only two things end it: an echo carrying the
-    // commanded value, or the reconcile window running out in tick(). The cost
-    // is the speed of a genuine failure report - it now takes the window rather
-    // than one round trip - and nothing depends on that speed.
+    // commanded value, or the reconcile window running out in tick(). A genuine
+    // failure is therefore reported after the window rather than one round
+    // trip, and nothing depends on that speed.
     //
     // Compared against e.value, which IS the optimistic value while pending -
     // not against prevValue. A second tap inside the window can legitimately
-    // command the value back to prevValue, and comparing against it declared a
-    // perfectly successful command failed ("Obeys can still show FAILED").
+    // command the value back to prevValue, and comparing against it would
+    // declare a successful command failed.
     if (e.pending) {
         if (!v.equals(e.value)) {
             // Replacing prevValue here does not break the rule commandValue()
@@ -709,7 +751,7 @@ bool EntityRegistry::setValue(const char *id, const EntityValue &v, uint32_t now
 
     e.everSet      = true;
 
-    // Unchanged values are not dirtied. This is most of ROADMAP 4.2's
+    // Unchanged values are not dirtied. This is most of the
     // rate-limiting: a sensor republishing the same reading every second
     // causes no redraws at all.
     if (changed) e.dirty = true;
@@ -733,9 +775,8 @@ bool EntityRegistry::commandValue(const char *id, const EntityValue &v, uint32_t
 
     // A PAUSED ENTITY REFUSES COMMANDS. Issue #60.
     //
-    // Not "accepts and ignores" - refuses, so the caller knows. The owner:
-    // "I would expect a PAUSED button to not respond". Accepting silently
-    // would leave the card showing an optimistic value for something that was
+    // Not "accepts and ignores" - refuses, so the caller knows. Accepting
+    // silently would leave the card showing an optimistic value for something that was
     // never sent, which is the lying-diagnostic shape all over again.
     if (e.paused) return false;
 
@@ -912,7 +953,7 @@ void EntityRegistry::tick(uint32_t nowMs) {
         }
         // The same for a light's levels: back to what the source last said.
         // Recorded with both, since a near miss and no report at all look the
-        // same on the card (G8).
+        // same on the card.
         if (e.attrPending && (nowMs - e.attrPendingSinceMs) > _reconcileMs) {
             const LightCommand &c = e.attrCmd;
             const EntityAttrs  &a = e.prevAttrs;

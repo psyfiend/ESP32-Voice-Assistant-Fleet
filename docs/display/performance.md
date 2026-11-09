@@ -36,7 +36,7 @@ lowest internal heap. **Frame time is not FPS.** Two runs reflashed in between a
 | `WS_P4_4B` | 51.1 (44) | 4.4-5.2 | 17.6, 10 per swap | ~300 | 87.2 |
 | `WS_P4_7B` | 64 (56) | 4.5 | 18, 0 late | 418-479 | 101 |
 | `CYD_P4_1060` | 64 (56) | 4.2 | 18, 0 late | 396-530 | 104 (other scheme) |
-| `WS_S3_4B` (pool in PSRAM) | 212 (198) | 22-26 | ~90, 5 per swap, 3 late | ~1,250 (rebuild ~1,000) | 221 |
+| `WS_S3_4B` | 212 (198) | 22-26 | ~90, 5 per swap, 3 late | ~1,250 (rebuild ~1,000) | 221 |
 
 - **Drawing is now the limit everywhere.** On the P4s drawing got faster once the CPU stopped
   copying (the copy was evicting LVGL's working set from the cache).
@@ -44,9 +44,9 @@ lowest internal heap. **Frame time is not FPS.** Two runs reflashed in between a
   on the P4_5) and laying them out. The fix is design, not flush: keep the neighbour page built, or
   show a snapshot while it builds (`docs/design/pages.md` §6-7).
 - The S3_4B's numbers are #70's baseline.
-- **The card window's folder panels (SETTINGS, CHART) sliding, `WS_P4_5`** (2.10c round 9, timed per
-  frame with `DEBUG_FRAMES`): 35-105 ms a frame while the holder was window-wide and transparent;
-  **8-40 ms** sized to the tab and pane. A moving object redraws its whole area; where nothing
+- **The card window's folder panels (SETTINGS, CHART) sliding, `WS_P4_5`** (timed per frame with
+  `DEBUG_FRAMES`): 35-105 ms a frame with a window-wide transparent holder; **8-40 ms** with the
+  holder sized to the tab and pane. A moving object redraws its whole area; where nothing
   opaque covers a strip, LVGL draws everything beneath it (LESSONS).
 
 ## 3. Levers tried, and the verdict
@@ -64,7 +64,7 @@ lowest internal heap. **Frame time is not FPS.** Two runs reflashed in between a
 | Rotation 0 vs 2 | 4B | same on full frames; card ~1 ms cheaper at 0 | - |
 | DMA2D copier for repairs | P4_5, 4B | ~140-150 MB/s vs the PPA's ~45-50; frames after a page change 43 -> 14 ms | **kept** (one job at a time - architecture §4) |
 | Panel-side 180 degrees (MADCTL) | 7B | no effect on glass | rejected |
-| LVGL pool in PSRAM | S3_4B | internal free 7 -> 133 KB; drawing ~5-10 % slower; one card 17 -> 22-26 ms | **kept on S3_4B only** as a fix for starvation; #70 |
+| LVGL pool in PSRAM | S3_4B | internal free 7 -> 133 KB; drawing ~5-10 % slower; one card 17 -> 22-26 ms | **kept, and now on every S3** (A11): internal RAM starvation outweighs the speed; #70 |
 | `DEBUG_CARDS` off | P4s | ~90 ms off every page swipe (UART) | off in `[P4-options]`; the 7B and S3s still have their own lines |
 
 ## 4. Framework settings — what we control and what is prebuilt
@@ -87,11 +87,11 @@ so an S3 rebuild cannot touch the P4s.
 
 ## 5. Memory
 
-- **LVGL's pool (`lv_mem`)**: 512 KB in PSRAM on every P4 (2026-10-06, #88 - full-screen frames
-  ~10% slower, measured on WS_P4_5: 91-97 -> 100-108 ms; a card frame unchanged), 128 KB in PSRAM on
-  `WS_S3_4B`, a 128 KB static array in internal RAM on the other S3s. A card costs ~715 B of it;
-  `lv_mem_monitor()` is the instrument, not `ESP.getFreeHeap()`.
+- **LVGL's pool (`lv_mem`)**: 512 KB in PSRAM on every P4 (#88 - full-screen frames ~10% slower,
+  measured on WS_P4_5: 91-97 -> 100-108 ms; a card frame unchanged) and 128 KB in PSRAM on every
+  S3 (A11). A card costs ~715 B of it; `lv_mem_monitor()` is the instrument, not
+  `ESP.getFreeHeap()`.
 - **S3_4B peak pool use over a 6-hour soak: ~78 KB** (never under 50 KB free) - the pool is
   oversized for today's pages, which is what makes "back in SRAM, smaller" plausible (#70).
-- Internal free under soak: P4s ~110 KB lowest; S3_4B 130 KB with the pool in PSRAM, 4-12 KB with it
-  internal.
+- Internal free under soak: P4s ~110 KB lowest; S3_4B 130 KB with the pool in PSRAM (4-12 KB with
+  it internal, measured before the pool moved).

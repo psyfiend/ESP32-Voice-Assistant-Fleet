@@ -1,11 +1,11 @@
-// THE HALO (D-35, 2.11 round 1): a window floating over the page stands on a
-// black rim at its edge fading to clear, UIShape HALO millimetres out ("Panel
-// Edges", the owner's choice). A header slot's panel has it only where it meets
-// the bar (haloOverBar(), round 5: below the bar it made the slide chunky).
+// THE HALO (D-35): a window floating over the page stands on a black rim at its
+// edge fading to clear, UIShape HALO millimetres out ("Panel Edges", the owner's
+// choice). A header slot's panel has it only where it meets the bar
+// (haloOverBar(); below the bar it makes the slide chunky).
 //
-// PAINTED, NOT LVGL'S SHADOW. Built first as a shadow (spread half its width),
-// it cost a full redraw with a window open 45 ms more on the P4_5 (129 -> 175 ms)
-// and banded into visible steps: black to the dark ground is a handful of 16-bit
+// PAINTED, NOT LVGL'S SHADOW. A shadow (spread half its width) costs a full
+// redraw with a window open 45 ms more on the P4_5 (129 -> 175 ms) and bands
+// into visible steps: black to the dark ground is a handful of 16-bit
 // levels (LESSONS: LVGL's gradients band on these panels). So it is four corner
 // images and four edge strips, painted once per size and scheme into PSRAM:
 // black, its alpha falling off with the distance from the object's rounded edge,
@@ -15,17 +15,15 @@
 // Drawn under the object, in its DRAW_MAIN_BEGIN; nothing inside the object's
 // edge is drawn twice (alpha 0 there).
 //
-// ITS STRENGTH (2.11 round 4, the owner: "the effect itself is outstanding",
-// but at full strength it stops reading as a shadow - "around 50%", Linen
-// lighter still): painted into the images (strengthOf()), each scheme's own
-// (UIMetrics::HALO_PCT: 25 since round 5) or the owner's from UI Tweaks'
-// slider, kept as schemes.<name>.halo.
+// ITS STRENGTH: at full strength it stops reading as a shadow, so the strength is
+// painted into the images (strengthOf()): each scheme's own (UIMetrics::HALO_PCT,
+// 25) or the owner's from UI Tweaks' slider, kept as schemes.<name>.halo.
 //
 // WHERE A PANEL MEETS THE BAR it is one shape - the open slot's tab, the two
 // coves and the pane's top - and its halo there is painted for that shape as a
-// whole (haloOverBar()): two halos, the pane's and the tab's, darkened twice
-// where they overlapped, and the coves' insides were painted in the bar's
-// colour over them (round 4, the owner's close-ups of Linen).
+// whole (haloOverBar()): two separate halos, the pane's and the tab's, would
+// darken twice where they overlap, and the coves' insides would be painted in
+// the bar's colour over them.
 #include "UI/Kit.h"
 #include "Settings.h"
 #include "src/misc/cache/instance/lv_image_cache.h"   // lv_image_cache_drop(): not in lvgl.h
@@ -87,7 +85,7 @@ int16_t &strengthSlot() {
 
 // PAINTED IN, not drawn at an opacity: the dither must straddle a 16-bit step
 // of the alpha as drawn, and an opacity scaled the dither down with it - at 30%
-// the steps came back (round 4, Linen). A change of strength repaints the sets.
+// the steps came back. A change of strength repaints the sets.
 float strengthOf(float a, uint8_t str) { return a * (float)str / 100.f; }
 
 // Black at the edge (d = 0), clear at h: eased, so it ends softly.

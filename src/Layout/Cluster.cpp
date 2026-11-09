@@ -1,4 +1,4 @@
-// Cluster arithmetic (2.11 round 1): include/Layout/Cluster.h says what and why.
+// Cluster arithmetic: include/Layout/Cluster.h says what and why.
 #include "Layout/Cluster.h"
 #include <math.h>
 
@@ -56,6 +56,62 @@ void tileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t &x, in
     w = last ? g.lastW : g.tileW;
     x = col * (w + gap);
     y = row * (g.tileH + gap);
+}
+
+namespace {
+void capSize(int32_t &tw, int32_t &th, const TileCap &c) {
+    if (c.maxW > 0 && tw > c.maxW) tw = c.maxW;
+    if (c.maxH > 0 && th > c.maxH) th = c.maxH;
+    if (c.tall > 0.f && th > (int32_t)((float)tw * c.tall)) th = (int32_t)((float)tw * c.tall);
+    if (c.wide > 0.f && tw > (int32_t)((float)th * c.wide)) tw = (int32_t)((float)th * c.wide);
+}
+}  // namespace
+
+TileGrid cappedGrid(uint8_t n, int32_t w, int32_t h, int32_t gap, const TileCap &cap) {
+    TileGrid best;
+    if (n == 0 || w <= 0 || h <= 0) return best;
+    const float box = (float)w / (float)h;
+    int32_t bestM = -1, bestEmpty = 0;
+    float   bestShape = 0.f;
+    for (uint8_t c = 1; c <= n; c++) {
+        const uint8_t r = (uint8_t)((n + c - 1) / c);
+        int32_t tw = (w - (c - 1) * gap) / c;
+        int32_t th = (h - (r - 1) * gap) / r;
+        if (tw <= 0 || th <= 0) continue;
+        capSize(tw, th, cap);
+        if (tw <= 0 || th <= 0) continue;
+        const int32_t m = tw < th ? tw : th;
+        const int32_t empty = c * r - n;
+        const float gw = (float)(c * tw + (c - 1) * gap), gh = (float)(r * th + (r - 1) * gap);
+        const float shape = fabsf(logf((gw / gh) / box));
+        const bool better = m > bestM || (m == bestM && (empty < bestEmpty || (empty == bestEmpty && shape < bestShape)));
+        if (!better) continue;
+        bestM = m; bestEmpty = empty; bestShape = shape;
+        best.cols = c;
+        best.rows = r;
+        best.tileW = best.lastW = tw;
+        best.tileH = th;
+    }
+    return best;
+}
+
+// THE SPARE ROOM SPREAD EVENLY (K162): the same space between the tiles and at
+// the edges, never less than their own gap.
+static int32_t evenGap(int32_t room, int32_t count, int32_t size, int32_t gap) {
+    const int32_t e = (room - count * size) / (count + 1);
+    return e > gap ? e : gap;
+}
+
+void cappedTileAt(const TileGrid &g, uint8_t n, uint8_t i, int32_t gap, int32_t w, int32_t h, int32_t &x, int32_t &y) {
+    const uint8_t cols = g.cols ? g.cols : 1;
+    const uint8_t row  = (uint8_t)(i / cols);
+    const uint8_t col  = (uint8_t)(i % cols);
+    const int32_t inRow = (row + 1 == g.rows) ? (int32_t)n - (int32_t)row * cols : cols;
+    const int32_t gx = evenGap(w, cols, g.tileW, gap), gy = evenGap(h, g.rows, g.tileH, gap);
+    const int32_t rowW  = inRow * g.tileW + (inRow - 1) * gx;   // a short last row centred on the same spacing
+    const int32_t gridH = g.rows * g.tileH + (g.rows - 1) * gy;
+    x = (w - rowW) / 2 + col * (g.tileW + gx);
+    y = (h - gridH) / 2 + row * (g.tileH + gy);
 }
 
 ClusterSpan clusterSpan(uint8_t n, const ClusterGeom &g, uint8_t maxCols, uint8_t maxRows) {

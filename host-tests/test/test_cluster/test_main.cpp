@@ -1,4 +1,4 @@
-// Cluster arithmetic (2.11 round 1): how mini tiles share a cluster, and how many
+// Cluster arithmetic: how mini tiles share a cluster, and how many
 // cells a cluster asks for. Sizes are the P4_5's and the 4B's in real pixels.
 #include <unity.h>
 #include "Layout/Cluster.h"
@@ -114,6 +114,57 @@ void test_too_narrow_does_not_fit() {
     TEST_ASSERT_FALSE(s.fits);
 }
 
+// THE GROUP VIEW (K159). The 1060's window, four tiles, the biggest a tile may be
+// 25 x 20 mm (167 x 133 px at 169.5 PPI): two by two at the most, not a ribbon.
+void test_capped_four_tiles_two_by_two_at_the_cap() {
+    TileCap cap;
+    cap.maxW = 167; cap.maxH = 133; cap.tall = 1.1f; cap.wide = 2.0f;
+    const TileGrid g = cappedGrid(4, 560, 330, 5, cap);
+    TEST_ASSERT_EQUAL_UINT8(2, g.cols);
+    TEST_ASSERT_EQUAL_UINT8(2, g.rows);
+    TEST_ASSERT_EQUAL_INT32(167, g.tileW);
+    TEST_ASSERT_EQUAL_INT32(133, g.tileH);
+    TEST_ASSERT_EQUAL_INT32(167, g.lastW);
+}
+
+// A short last row's tile is the size of the rest, centred under them; the
+// spare room spread evenly between the tiles and at the edges (K162).
+void test_capped_last_row_centred_not_stretched() {
+    TileCap cap;
+    cap.maxW = 100; cap.maxH = 100;
+    const TileGrid g = cappedGrid(3, 300, 300, 10, cap);
+    TEST_ASSERT_EQUAL_UINT8(2, g.cols);
+    TEST_ASSERT_EQUAL_UINT8(2, g.rows);
+    int32_t x, y;
+    cappedTileAt(g, 3, 0, 10, 300, 300, x, y);
+    TEST_ASSERT_EQUAL_INT32(33, x);
+    TEST_ASSERT_EQUAL_INT32(33, y);
+    cappedTileAt(g, 3, 1, 10, 300, 300, x, y);
+    TEST_ASSERT_EQUAL_INT32(166, x);
+    cappedTileAt(g, 3, 2, 10, 300, 300, x, y);
+    TEST_ASSERT_EQUAL_INT32(100, x);
+    TEST_ASSERT_EQUAL_INT32(166, y);
+}
+
+// No spare room: the tiles' own gap, nothing at the edges.
+void test_capped_full_box_keeps_the_gap() {
+    TileCap cap;
+    const TileGrid g = cappedGrid(2, 210, 100, 10, cap);
+    int32_t x, y;
+    cappedTileAt(g, 2, 1, 10, 210, 100, x, y);
+    TEST_ASSERT_EQUAL_INT32(110, x);
+    TEST_ASSERT_EQUAL_INT32(0, y);
+}
+
+// No wider than twice its height.
+void test_capped_never_twice_as_wide_as_tall() {
+    TileCap cap;
+    cap.wide = 2.0f;
+    const TileGrid g = cappedGrid(1, 400, 100, 10, cap);
+    TEST_ASSERT_EQUAL_INT32(200, g.tileW);
+    TEST_ASSERT_EQUAL_INT32(100, g.tileH);
+}
+
 int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_two_tiles_side_by_side_in_a_wide_box);
@@ -126,5 +177,9 @@ int main(int, char **) {
     RUN_TEST(test_one_cell_only_when_allowed);
     RUN_TEST(test_many_tiles_take_more_cells);
     RUN_TEST(test_too_narrow_does_not_fit);
+    RUN_TEST(test_capped_four_tiles_two_by_two_at_the_cap);
+    RUN_TEST(test_capped_last_row_centred_not_stretched);
+    RUN_TEST(test_capped_never_twice_as_wide_as_tall);
+    RUN_TEST(test_capped_full_box_keeps_the_gap);
     return UNITY_END();
 }

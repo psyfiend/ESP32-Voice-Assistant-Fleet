@@ -1,5 +1,6 @@
 // CardGroups - see CardGroups.h.
 #include "Cards/CardGroups.h"
+#include "Cards/CardAdded.h"   // the made cards' areas (K171)
 #include "Cards/Card.h"
 #include "Cards/CardIcons.h"   // cardAreaColor(), the card-label palette
 #include "Cards/PageSpec.h"
@@ -7,6 +8,7 @@
 #include "Settings.h"
 #include <Arduino.h>   // millis(): autoColour()'s refresh
 #include <ctype.h>
+#include "PsramArray.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,18 +34,26 @@ void slugInto(const char *prefix, const char *name, char *out, size_t cap) {
 
 bool startsWith(const char *s, const char *p) { return !strncmp(s, p, strlen(p)); }
 
+// EVERY CARD SPEC: each page's compiled ones (a group card's members too), then
+// the cards made on the board - most of the dashboard (K171).
+template <typename F> void eachSpec(F f) {
+    for (uint8_t p = 0; p < s_nPages; p++) forEachCardSpec(*s_pages[p], f);
+    // Only cards still live: a removed member would otherwise vote its HA area
+    // until the next boot, naming HA's Office "New group".
+    for (uint8_t i = 0; i < CardAdded::count(); i++) if (CardAdded::liveAt(i)) f(CardAdded::specAt(i));
+}
+
 // The dashboard's areas, each once, in page order.
 uint8_t sheetAreas(const char **out, uint8_t cap) {
     uint8_t n = 0;
-    // A group card's members too (2.11): a cluster's area is its members'.
-    for (uint8_t p = 0; p < s_nPages; p++)
-        forEachCardSpec(*s_pages[p], [&](const CardSpec &cs) {
-            const char *a = cs.area;
-            if (!a || !a[0]) return;
-            bool seen = false;
-            for (uint8_t k = 0; k < n && !seen; k++) seen = !strcmp(out[k], a);
-            if (!seen && n < cap) out[n++] = a;
-        });
+    // A group card's members too: a cluster's area is its members'.
+    eachSpec([&](const CardSpec &cs) {
+        const char *a = cs.area;
+        if (!a || !a[0]) return;
+        bool seen = false;
+        for (uint8_t k = 0; k < n && !seen; k++) seen = !strcmp(out[k], a);
+        if (!seen && n < cap) out[n++] = a;
+    });
     return n;
 }
 
@@ -52,20 +62,30 @@ uint8_t sheetAreas(const char **out, uint8_t cap) {
 // dashboard's (shorter) name. Cards HA has not placed, and entities that are
 // not HA's (the Fleet page's virtual lamps), do not count either way. "" when
 // they disagree or nothing is known yet.
+// A card in a group made on the board: its `group` names that group's own id,
+// never a dashboard area's ("sheet_") or an HA area's ("ha_").
+bool inMadeGroup(const CardSpec &cs) {
+    char v[48];
+    if (!cs.id || !Settings::card(cs.id, "group", v, sizeof(v)) || !v[0]) return false;
+    return strcmp(v, "none") && !startsWith(v, CardGroups::SHEET_PREFIX) && !startsWith(v, CardGroups::HA_PREFIX);
+}
+
 const char *linkOf(const char *area) {
     static char id[40];
     id[0] = '\0';
     if (!s_reg || !area || !area[0]) return id;
-    // A group card's members count (2.11): a cluster has no entity of its own.
+    // A group card's members count: a cluster has no entity of its own.
+    // A GROUP MADE ON THE BOARD NEVER NAMES AN HA AREA: its cards do not vote.
+    // Otherwise a New group of Office lamps would name HA's Office "New group",
+    // and every Office card from HA would say so.
     bool split = false;
-    for (uint8_t p = 0; p < s_nPages && !split; p++)
-        forEachCardSpec(*s_pages[p], [&](const CardSpec &cs) {
-            if (split || !cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0]) return;
-            const Entity *e = s_reg->find(cs.primaries[0]);
-            if (!e || e->desc.source != EntitySource::HA || !e->sourceAreaId[0]) return;
-            if (!id[0]) snprintf(id, sizeof(id), "%s", e->sourceAreaId);
-            else if (strcmp(id, e->sourceAreaId) != 0) split = true;
-        });
+    eachSpec([&](const CardSpec &cs) {
+        if (split || !cs.area || strcmp(cs.area, area) != 0 || !cs.primaries[0] || inMadeGroup(cs)) return;
+        const Entity *e = s_reg->find(cs.primaries[0]);
+        if (!e || e->desc.source != EntitySource::HA || !e->sourceAreaId[0]) return;
+        if (!id[0]) snprintf(id, sizeof(id), "%s", e->sourceAreaId);
+        else if (strcmp(id, e->sourceAreaId) != 0) split = true;
+    });
     if (split) id[0] = '\0';
     return id;
 }
@@ -93,7 +113,7 @@ void sheetGroupId(const char *area, char *out, size_t cap) {
 // Every known group, each once: the dashboard's areas (as linked HA groups
 // where they are one), every HA area an entity here is in, and the groups in
 // the settings file. LVGL thread only (one static list).
-Group   s_list[32];
+PsramArray<Group, 32> s_list;   // ~4 KB
 uint8_t s_listN = 0;
 
 void addListed(const char *gid) {
@@ -174,7 +194,7 @@ bool savedColour(const char *gid, uint32_t &c) {
     return true;
 }
 
-// GROUPS TRY TO HAVE COLOURS OF THEIR OWN (owner, 2026-10-09), unless one was
+// GROUPS TRY TO HAVE COLOURS OF THEIR OWN (K47), unless one was
 // set on purpose to match another. The order decides who keeps what: the
 // dashboard's areas page by page, then the other HA areas, then the groups
 // made here. A colour set on purpose is taken first; then each group keeps the
@@ -283,6 +303,25 @@ bool ofId(const char *cardId, const char *sheetArea, Group &g) {
     char gid[48];
     sheetGroupId(sheetArea, gid, sizeof(gid));
     return byId(gid, g);
+}
+
+void dumpLinks(void (*out)(const char *line, void *ctx), void *ctx) {
+    const char *areas[32];
+    const uint8_t na = sheetAreas(areas, 32);
+    char line[160], gid[48];
+    for (uint8_t i = 0; i < na; i++) {
+        sheetGroupId(areas[i], gid, sizeof(gid));
+        snprintf(line, sizeof(line), "area \"%s\" -> %s\n", areas[i], gid);
+        out(line, ctx);
+        eachSpec([&](const CardSpec &cs) {
+            if (!cs.area || strcmp(cs.area, areas[i]) != 0) return;
+            const Entity *e = (s_reg && cs.primaries[0]) ? s_reg->find(cs.primaries[0]) : nullptr;
+            snprintf(line, sizeof(line), "   %-40s %-32s %s%s\n", cs.id ? cs.id : "(no id)",
+                     cs.primaries[0] ? cs.primaries[0] : "-", e ? e->sourceAreaId : "",
+                     inMadeGroup(cs) ? " (made group)" : "");
+            out(line, ctx);
+        });
+    }
 }
 
 bool make(const char *name, char *idOut, size_t cap) {

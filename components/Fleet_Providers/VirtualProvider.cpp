@@ -11,7 +11,7 @@ static const char *const ECHOERS[] = {
 static const uint8_t ECHOER_COUNT = sizeof(ECHOERS) / sizeof(ECHOERS[0]);
 
 // ---------------------------------------------------------------------------
-// THE LAMPS ARE FOUR DIFFERENT KINDS OF LIGHT (2.10b), so a window can be seen
+// THE LAMPS ARE FOUR DIFFERENT KINDS OF LIGHT, so a window can be seen
 // hiding what a light cannot do, and "All Lamps" - a group of all four - can
 // be seen doing what an HA light group does with members that differ:
 //
@@ -21,8 +21,8 @@ static const uint8_t ECHOER_COUNT = sizeof(ECHOERS) / sizeof(ECHOERS[0]);
 //   Lamp 4  on/off only               Power
 //
 // Each plays a bulb: it REMEMBERS its brightness and colour while off, and
-// comes back on at them, which is what the owner saw HA do with a group
-// (2026-10-05) - and, like HA, reports no levels at all while it is off.
+// comes back on at them, as HA does with a group - and, like HA, reports no
+// levels at all while it is off.
 // ---------------------------------------------------------------------------
 namespace {
 struct LampModel {
@@ -127,7 +127,7 @@ void VirtualProvider::loop(uint32_t nowMs) {
         if (!e) continue;
         const int lamp = lampIndex(ECHOERS[i]);
 
-        // A LIGHT'S LEVELS FIRST (2.10b): the bulb takes what was asked once
+        // A LIGHT'S LEVELS FIRST: the bulb takes what was asked once
         // the echo delay has passed since the LAST command - so a slider
         // dragged for two seconds is answered once, after it stops, as a
         // slow bulb would be. The report then matches the latest command and

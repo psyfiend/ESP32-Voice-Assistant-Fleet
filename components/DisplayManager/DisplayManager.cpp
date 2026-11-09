@@ -42,9 +42,8 @@ DisplayManager::DisplayManager() {
     #endif
 }
 
-// The device-identity banner that used to open this function - firmware
-// version, device name, PSRAM and flash size - was never display-specific.
-// It now lives in SystemCore::printIdentity(), which is where "what board is
+// The device-identity banner (firmware version, device name, PSRAM and flash
+// size) lives in SystemCore::printIdentity(), which is where "what board is
 // this" belongs. DisplayManager is a reusable HAL component and prints only
 // about the display. See docs/design/startup.md.
 bool DisplayManager::begin() {
@@ -252,8 +251,8 @@ void DisplayManager::initBacklightPWM(bool on) {
     if (bsp_display.BL_FREQ <= 0) {
         Serial.println("[BacklightMgr] No PWM on this board (on/off backlight only) - fixed at full brightness.");
         // No dimming available, so report "full" rather than leaving _currentBrightness
-        // at its zero-initialized default - that previously made getBrightness() claim
-        // 0% while the backlight pin was actually being driven fully on above.
+        // at its zero-initialized default, which would make getBrightness() claim
+        // 0% while the backlight pin is driven fully on above.
         _currentBrightness = 100;
         return;
     }
@@ -276,8 +275,8 @@ void DisplayManager::initBacklightPWM(bool on) {
         .timer_sel  = BL_LEDC_TIMER,
         .duty       = 0,
         .hpoint     = 0,
-        // Active-LOW boards get inverted here in hardware, replacing the manual
-        // "BL_MAX_DUTY - raw_duty" math setBrightness() used to do in software.
+        // Active-LOW boards get inverted here in hardware, so setBrightness()
+        // needs no "BL_MAX_DUTY - raw_duty" math.
         .flags      = {.output_invert = (bsp_display.BL_ON_LEVEL == 0) ? 1u : 0u},
     };
 

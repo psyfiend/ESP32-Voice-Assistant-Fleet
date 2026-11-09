@@ -5,7 +5,7 @@
 #include "EntityTypes.h"
 
 // ---------------------------------------------------------------------------
-// One entity. Fields follow ROADMAP section 4.1's table.
+// One entity (DECISIONS A3).
 //
 // Split deliberately into two halves:
 //
@@ -14,8 +14,8 @@
 //   Entity           - the descriptor plus its live value and bookkeeping.
 //
 // What is NOT here, and must never be added: anything about LAYOUT. No grid
-// span, no page, no card type, no position. ROADMAP Q3b/Q4 place cards in grid
-// *units* from the build sheet, with preferred_span / min_span / priority for
+// span, no page, no card type, no position. Cards are placed by the page and
+// the arranger (DECISIONS D-4), with a span and priority per card for
 // responsive degradation. Keeping size out of the entity is what lets the same
 // temperature reading appear as a 2x2 tile on one page and a 4x2 graph on
 // another. Put a span in here and that becomes impossible to express.
@@ -25,28 +25,23 @@ static constexpr uint8_t ENTITY_ID_MAX     = 40;  // "living_room_temp"
 static constexpr uint8_t ENTITY_NAME_MAX   = 40;  // "Living Room Temperature"
 static constexpr uint8_t ENTITY_SHORT_MAX  = 20;  // unit, device_class, state_class
 
-// ICONS NEED MORE ROOM THAN THE OTHER SHORT FIELDS, AND 20 WAS NOT ENOUGH.
+// ICONS NEED MORE ROOM THAN THE OTHER SHORT FIELDS (20).
 //
-// Material Design Icon names are long and the ones this fleet actually wants
-// are among the longest: `mdi:ceiling-light-outline` is 25 characters and
-// `mdi:motion-sensor-off` is 21. Both overflowed, and the second matters more
-// than the first, because HA ships the live state-dependent icon in
-// `attributes.icon` - so the limit was not only clipping what we declare, it
-// would have clipped what the server sends us.
+// Material Design Icon names are long and the ones this fleet wants are among
+// the longest: `mdi:ceiling-light-outline` is 25 characters and
+// `mdi:motion-sensor-off` is 21. HA ships the live state-dependent icon in
+// `attributes.icon`, so the limit also bounds what the server sends us; a char
+// array too small for a string that arrives at runtime truncates silently and
+// renders as the wrong glyph or as tofu.
 //
-// Found at compile time on the owner's 18-entity table (2026-09-20), which is
-// the good outcome; a char array one byte too small for a string that arrives
-// at runtime truncates silently and renders as the wrong glyph or as tofu.
-//
-// 32 costs 12 bytes per entity over the old size, and entity storage lives in
-// PSRAM (see SystemCore::beginEntityStorage), so 128 entities pay 1.5 KB of
-// the cheap memory. Splitting it out rather than raising ENTITY_SHORT_MAX
-// keeps unit / device_class / state_class - which are genuinely short - from
-// paying for it.
+// 32 costs 12 bytes per entity over ENTITY_SHORT_MAX, and entity storage lives
+// in PSRAM (see SystemCore::beginEntityStorage), so 128 entities pay 1.5 KB of
+// the cheap memory. A separate limit keeps unit / device_class / state_class -
+// which are genuinely short - from paying for it.
 static constexpr uint8_t ENTITY_ICON_MAX   = 32;  // "mdi:ceiling-light-outline"
 static constexpr uint8_t ENTITY_TOPIC_MAX  = 128; // external topic / HA entity id
-static constexpr uint8_t ENTITY_MEMBERS_MAX = 8;  // members of one HA-defined group (2.10c)
-static constexpr uint8_t ENTITY_SCENES_MAX  = 12; // scenes of one light (2.10c)
+static constexpr uint8_t ENTITY_MEMBERS_MAX = 8;  // members of one HA-defined group
+static constexpr uint8_t ENTITY_SCENES_MAX  = 12; // scenes of one light
 
 struct EntityDescriptor {
     // Stable key a card binds to. Never renumbered, never reused - the same
@@ -65,20 +60,18 @@ struct EntityDescriptor {
     char unit[ENTITY_SHORT_MAX]        = {0};  // "C", "%", "lx", "W"
     char deviceClass[ENTITY_SHORT_MAX] = {0};  // "temperature", "occupancy"
     char stateClass[ENTITY_SHORT_MAX]  = {0};  // "measurement", "total_increasing"
-    // THE USER'S OVERRIDE, not a copy of what the source says. 2.7.
+    // THE USER'S OVERRIDE of the source's icon; it is not a copy of it.
     //
-    // For an entity someone else owns this used to hold a transcription of
-    // HA's icon, which then outranked HA's LIVE icon and froze it. cards.md
-    // section 13: the source's live icon is the default, and these fields are
-    // the build sheet's way of overriding it - this descriptor stands in for
-    // the build sheet until 3.2. Leave them empty to follow the source.
+    // cards.md section 13: the source's live icon is the default, and these
+    // fields are the build sheet's way of overriding it - this descriptor
+    // stands in for the build sheet. Leave them empty to follow the source.
     //
     // For an entity WE own there is no source to follow, so `icon` is also
     // what our own HA discovery advertises.
     char icon[ENTITY_ICON_MAX]         = {0};  // "mdi:thermometer"
 
-    // A custom STATE PAIR for the hero - the owner's "could users add their
-    // own open/closed icons". Both must be set to take effect, and together
+    // A custom STATE PAIR for the hero, so users can add their own open/closed
+    // icons. Both must be set to take effect, and together
     // they outrank everything else, `icon` included. Empty = not overridden.
     char iconOn[ENTITY_ICON_MAX]       = {0};  // "mdi:garage-open"
     char iconOff[ENTITY_ICON_MAX]      = {0};  // "mdi:garage"
@@ -123,8 +116,8 @@ struct EntityDescriptor {
     // Only meaningful when advertise == false: where someone else's value
     // arrives from. For EntitySource::HA this is the HA entity_id; for
     // EntitySource::MQTT a full topic. Left empty for entities we own, whose
-    // topics are derived centrally from the device identity - ROADMAP 4.1 is
-    // explicit that a descriptor never spells its own topics out.
+    // topics are derived centrally from the device identity - a descriptor
+    // never spells its own topics out.
     char externalRef[ENTITY_TOPIC_MAX] = {0};
 
     // Which field to read out of the payload that arrives on externalRef.
@@ -145,23 +138,21 @@ struct EntityDescriptor {
     //
     // Needed because the two are genuinely different addresses for an entity
     // someone else owns. Zigbee2MQTT publishes state on `zigbee2mqtt/thing`
-    // and takes orders on `zigbee2mqtt/thing/set`; the owner's own Shed Power
-    // Monitor uses the same split, `.../motion_timer/state` and
-    // `.../motion_timer/set`, which is also exactly HA's discovery convention
-    // of state_topic vs command_topic. Three independent sources, one shape.
+    // and takes orders on `zigbee2mqtt/thing/set`; the Shed Power Monitor uses
+    // the same split, `.../motion_timer/state` and `.../motion_timer/set`,
+    // which is also HA's discovery convention of state_topic vs command_topic.
     //
     // Left EMPTY for:
     //   - entities WE own (advertise = true). Their command topic is derived
     //     centrally from the device identity, the same way their state topic
-    //     is - ROADMAP 4.1 is explicit that a descriptor never spells its own
-    //     topics out.
+    //     is - a descriptor never spells its own topics out.
     //   - HA-sourced entities. A websocket call_service is addressed by
     //     entity_id, which externalRef already holds; there is no topic.
     char commandRef[ENTITY_TOPIC_MAX] = {0};
 };
 
 // ---------------------------------------------------------------------------
-// What the SOURCE says about an entity besides its value. Milestone 2.7.
+// What the SOURCE says about an entity besides its value.
 //
 // Runtime, not descriptor: these change while the board runs - a light's
 // brightness moves during a fade, a template sensor's icon flips with its
@@ -169,7 +160,7 @@ struct EntityDescriptor {
 // meaning "the source did not say", because silence and zero are different
 // claims (a light that is off reports no brightness at all, not 0).
 //
-// Measured against the owner's instance, 2026-09-22 (cards.md section 13):
+// What HA sends (cards.md section 13):
 //   icon    present only when a user or an integration set one. HA core does
 //           NOT compute a state-dependent icon into the state object
 //   rgb     HA sends rgb_color for every colour mode, colour temperature
@@ -177,7 +168,6 @@ struct EntityDescriptor {
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // What a LIGHT can do - HA's `supported_color_modes`, folded into four bits.
-// 2.10b (#65).
 //
 // HA's modes are onoff, brightness, color_temp, hs, xy, rgb, rgbw, rgbww and
 // white. Every one but onoff can be dimmed, and every colour mode (hs, xy,
@@ -216,7 +206,7 @@ struct EntityAttrs {
     uint32_t rgb        = 0;               // 0xRRGGBB, valid when hasRgb
     bool     hasRgb     = false;
 
-    // A light's, 2.10b. HA reports these as null while the light is off, and
+    // A light's. HA reports these as null while the light is off, and
     // so does VirtualProvider: -1 / LMODE_UNKNOWN then, never a remembered
     // value - the BULB remembers its brightness, and says so when it is on.
     uint8_t   lightCaps  = 0;              // LightCapBits; 0 = not reported
@@ -226,12 +216,25 @@ struct EntityAttrs {
     int16_t   hue        = -1;             // 0-359
     int8_t    sat        = -1;             // 0-100
 
+    // A thermostat's (K144): HA's climate state is its MODE ("heat"), and
+    // the readings are attributes. Tenths of a degree in the entity's own unit;
+    // ATTR_NONE = not reported. `action` is hvac_action ("idle", "heating").
+    static constexpr int16_t ATTR_NONE = -32768;
+    int16_t   curTemp10    = ATTR_NONE;   // current_temperature
+    int16_t   target10     = ATTR_NONE;   // temperature: the setpoint
+    int8_t    curHumidity  = -1;          // current_humidity, %
+    char      action[16]   = {0};
+    char      fanMode[12]  = {0};
+
     bool equals(const EntityAttrs &o) const {
         return brightness == o.brightness && hasRgb == o.hasRgb &&
                (!hasRgb || rgb == o.rgb) && strcmp(icon, o.icon) == 0 &&
                lightCaps == o.lightCaps && lightMode == o.lightMode &&
                colorTempK == o.colorTempK && minTempK == o.minTempK &&
-               maxTempK == o.maxTempK && hue == o.hue && sat == o.sat;
+               maxTempK == o.maxTempK && hue == o.hue && sat == o.sat &&
+               curTemp10 == o.curTemp10 && target10 == o.target10 &&
+               curHumidity == o.curHumidity && strcmp(action, o.action) == 0 &&
+               strcmp(fanMode, o.fanMode) == 0;
     }
 };
 
@@ -289,20 +292,18 @@ struct Entity {
 
     // --- Optimistic write bookkeeping ------------------------------------
     //
-    // Owner's decision (2026-09-07): a tap updates the entity immediately so
-    // the control responds, then reconciles when the source echoes the change
-    // back - reverting if it never does.
+    // A tap updates the entity immediately so the control responds, then
+    // reconciles when the source echoes the change back - reverting if it never
+    // does (DECISIONS A4).
     //
     // pending* holds the value we optimistically applied and the moment we
     // applied it. On echo, the pending state clears. On timeout, `value`
     // reverts to prevValue and the card shows what the hardware actually did.
-    // Without the revert this becomes the third lying diagnostic in a project
-    // that has already been bitten by three.
     bool        pending        = false;
     EntityValue prevValue;             // value before the optimistic write
     uint32_t    pendingSinceMs = 0;
 
-    // THE SAME, FOR A LIGHT'S LEVELS (2.10b): a brightness, temperature or
+    // THE SAME, FOR A LIGHT'S LEVELS: a brightness, temperature or
     // colour command applies at once and waits for the source to agree. Kept
     // apart from `pending` because the two resolve separately - "on" can be
     // confirmed while the brightness is still fading toward its target.
@@ -317,22 +318,20 @@ struct Entity {
     // Did the LAST command on this entity fail to take?
     //
     // This lives on the entity rather than on whichever card issued the
-    // command, and that placement is the whole point. A card bound to several
-    // switches was previously tracking its own commands in a bitmask, so a
-    // parent card and a child card bound to the same switch could disagree
-    // about whether it had failed - the answer depended on which card you had
-    // tapped, not on what the switch was actually doing. The owner's rule is
-    // that a parent reflects "the current state of the children, NOT the
-    // method or path in which child cards arrived at their state", and that is
-    // only expressible if the fact belongs to the thing itself.
+    // command, and that placement is the whole point. A per-card flag would let
+    // a parent card and a child card bound to the same switch disagree about
+    // whether it had failed, depending on which card was tapped. A parent
+    // reflects "the current state of the children, NOT the method or path in
+    // which child cards arrived at their state", and that is only expressible
+    // if the fact belongs to the thing itself.
     //
     // Set when the reconcile window expires, or when an echo arrives carrying
     // the value from BEFORE the command. Cleared by the next command, and by
     // any genuine change from the source - at which point we know the current
     // state and the old failure is history.
     //
-    // It is one bool and no new dependency, so the zero-dependency guarantee
-    // of ROADMAP Q9 is untouched.
+    // It is one bool and no dependency, so the zero-dependency rule
+    // (DECISIONS A6) holds.
     bool        cmdFailed      = false;
 
     // Needs a UI update. Lives here rather than in a parallel array in the
@@ -349,9 +348,7 @@ struct Entity {
     // and a thermostat that has been unplugged are indistinguishable by age.
     //
     // HA states this directly - it sends the literal state "unavailable" - and
-    // that word is strictly better information than any timeout we could
-    // invent. Before this the word was simply dropped on the floor and the
-    // card went on displaying its last good reading indefinitely.
+    // that word is better information than any timeout we could invent.
     //
     // Starts TRUE so that an entity nobody has said anything about is not born
     // broken; `everSet` is what distinguishes "no reading yet".
@@ -364,10 +361,9 @@ struct Entity {
     // sending bogus data to HA" is a statement about the PROBE, and stays true
     // whether or not a tile happens to be showing it.
     //
-    // This project already made the identical call once, for cmdFailed just
-    // below: a fact tracked per-card let a parent card and a child card bound
-    // to the same switch disagree. Pause has the same shape - leave it on the
-    // card and pausing from the wrong tile leaves a local sensor publishing.
+    // The same reasoning as for cmdFailed: a per-card fact lets two cards bound
+    // to one entity disagree. Pause has the same shape - kept on the card,
+    // pausing from the wrong tile would leave a local sensor publishing.
     //
     // What it means, by who owns the entity:
     //   advertise == true  (ours)    -> stop sampling, stop publishing, and
@@ -378,12 +374,12 @@ struct Entity {
     // deliberately NOT implemented as "stop rendering", which would leave the
     // registry holding one number while the screen showed another.
     //
-    // Owner's rule, and it is stronger than "looks frozen": a paused entity
-    // stops ALL conditional evaluation. No staleness transition, no cmdFailed
-    // transition. Held still, not merely quiet.
+    // A paused entity stops ALL conditional evaluation, which is stronger than
+    // "looks frozen": no staleness transition, no cmdFailed transition. Held
+    // still, not merely quiet.
     //
-    // Persisted in NVS: "if I want a card paused I do not want a reboot to
-    // unpause it."
+    // Persisted (the pause store, see EntityRegistry.h) so a reboot does not
+    // unpause it.
     bool        paused         = false;
 
     // Set when a pause is LIFTED. The held value is from the moment of the
@@ -396,7 +392,7 @@ struct Entity {
     // clears the flag. A transport with no way to re-ask simply clears it.
     bool        needsRefresh   = false;
 
-    // --- A group defined at the SOURCE. 2.10c (#65, DECISIONS K17). ---------
+    // --- A group defined at the SOURCE (#65, DECISIONS K17). ----------------
     //
     // `light.office` is one entity to HA - a Hue room - and HA (or the Hue
     // bridge) sends each command on to its bulbs. The source names them, in
@@ -408,8 +404,9 @@ struct Entity {
     uint8_t     members[ENTITY_MEMBERS_MAX] = {0};
     uint8_t     nMembers       = 0;
     bool        learnt         = false;   // registered from a group's member list
+    bool        adopted        = false;   // a card made from HA stands for it (adopt()) - asked as a given one
 
-    // A LIGHT'S SCENES, learnt the same way (2.10c, DECISIONS K15): HA's scene
+    // A LIGHT'S SCENES, learnt the same way (DECISIONS K15, K19): HA's scene
     // entities on the light's own device - for a Hue room, the scenes made in
     // the Hue app. Each is a learnt entity of kind BUTTON: loaded with
     // press(), never shown as on, because HA does not say which scene is
@@ -418,26 +415,26 @@ struct Entity {
     uint8_t     nScenes        = 0;
 
     // Hidden in the SOURCE's own UI (HA's entity registry, hidden_by): a
-    // scene the owner hid in HA is hidden on the panel too, unless the card
+    // scene hidden in HA is hidden on the panel too (K21), unless the card
     // says show all (SceneShow). Learnt with the scenes, each session.
     bool        sourceHidden   = false;
 
     // The source's own name for it (HA's friendly_name), for every entity -
-    // declared ones included, whose desc.name is the user's (2.10d, K40:
-    // Label "From HA"). Empty until the source has said. Written by
+    // declared ones included, whose desc.name is the user's (for the entity
+    // label "HA name"). Empty until the source has said. Written by
     // setSourceName() only.
     char        sourceName[ENTITY_NAME_MAX] = {0};
 
     // The source's AREA for it (HA's area_name(): the entity's own area, else
-    // its device's), for a card label set to "HA area" (2.10d, K44). Empty
+    // its device's), for a card label set to "HA area" (K46). Empty
     // until learnt - once per session, with the scenes - or when HA has none.
     // Written by setSourceArea() only.
     char        sourceArea[ENTITY_NAME_MAX] = {0};
     // ...and its id (HA's area_id(): "office"), which does not change when the
     // area is renamed in HA. The key of the group linked to that area (K46).
     char        sourceAreaId[ENTITY_NAME_MAX] = {0};
-    // The DEVICE it belongs to in HA (its name as the owner set it, else the
-    // device's own), for the window's Properties (2.10e). Learnt with the area;
+    // The DEVICE it belongs to in HA (its name as set in HA, else the
+    // device's own), for the window's Properties. Learnt with the area;
     // empty for an entity with no device (a helper). Written by setSourceArea().
     char        sourceDevice[ENTITY_NAME_MAX] = {0};
 };

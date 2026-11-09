@@ -3,13 +3,13 @@
 // CardAdded - cards made on the device (K17, DECISIONS K65-K66; design:
 // docs/design/group-cards.md section 5).
 //
-// The first cards that are not in the compiled dashboard: a member of a group
-// card ("Desk" > Members > the lamp) made into a card of its own from SETTINGS'
+// Cards that are not in the compiled dashboard: a member of a group card
+// ("Desk" > Members > the lamp) made into a card of its own from SETTINGS'
 // "Add as a card". A COPY - the member stays in its group card.
 //
 // Kept in the settings file as an ordinary card entry with a few keys more, so
 // its other choices (Tap action, Entity label...) are saved exactly as any
-// card's, and 3.1's build sheet takes the lot over unchanged (K34):
+// card's (K34):
 //
 //   "cards": { "<id>": { "page": "house", "after": "<the card it came from>",
 //                        "entity": "ha_light_office_lamp", "area": "Office",
@@ -18,7 +18,7 @@
 //
 // A page is built from its compiled cards with each one followed by the cards
 // added after it (merge()), so a new card stands RIGHT AFTER the card it came
-// from (owner), with that card's priority - on a full page the lowest priority
+// from, with that card's priority - on a full page the lowest priority
 // still drops first. Removed cards stay in the file with their settings, the
 // page's pool (K35, K66), and are not built.
 //
@@ -36,7 +36,20 @@ class Card;
 
 namespace CardAdded {
 
-constexpr uint8_t MAX = 24;   // cards added on one device and on its pages (removed ones are in the file only)
+// Cards added on one device and on its pages (removed ones are in the file
+// only). 128 (K176): nearly every card is a made one (K171), and Add card from
+// HA makes them by the handful.
+constexpr uint8_t MAX = 128;
+uint8_t count();   // how many there are, of MAX
+// Each made card as a spec (the page's and its clusters' members alike), i < count():
+// CardGroups reads their areas, as it reads the compiled cards' (K171).
+const CardSpec &specAt(uint8_t i);
+// Still a card: not deleted or hidden this boot. Such a record stays (a Card points
+// at its id) until the next boot, which does not read it - nor should anything else.
+bool liveAt(uint8_t i);
+
+// WITHIN 25% OF THE LIMIT (K176): opening Edit cards says so (EditCards::build()).
+bool nearLimit();
 
 // Read the added cards from the settings file. `compiledId` says whether an id
 // is a compiled card's (so a new id never repeats one). Once, at boot, before
@@ -44,8 +57,8 @@ constexpr uint8_t MAX = 24;   // cards added on one device and on its pages (rem
 void begin(bool (*compiledId)(const char *id));
 
 // The page being built, by slug: where "Add as a card" puts its card. With its
-// compiled spec (the 2.11 follow-ups): its hidden clusters, and a card's
-// dashboard words when that card is not built.
+// compiled spec: its hidden clusters, and a card's dashboard words when that
+// card is not built.
 void setPage(const char *slug, const PageSpec *compiled = nullptr);
 const PageSpec *pageSpec();
 const CardSpec *specOf(const char *cardId);   // a compiled card of that page (a member too); null
@@ -64,15 +77,20 @@ const char *addedFor(const char *parentId, const char *entityId);
 
 // Make a card for `member`, right after `parent`, on the page being built. Its
 // id into `idOut`. False when full, or the parent has no id. `fromId`: the
-// member card it came out of (a cluster's tile, the sprint after round 7), kept
-// as "from" - so its Visibility knows a copy from a move.
+// member card it came out of (a cluster's tile), kept as "from" - so its
+// Visibility knows a copy from a move.
 bool add(const Card &parent, const Entity &member, char *idOut, size_t cap, const char *fromId = nullptr);
+// A CARD FROM HOME ASSISTANT (K140): `e` on the page being built, after
+// its own cards (no "after"), at the default priority, in `groupId` (its HA
+// area's group). Its id into `idOut`. False when full.
+bool addToPage(const Entity &e, const char *area, const char *groupId, char *idOut, size_t cap);
+// A CLUSTER MADE HERE (K140, K91's "making a cluster"): on the page being
+// built, named, in `groupId`; its members are then added with addTo(id, ...).
+bool addCluster(const char *name, const char *area, const char *groupId, char *idOut, size_t cap);
 // To the page's pool. False if it is not a card added here.
 bool remove(const char *cardId);
 
-// --- A TILE TAKEN OUT TO THE PAGE, TRACKED (the sprint after round 7, the owner:
-// Outside's Front added to the dashboard stayed in the cluster, and its new card
-// could only be hidden - a copy in the hidden cards that should not exist) ------
+// --- A TILE TAKEN OUT TO THE PAGE, TRACKED ---------------------------------------
 // Add card to dashboard from a cluster's tile asks Copy or Move, as Add to a
 // cluster does the other way (K111). The page card records "from", the member.
 //   Copy  the member stays; the page card can go again for good (drop()).
@@ -87,7 +105,7 @@ bool movedHere(const char *pageCardId);      // a page card that IS a member mov
 bool moveBack(const char *pageCardId);       // ...back into its cluster; the page card deleted
 bool drop(const char *pageCardId);           // a card added here deleted, entry and all (not a moved one)
 
-// --- MEMBERS ADDED TO A CLUSTER (2.11 round 3, K91, K100) -----------------------
+// --- MEMBERS ADDED TO A CLUSTER (K91, K111) -------------------------------------
 // A card copied into a cluster from the glass: a card entry with "in" (the
 // cluster's id), "entity" and "area" - a copy with an id of its own (K92: a
 // grouping is of copies), wearing the cluster's group (K92 rule 2). Built after
@@ -96,12 +114,11 @@ bool drop(const char *pageCardId);           // a card added here deleted, entry
 //   "cards": { "<id>": { "in": "office_261019_0500", "entity": "...", "area": "Office",
 //                        "group": "ha_office", "from": "<the card it came from>" } }
 //
-// COPY OR MOVE, TRACKED (round 7, the owner: a card moved into a cluster turned
-// up in the page's hidden cards, and could be restored AND added again from the
-// cluster - two of one light). "from" names the card a member came from. Moved,
-// that card is "removed": "moved" - off its page, and NOT in its pool: the
-// hidden cards are only what was hidden (Hide from this page, Hide from the
-// cluster). Removing the member puts the moved card back on its page.
+// COPY OR MOVE, TRACKED (K111): "from" names the card a member came from, so no
+// entity gets a second card. Moved, that card is "removed": "moved" - off its
+// page, and NOT in its pool: the hidden cards are only what was hidden (Hide
+// from this page, Hide from the cluster). Removing the member puts the moved
+// card back on its page.
 bool    addTo(const Card &cluster, const Entity &e, char *idOut, size_t cap, const char *fromId = nullptr);
 uint8_t membersIn(const char *clusterId, const CardSpec **out, uint8_t cap);
 bool    inCluster(const char *clusterId, const char *entityId);   // a copy of it is in there already
@@ -113,8 +130,7 @@ bool    removeMember(const char *cardId);
 bool    moveOut(const char *cardId, const char *toId = nullptr);   // a card moved into a cluster: off its page, not in the pool
 bool    isMoved(const char *cardId);
 
-// --- A TILE MOVED STRAIGHT TO ANOTHER CLUSTER (owner, after v0.2.19: a card had
-// to go to the dashboard first, then into the other cluster) ---------------------
+// --- A TILE MOVED STRAIGHT TO ANOTHER CLUSTER -----------------------------------
 // A copy made here changes cluster: its "in" is the other's, and it wears that
 // cluster's group (K92 rule 2); its "from" stays, so removing it still puts back
 // the card it came from. A dashboard's member cannot change cluster: it is
@@ -125,7 +141,7 @@ bool rehome(const char *memberId, const Card &cluster);
 // on a page; null when the member has not moved.
 const char *movedTo(const char *memberId);
 
-// --- ONE CARD, ONE WAY BACK (owner, round 2 of the 2.11 follow-ups) ---------------
+// --- ONE CARD, ONE WAY BACK (K137) ------------------------------------------------
 // Every card made here names its ORIGINAL ("from", a compiled card), and a card
 // made here that moves again RELOCATES - its record changes, page to cluster,
 // cluster to page or cluster to cluster - so there is never a copy of a copy, and
@@ -144,10 +160,15 @@ bool toPage(const char *cardId, const char *afterId, uint8_t pri);   // a cluste
 bool isMoveOf(const char *cardId);           // made here, and it IS its original moved
 const char *becameOf(const char *origId);    // the card a moved original became; null
 bool unmake(const char *cardId);             // deleted wherever it is; a move's original back home
+// A board-made group with no card in it is deleted, with its label group if no
+// other card wears it (K200): true when it is gone (or was already). False for a compiled
+// group or one a card is still in - one emptied by a move, which the caller hides.
+bool emptied(const char *clusterId);
+const char *clusterOf(const char *cardId);   // the group a member made here is in; null
 void keepHome(const char *memberId, const char *name, const char *groupId);   // with moveToPage()
 bool home(const char *memberId, char *name, size_t nameCap, char *groupId, size_t gidCap);
 
-// --- THE PAGE'S POOL, FOR EVERY CARD (2.11 round 3, K66, K96) -----------------
+// --- THE PAGE'S POOL, FOR EVERY CARD (K66, K96) ---------------------------------
 // "Hide from this page" sends any card on a page there - a compiled one too:
 // "removed": "yes" on its entry, as on an added card's, its settings kept.
 // merge() leaves a hidden card out; the cards added after it still follow its
@@ -170,8 +191,8 @@ uint8_t pool(const PageSpec &page, PoolItem *out, uint8_t cap);
 // to show it (GUIManager, once no card window is open).
 bool takeChanged();
 
-// --- THE DEVELOPMENT RESET (2.11 round 9, the owner: "the dashboard and its
-// clusters back as they were built") --------------------------------------------
+// --- THE DEVELOPMENT RESET -------------------------------------------------------
+// Puts the dashboard and its clusters back as they were built.
 // Every card made on this board deleted, entry and settings (cards added to a
 // page, copies in clusters, members moved out); every hide and move undone
 // ("removed", a member's "hidden"); every group card's header slots and

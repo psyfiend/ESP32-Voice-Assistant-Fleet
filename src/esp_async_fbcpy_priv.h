@@ -19,10 +19,10 @@
 //     `static dma2d_trans_config_t` shared by every handle, and the driver
 //     reads it only when a QUEUED job starts - by then a later call has
 //     rewritten it, so the job runs with the last caller's handle: pieces
-//     copied twice, others never. Found 2026-09-26 as stale pixels on
-//     WS_P4_5 with a 16-handle pool; two copies that both START at once (free
-//     channels, nothing queued) happen to survive, which is why a two-copy
-//     test passed. LVGL_Flush_EspLcd.cpp runs every copy through one worker.
+//     copied twice, others never (stale pixels on the glass). Two copies
+//     that both START at once (free channels, nothing queued) happen to
+//     survive, which is why a two-copy test passes.
+//     LVGL_Flush_EspLcd.cpp runs every copy through one worker.
 //   - ONE transaction in flight per handle (a single descriptor pair); start
 //     the next only after the callback for the previous one.
 //   - Runs on a DMA2D channel pair from the shared pool - the PPA uses the same

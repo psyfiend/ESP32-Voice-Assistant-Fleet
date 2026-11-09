@@ -1,13 +1,13 @@
-// Properties (2.12 P1, split from CardPopup.cpp).
+// Properties.
 #include "PopupState.h"
 
 namespace popup {
 
-// --- PROPERTIES (owner, 2.10e round 2) ---------------------------------------
+// --- PROPERTIES ---------------------------------------
 // What the entity is, read-only: HA's name and entity id, HA's own area (which
 // can differ from the card's group), and what kind of thing it is. Reached
 // from SETTINGS' "Entity properties" button - no corner icon, there is no room
-// for another on the 4B (owner). Back goes to the controls.
+// for another on the 4B. Back goes to the controls.
 Card *cardOf(lv_obj_t *sf);
 
 void propRow(lv_obj_t *list, const char *what, const char *value) { Kit::factRow(list, what, value); }
@@ -25,7 +25,7 @@ void buildProps() {
             if (s.ent[i]) propRow(list, s.ent[i]->desc.name,
                                   s.ent[i]->desc.externalRef[0] ? s.ent[i]->desc.externalRef : s.ent[i]->desc.id);
     } else {
-        // The owner's order (2026-10-13): where it comes from, what it is
+        // The order: where it comes from, what it is
         // called and where it lives, then what kind of thing, then the card's.
         Card *c = inMember() ? nullptr : cardOf(h.surface);
         const bool ha = e->desc.source == EntitySource::HA;
@@ -34,8 +34,8 @@ void buildProps() {
         propRow(list, "Name in HA", ha ? (e->sourceName[0] ? e->sourceName : e->desc.name) : "");
         propRow(list, "Entity ID", e->desc.externalRef[0] ? e->desc.externalRef : e->desc.id);
         propRow(list, "Area in HA", ha ? (e->sourceArea[0] ? e->sourceArea : "None") : "");
-        CardGroups::Group g;   // its group on this dashboard (K46)
-        if (c) propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
+        CardGroups::Group g;   // its label on this dashboard (K46, K158); a cluster's group
+        if (c) propRow(list, s.cluster ? "Group" : "Card label", CardGroups::ofCard(*c, g) ? g.name : "None");
         const bool mine = e->desc.source == EntitySource::SYSTEM || e->desc.source == EntitySource::LOCAL;
         propRow(list, "Device", ha ? (e->sourceDevice[0] ? e->sourceDevice : "None") : mine ? "This board" : "");
         propRow(list, "Device class", e->desc.deviceClass);
@@ -47,14 +47,14 @@ void buildProps() {
     // A card standing for several entities made here: its group and id after them.
     if (Card *c = (!e && !inMember()) ? cardOf(h.surface) : nullptr) {
         CardGroups::Group g;
-        propRow(list, "Card group", CardGroups::ofCard(*c, g) ? g.name : "None");
+        propRow(list, s.cluster ? "Group" : "Card label", CardGroups::ofCard(*c, g) ? g.name : "None");
         propRow(list, "Card ID", c->hasId() ? c->id() : "");
     }
-    // The values in one column, after the longest words (#97).
+    // The values in one column, after the longest words.
     Kit::factColumns(list);
-    // ALL OF IT IN SIGHT where it can be (owner, round 6: the P4_5 cut "Card
-    // id" in half): the gaps between the rows close up, as far as a third of
-    // their size; past that the list scrolls, as before.
+    // ALL OF IT IN SIGHT where it can be (no label is cut in half): the gaps
+    // between the rows close up, as far as a third of their size; past that
+    // the list scrolls.
     lv_obj_update_layout(list);
     const uint32_t cnt = lv_obj_get_child_count(list);
     if (cnt > 1) {

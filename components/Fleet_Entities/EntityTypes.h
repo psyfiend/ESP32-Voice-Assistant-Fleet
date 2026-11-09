@@ -6,11 +6,11 @@
 #include <string.h>
 
 // ---------------------------------------------------------------------------
-// Fleet Entities - the vocabulary. ROADMAP section 4.1.
+// Fleet Entities - the vocabulary (DECISIONS A3).
 //
 // ZERO DEPENDENCIES, deliberately. No Arduino.h, no LVGL, no ArduinoJson, no
-// PubSubClient. Per ROADMAP Q9 this library must compile and unit-test on a
-// PC, which is also what keeps the Q8 ESP-IDF escape hatch real. If something
+// PubSubClient. Per DECISIONS A6 this library must compile and unit-test on a
+// PC, which is also what keeps an ESP-IDF move straightforward (W4). If something
 // here ever needs Arduino, it belongs in a provider instead.
 //
 // That constraint is why this file uses fixed char arrays rather than String,
@@ -39,15 +39,14 @@ enum class EntityKind : uint8_t {
     WEATHER,        // condition + forecast
 };
 
-// Where a value comes from. A card NEVER branches on this - ROADMAP 4.1's
-// whole point is that the same card renders a local I2C sensor and a remote HA
-// entity identically. It exists so providers know what they own, and so
+// Where a value comes from. A card NEVER branches on this - the same card
+// renders a local I2C sensor and a remote HA entity identically. It exists so providers know what they own, and so
 // discovery knows what to advertise.
 enum class EntitySource : uint8_t {
     LOCAL = 0,  // a physical peripheral on this board (I2C sensor, etc.)
     SYSTEM,     // this board's own telemetry: rssi, ip, uptime, heap
     MQTT,       // a plain MQTT topic we subscribe to
-    HA,         // a Home Assistant entity, reached over MQTT
+    HA,         // a Home Assistant entity, reached over HA's websocket (DECISIONS A8)
     VIRTUAL,    // computed or derived; no external source at all
 };
 
@@ -95,7 +94,7 @@ struct EntityValue {
 
     // Value equality, used to suppress no-op updates. A provider republishing
     // an unchanged reading should not dirty the entity and cause a redraw -
-    // that is most of the rate-limiting ROADMAP 4.2 wants, for free.
+    // that is most of the rate-limiting, for free.
     bool equals(const EntityValue &o) const {
         if (type != o.type) return false;
         switch (type) {

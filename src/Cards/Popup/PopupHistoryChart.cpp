@@ -1,4 +1,4 @@
-// History: the chart (2.12 P1, split from CardPopup.cpp).
+// History: the chart.
 #include "PopupState.h"
 
 namespace popup {
@@ -47,7 +47,7 @@ void histDrawChart(lv_obj_t *body) {
     lv_obj_set_style_text_align(read, LV_TEXT_ALIGN_RIGHT, 0);
     histCorner(read, LV_ALIGN_RIGHT_MID);
     // Min and Max, their numbers lined up: the words in one label, the numbers
-    // in another beside it, right-aligned (owner, round 5).
+    // in another beside it, right-aligned.
     lv_obj_update_layout(top);
     const int32_t topW = lv_obj_get_width(top);
     int32_t leftEnd = 0;
@@ -70,10 +70,10 @@ void histDrawChart(lv_obj_t *body) {
     lv_obj_t *area = plain(body);
     lv_obj_set_width(area, lv_pct(100));
     lv_obj_set_flex_grow(area, 1);
-    // Half a line closer to the top line (owner, round 6): the strip for the
-    // finger's reading, empty until a finger is down, made the gap look a line.
+    // Half a line closer to the top line: the strip for the finger's reading,
+    // empty until a finger is down, would make the gap look a line.
     lv_obj_set_style_margin_top(area, -lv_font_get_line_height(t.TAG) / 2, 0);
-    // A FINGER READS THE CHART (owner, round 2): see histScrub().
+    // A FINGER READS THE CHART: see histScrub().
     lv_obj_add_flag(area, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(area, histChartCb, LV_EVENT_PRESSED, nullptr);
     lv_obj_add_event_cb(area, histChartCb, LV_EVENT_PRESSING, nullptr);
@@ -90,7 +90,7 @@ void histDrawChart(lv_obj_t *body) {
     const int32_t botH = xLeg ? lh + mm(UI::shape().S1) : mm(UI::shape().S2);
     const int32_t plotH = LV_MAX(10, ah - topH - botH);
 
-    // THE VALUE SCALE, IN ROUND STEPS (owner, round 3): as many lines as the
+    // THE VALUE SCALE, IN ROUND STEPS: as many lines as the
     // plot's height has room for - a label every ~2.4 lines of text - each step
     // 1, 2, 2.5 or 5 times a power of ten, the range widened to whole steps. So
     // 0-100 gets lines every 20 or 25, 40-60 every 5; a taller chart (the 1060,
@@ -140,7 +140,7 @@ void histDrawChart(lv_obj_t *body) {
         lastLblY = ly;
     }
 
-    // THE TIME SCALE ON THE CLOCK (owner, round 3): ticks on whole hours, half
+    // THE TIME SCALE ON THE CLOCK: ticks on whole hours, half
     // hours or minutes, as many as fit their labels across the plot - every 2
     // or 3 hours on a day, 10 or 15 minutes on an hour. A faint line at each.
     {
@@ -194,7 +194,7 @@ void histDrawChart(lv_obj_t *body) {
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
     lv_chart_set_div_line_count(ch, 0, 0);   // the grid above is ours
     lv_chart_set_axis_range(ch, LV_CHART_AXIS_PRIMARY_Y, (int32_t)lroundf(ymin * 10), (int32_t)lroundf(ymax * 10));
-    if (s_hv.shade) {   // the fill under the line (Shading: under line, round 5)
+    if (s_hv.shade) {   // the fill under the line (Shading: under line)
         lv_obj_add_flag(ch, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
         lv_obj_add_event_cb(ch, histFillCb, LV_EVENT_DRAW_TASK_ADDED, nullptr);
     }
@@ -218,7 +218,7 @@ void histDrawChart(lv_obj_t *body) {
     s_hv.ys = ys; s_hv.m = m;
     s_hv.scrubLine = s_hv.scrubLbl = nullptr;
 
-    // MIN AND MAX WHERE THEY HAPPENED (owner, rounds 2, 4 and 5): a faint dotted
+    // MIN AND MAX WHERE THEY HAPPENED: a faint dotted
     // line down the plot at each, its time IN THE PLOT - the max just above
     // the line where its label stands, the min just below, each moved to the
     // other side if there is no room, so a label never sits on the line.
@@ -260,7 +260,7 @@ void histDrawChart(lv_obj_t *body) {
             if (y < top || y > bot) y = above ? yBot + gap : yTop - gap - lh;   // no room: the other side
             lv_obj_set_pos(l, lx, LV_CLAMP(top, y, bot));
         };
-        // Which, and when (owner, rounds 5 and 6): "Max: 3:53 PM" - the values
+        // Which, and when: "Max: 3:53 PM" - the values
         // are in the top line.
         char a[32], b[32], c[16];
         tfClock(c, sizeof(c), (time_t)tHi);
@@ -272,7 +272,7 @@ void histDrawChart(lv_obj_t *body) {
     }
 }
 
-// THE FILL UNDER THE LINE (owner, round 4): the accent, faint at the line and
+// THE FILL UNDER THE LINE: the accent, faint at the line and
 // gone at the plot's foot. Drawn as LVGL's own area-chart example does
 // (lv_example_chart_5): for each piece of the line, a triangle down to its
 // lower end and a rectangle from there to the foot, each a vertical gradient.
@@ -321,7 +321,7 @@ void histFillCb(lv_event_t *ev) {
     }
 }
 
-// --- The finger on the chart (owner, round 2) --------------------------------
+// --- The finger on the chart --------------------------------
 // Press anywhere on it and a dotted line stands at that time, with the time and
 // the value in the strip above the plot - never under the finger. Slide to move
 // it; it stays where the finger lifts, until the span changes.

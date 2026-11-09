@@ -25,23 +25,22 @@ typedef struct esp_websocket_client *esp_websocket_client_handle_t;
 // message auth handshake, request ids, and handing complete JSON messages to
 // whoever registered for them. It does not know what an area is, does not know
 // which entities we care about, and never touches a card. That split is the
-// same one Fleet_MQTT draws - see ROADMAP Q9.
+// same one Fleet_MQTT draws (DECISIONS A6).
 //
 //
-// THIS IS THE PROJECT'S FIRST GENUINELY ASYNCHRONOUS PROVIDER. READ THIS.
+// THIS IS AN ASYNCHRONOUS PROVIDER. READ THIS.
 //
-// Every data path before this one ran on the loop task. PubSubClient is
-// synchronous and is pumped from loop(); the local sensor providers are polled
-// from loop(). esp_websocket_client is not: it runs its own FreeRTOS task and
-// calls our handler on THAT task, at whatever moment a frame arrives.
+// PubSubClient is synchronous and is pumped from loop(), and the local sensor
+// providers are polled from loop(). esp_websocket_client is not: it runs its
+// own FreeRTOS task and calls our handler on THAT task, at whatever moment a
+// frame arrives.
 //
 // Two rules follow, and neither is optional:
 //
 //   1. THE HANDLER MUST NOT TOUCH LVGL. Not a label, not a style, not a
 //      lv_timer. LVGL here is single threaded (LV_USE_OS == LV_OS_NONE) and
-//      its thread is the loop task. This is the same rule CLAUDE.md already
-//      states for providers, except that until now no provider could actually
-//      break it. Now one can.
+//      its thread is the loop task. This is the rule CLAUDE.md states for
+//      providers.
 //
 //   2. WRITE THROUGH EntityRegistry, WHICH HAS ITS OWN std::mutex. setValue()
 //      takes a short lock, writes, and marks dirty; the loop task picks the
@@ -92,23 +91,21 @@ public:
     // The next request id. HA replies carry the id back, which is how a reply
     // is matched to its request.
     //
-    // IT MUST STRICTLY INCREASE WITHIN A CONNECTION, AND THAT IS A SERVER RULE,
-    // NOT A CONVENTION. Measured against HA 2026.9.2 on 2026-09-20: sending id
-    // 5 then id 3 returns
+    // IT MUST STRICTLY INCREASE WITHIN A CONNECTION. THAT IS A SERVER RULE.
+    // HA answers id 5 followed by id 3 with
     //
     //     {"success":false,"error":{"code":"id_reuse",
     //      "message":"Identifier values have to increase."}}
     //
-    // and id 6 afterwards succeeds. So a scheme that allocates ids from a pool,
+    // and id 6 afterwards succeeds. A scheme that allocates ids from a pool,
     // or recycles them when a request completes, silently breaks - and breaks as
     // a per-request error rather than a dropped connection, which is the kind of
     // failure that gets blamed on the network.
     //
     // A counter that never resets is therefore correct by construction. Resetting
-    // it on reconnect would ALSO be legal (the id space is per-connection -
-    // measured: a fresh socket accepted id 2 again after the previous one had
-    // used it), but there is no reason to, and not resetting is one less rule to
-    // remember.
+    // it on reconnect would ALSO be legal (the id space is per-connection: a
+    // fresh socket accepts id 2 again), but there is no reason to, and not
+    // resetting is one less rule to remember.
     uint32_t nextId() { return ++_reqId; }
 
     // --- Diagnostics, for SystemReport -----------------------------------

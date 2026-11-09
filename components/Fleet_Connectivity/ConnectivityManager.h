@@ -20,9 +20,9 @@
 // ConnectivityManager - the fleet's link layer.
 //
 // Owns WiFi station mode, the fallback/provisioning AP, the four connectivity
-// modes from docs/ROADMAP.md Q1, and the interactive scan/join flow the
+// modes (DECISIONS C1), and the interactive scan/join flow the
 // settings UI drives. Ethernet is represented in the type vocabulary
-// (LinkType) but not implemented yet - callers ask isOnline()/getLinkType()
+// (LinkType) but not implemented - callers ask isOnline()/getLinkType()
 // rather than "is wifi up", so adding it later does not churn call sites.
 //
 // THREADING - read this before calling anything from UI code.
@@ -34,10 +34,9 @@
 //     event handler is the single authority for state transitions; it never
 //     touches LVGL and never calls back into UI code.
 //   * The UI therefore POLLS the getters (cheap, all atomic or mutex-guarded)
-//     rather than being called back. This is deliberate: a callback into the
-//     UI layer from the event task would need LVGL locking at every call site
-//     and would invert the dependency. Same conclusion both reference projects
-//     reached independently - see docs/ROADMAP.md section 4.2.
+//     rather than being called back. A callback into the UI layer from the
+//     event task would need LVGL locking at every call site and would invert
+//     the dependency (DECISIONS A3).
 //
 // A NOTE ON ATOMIC WIDTH: scalars shared across tasks are int32_t-backed, not
 // uint8_t. Sub-word atomics on RISC-V (i.e. the P4 boards) can read-modify-write
@@ -67,17 +66,14 @@ public:
     int8_t      getRssi() const       { return (int8_t)_rssi.load(); }
     uint8_t     getLastDisconnectReason() const { return (uint8_t)_lastReason.load(); }
 
-    // How long ago the RSSI value was actually measured. Before issue #49 this
-    // question could not be asked: RSSI was read once in the GOT_IP handler
-    // and never again, so getRssi() returned a number from the moment of
-    // association for as long as the board stayed up. UINT32_MAX = never read.
+    // How long ago the RSSI value was actually measured (it is re-read every
+    // RSSI_POLL_MS while associated). UINT32_MAX = never read.
     uint32_t    rssiAgeMs() const;
     bool        isRssiFresh() const;
 
     // NONE when the sample is too old to stand behind, so the header glyph
-    // says "I do not know" instead of repeating a six-hour-old reading. That
-    // substitution is the whole point - a confident wrong indicator is worse
-    // than an honest blank one, which is this project's oldest lesson.
+    // says "I do not know" instead of repeating an old reading. A confident
+    // wrong indicator is worse than an honest blank one.
     SignalBand  getSignalBand() const {
         return isRssiFresh() ? signalBandFromRssi(getRssi()) : SignalBand::NONE;
     }
@@ -101,7 +97,7 @@ public:
 
     // Evidence from a layer ABOVE that something beyond this device could not
     // be reached. Called by SystemCore, never by Fleet_MQTT itself - MQTT
-    // deliberately knows nothing about the link it rides on (ROADMAP Q9), so
+    // deliberately knows nothing about the link it rides on (DECISIONS A6), so
     // the owner of both objects is what joins them up.
     //
     // This is corroborating evidence only. It can raise LINK_SUSPECT and it
@@ -240,8 +236,7 @@ private:
     std::atomic<int32_t> _health{(int32_t)LinkHealth::LINK_UNKNOWN};
     // millis() at which _rssi was last actually measured. 0 = never. Paired
     // with _rssi rather than folded into it because "how old" and "how strong"
-    // are different questions and the fault was caused by only being able to
-    // ask the second one.
+    // are different questions.
     std::atomic<int32_t> _rssiAtMs{0};
     // A publishable copy of _attempt, which is otherwise a plain uint8_t only
     // touched from loop(). The UI reads this one.
@@ -258,8 +253,8 @@ private:
 
     // Consecutive RSSI reads that returned nothing. Backs the poll interval
     // off, because on a P4 whose C6 link is dead WiFi.RSSI() is an SDIO RPC
-    // that blocks the LOOP TASK on a ~10 s timeout every single time - the
-    // "freezing every few seconds" the owner saw on WS_P4_4B. See pollRssi().
+    // that blocks the LOOP TASK on a ~10 s timeout every single time, freezing
+    // the UI. See pollRssi().
     uint8_t  _rssiFails        = 0;
     static constexpr uint32_t RSSI_POLL_MAX_MS = 300000;   // 5 minutes
     uint32_t _lastProbeMs      = 0;
@@ -305,7 +300,7 @@ private:
     uint32_t _apLastClientMs   = 0;
     // Grows each time a full attempt cycle fails while parked in AP, so a
     // device with genuinely wrong credentials stops thrashing the radio (and
-    // the power rail) every minute forever. Reset on success.
+    // the power rail) on a fixed tick. Reset on success.
     uint32_t _apRetryDelayMs   = 0;
     // Accumulated deferral while a client is attached to our AP. Someone is
     // probably configuring us and yanking the radio mid-form is hostile - but

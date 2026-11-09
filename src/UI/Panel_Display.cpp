@@ -20,7 +20,7 @@ static void drag_event_handler(lv_event_t * e) {
     int32_t y = lv_obj_get_style_y(obj, LV_PART_MAIN) + vect.y;
     lv_obj_set_pos(obj, x, y);
 
-    // KEEP IT ON THE GLASS (#68, owner: keep it draggable). The offsets above
+    // KEEP IT ON THE GLASS (it stays draggable). The offsets above
     // are relative to the panel's RIGHT_MID alignment, so rather than work the
     // limits out in that frame, place it, measure where it landed, and push
     // it back by however far it overhangs an edge.
@@ -123,9 +123,8 @@ void Panel_Display::init(lv_obj_t* parent) {
     // Touch Overlay Logic
     // ON THE TOP LAYER, not on the screen.
     //
-    // As a child of the screen it sat below the dashboard in the z-order from
-    // 2.5 onward and was never visible - the owner reported "Show Touches"
-    // doing nothing. lv_layer_top() is drawn above all screen content, which
+    // As a child of the screen it would sit below the dashboard in the z-order
+    // and never be visible. lv_layer_top() is drawn above all screen content, which
     // is what a touch visualiser wants anyway: it is an overlay, not part of
     // the page, and it should not have to be re-stacked every time the
     // dashboard is rebuilt.

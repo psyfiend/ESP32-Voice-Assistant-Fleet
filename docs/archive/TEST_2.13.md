@@ -1,0 +1,757 @@
+# Test sheet - 2.13, cards from Home Assistant (rounds 1 to 5, and the final suite)
+
+# Final suite - for signing off 2.13
+
+**This is the one sheet to run.** It replaces round 5's T1-T27, which were never run: those still
+standing are carried below as F21-F42, and the two that changed (T10, T19) are F1 and F11-F12.
+
+**Branch** `feat/2.13-add-from-ha`. **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run it (app only;
+each board's settings saved first and compared after - 0 differences). **Scope** K192: K188-K191,
+Reset removed, Restore of a moved card fixed. **Not in 2.13**: Backup and Restore (next milestone),
+the mirror and HA groups as board groups (K184, K170), summary cards and sensor groups (2.14).
+
+**Checked by Claude on the P4_5 over `/popup`** (and put back after): Kitchen through Show as... to a
+solo card (face Sink, Group view) and back to Group, the pins kept; the solo card's Visibility line,
+group view and Members (no pins); New group with one card pinned - the dialog, face and tap steps,
+and what it saved. **Nothing here is seen on the glass yet.**
+
+## What changed since round 5
+
+- **Show as... is a flow** (K191): a group's Visibility opens with "Group card being presented as
+  'Solo card'" (or 'Group'); **Show as...** walks Solo card (face, then tap) or Group (pins), then a
+  dialog says what will happen. The Show as chips are gone.
+- **A group with fewer than two pinned cards shows as its solo card**; pins are kept through any
+  switch (K188).
+- **A solo group card opens its group view**: Group view is in its Tap action and Long press opens.
+  Its Members show **no pins**, only the header glyphs of its group view's header sensors (K188).
+- **A mixed group's solo card toggles nothing**: Members by default, no Toggle. Sensors in the
+  header do not make a group mixed (K188).
+- **New group**: a card's first tap adds it **pinned**; then the header (a sensor), unpinned, off
+  (K190). With fewer than two pinned, "This will create a group on the page shown as a 'Solo card'."
+  and the face and tap steps (K191).
+- **"Group" replaces "cluster"** on screen (K191). **Reset** is gone from the system panel (K192).
+- **Restore of a card moved out of a group** works again (the groups made on the board since K171).
+- The five fixes found on the glass on 11-05 (below, round 5's "Found on the glass").
+
+## Tests
+
+**Groups: Show as..., the solo card, pins**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F1 | Kitchen's Visibility | "Group card being presented as 'Group'" at the top; Show as..., Rename group, Hide from this page; no Show as chips; the GROUP panel beside it |
+| F2 | Show as..., Solo card, Next | "Select card to show as the face:" - All lights, then Sink, Overhead, Table and the header sensors |
+| F3 | Choose Sink, Next | "Select tap action:" - Toggle, Group view, Members view, History view (Toggle offered: Kitchen's header sensors do not count) |
+| F4 | Choose Group view, Next | "Show group as solo card?" naming Kitchen, Sink, the 'Group view', and that pinned cards are kept; Cancel changes nothing |
+| F5 | Again to the dialog; Confirm | Kitchen is one card showing Sink; "Optimizing page view..." while the page arranges |
+| F6 | Tap the Kitchen card | its group view, the header sensors at the top; tap its name: Members |
+| F7 | Kitchen's Members | no pins; the header sensors show their header glyph beside them |
+| F8 | Kitchen's SETTINGS: Tap action; Long press opens | Toggle, Details view, Group view, Members view, History view, Nothing; Long press has Group view |
+| F9 | Kitchen's GROUP panel | Face live (it is a solo card); Header options greyed |
+| F10 | Show as..., Group, Next | "Select cards to pin:" - Sink, Overhead, Table, each ticked (the pins were kept); the line "The group will be shown on the page with its pinned cards." |
+| F11 | Untick two | the line becomes "Fewer than two cards are pinned, so the group will still be shown as a solo card." |
+| F12 | Tick them again; Next; Confirm | "Show group as group?" naming the pinned cards; Kitchen is a group again, its tiles as before |
+| F13 | In Show as..., the back arrow on each step | one step back; from the first, Visibility |
+| F14 | A member's Visibility: Unpin this card, on Kitchen, until one tile is left | the page shows Kitchen as its solo card; Pin the second back: a group again |
+| F15 | A group with a light and an occupancy sensor (both pinned), Show as... Solo card | no Toggle in the tap step; on the page its tap opens Members; SETTINGS' Tap action has no Toggle |
+
+**New group (K190, K191)**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F16 | Page panel, CARDS, New group, Office: tap a light once, twice, three times | pinned (the pin in the square), then unpinned, then off |
+| F17 | Tap a temperature sensor once, twice, three times, four | pinned, in the header (its glyph), unpinned, off |
+| F18 | Two lights pinned; Create group 2; Next; Create | no solo card dialog; "New group" offered (Office is taken); the new group on the page as a group |
+| F19 | New group again: one light pinned, one unpinned; Create group 2 | "This will create a group on the page shown as a 'Solo card'." - Cancel, Next |
+| F20 | Next | the face step with the pinned light lit; then the tap step (Toggle first); then the name; Create: a solo card with that face and tap |
+
+**Round 5's tests still standing (T1-T27 less T10, T19, T25's wording)**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F21 | Members or Edit cards of Office | the pins in the accent color |
+| F22 | Look at a light, a door and occupancy card; a temperature card | no corner icon on the first three; the temperature keeps its corner icon |
+| F23 | UI Tweaks, Group view: Cards; Linen; tap Office | the window's ground is the page's, cards the page's card color, cut corners the ground's color |
+| F24 | Office's Card UI: Card state Fill; open its group view | its members use Fill there too |
+| F25 | Group view: tap the header sensors; tap a tile while the panel is down | it slides down; the tile tap only folds it (sliding up) |
+| F26 | Long-press a group view tile | it presses in as on the page, then opens the member |
+| F27 | In the group view long-press Desk; SETTINGS | Tap action, Long press opens, Card UI live; change Tap action, close; on the page Desk's tap does the new thing |
+| F28 | Group view: a header sensor's row, then back | back to the group view (not the sensor's Details) |
+| F29 | A card whose Long press opens is History: long-press, then back | the window closes |
+| F30 | Office: Members, Card UI, Properties | the GROUP panel on each; on History, CHART or ACTIVITY instead |
+| F31 | Office's Edit cards | no panels under it; it reaches the screen's foot |
+| F32 | A member's Visibility: Unpin this card; then Pin this card | each asks first, in the owner's words; Confirm does it |
+| F33 | Office's Edit cards: tap two cards to add, one twice; Save | "Save 3 changes?" naming them - added, pinned; Save does it |
+| F34 | Edit cards: an HA area with Office's cards in it | Office's members there show the square and take the tap cycle |
+| F35 | Edit cards: tap a temperature sensor not yet in Office three times | its square shows the header glyph; Save: it is in Office's header |
+| F36 | Edit cards: choose a row | no check mark; nothing in the row moves |
+| F37 | A page card's Visibility: Add to group, into Office | it joins Office unpinned (not on the page; in the group view) |
+| F38 | Hide the system header; show it | the cards keep their size, the spare height spread round them |
+| F39 | UI Tweaks: Card margins Large; then Office's Card UI, Group view section: Card margins Small | the page re-arranges with wider gaps; then only Office's group view changes |
+| F40 | Eric Bedroom's light card | a Scenes button, its Hue scenes listed |
+| F41 | Kitchen's Edit cards: tap Sink three times | it cycles pin, remove (red), back |
+| F42 | The Fleet page (swipe), Panel's Visibility, the page's Edit cards | the Panel group and the MQTT group, nothing else; no Hide from this page on Panel; Panel's row "Built in" |
+
+**The rest**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F43 | System panel | SYSTEM - DIAGNOSTICS: Log, UI Tweaks, About - no Reset |
+| F44 | Kitchen's Overhead: Visibility, Add to dashboard, Move; then the new card's Restore | the dialog says it goes back to Kitchen; Restore: back in Kitchen as a tile, its page card gone |
+| F45 | Anywhere on screen | the word "cluster" nowhere (the hidden cards' notes, Show as) |
+| F46 | Office: GROUP, Header options | the GROUP panel folds as the view opens |
+| F47 | Office's Card UI | one list, GROUP VIEW a centred title between rules, scrolling with the rest |
+| F48 | Indoor temp (the 1060): SETTINGS | no Active state row |
+| F49 | The House page | as before: Doors, Outside, Kitchen, Office, Thermo, Eric, the rest; each card's own settings kept |
+
+**Found on the glass on 11-06 evening, fixed and flashed the same night**
+
+| # | Do this | PASS if |
+|---|---|---|
+| F50 | Indoor Temp (the 1060; Claude saved its face as Front Room through Show as... while checking) | the card shows Front Room's reading and is named "Front Room Temperature", its card label still Indoor Temp; GROUP's Face says Front Room Temperature |
+| F51 | Long-press Indoor Temp | the title "Indoor Temp > Front Room Temperature" |
+| F52 | Indoor Temp's Members | the title "Indoor Temp" alone; tap it: the group view; tap the group view's name: Members |
+| F53 | Show as..., Solo card: choose a face, then leave the flow without Confirm | nothing changes - the face is saved only at the dialog's Confirm (what happened on the glass: GROUP's Face still said All members) |
+
+## Results, 11-06 night (owner, on the 1060)
+
+**Passed:** F1, F2, F4-F7, F9, F10, F12, F13, F15-F19, F21-F43, F45, F47-F51, F53.
+**Failed:** F3, F8, F11, F14 (partly), F20, F44, F46, F52.
+
+| # | What was wrong | Cause | Now |
+|---|---|---|---|
+| F3, F8 | No Toggle for Kitchen | Not the offline Tuya switches. **The 1060's Kitchen has the Front Thermostat as a member** (unpinned), so it is mixed and K188 offers no Toggle | Unchanged; a question below (Open, 1) |
+| F20 | No Toggle in New group or after | Not reproduced: with two Office lamps Claude got Toggle in the tap step and in the card's SETTINGS. Your two test groups' members were removed, so which cards you picked cannot be read back | Which cards did you pick? A sensor or the thermostat would explain it (Open, 1) |
+| F11 | The pins line and the dialog miscounted | The prompt sits first in the check table, so each check read the row above it | **Fixed** |
+| F14 | Pin's Confirm left the window open | It returned to Visibility by design (K160) | **Fixed**: Confirm closes the window and the page arranges. Unpin unchanged (Open, 3) |
+| F44 | Restore deleted Overhead | Since K171 every card is "made", and Restore took any made card for a copy. On the 1060, Kitchen's Overhead was the Living page card moved into Kitchen (10-26), so Move put that page card back (owner's 17), and its Restore then deleted it | **Fixed**: Restore deletes or moves only a card that is a copy. **The 1060's Overhead is back** in Kitchen from the 11-06 21:05 backup. HA calls it "Laundry Light", which is why Edit cards had no "Overhead" |
+| F44 | Copy and Move chips flat | That chip row had no finish | **Fixed**: unlit is satin |
+| F46 | GROUP stayed open over Header options | GROUP is the left panel; only the right one was folded | **Fixed** |
+| F52 | Tapping "Indoor Temp" in Members did nothing | A solo card's window title was never made a link | **Fixed** |
+
+**Flashed 11-07 00:45, app only, on all three (0 settings differences).** Retest:
+
+| # | Do this | PASS if |
+|---|---|---|
+| R1 | Show as..., Group: untick and tick the pins in any order, several times | the line always matches the number ticked; the dialog names exactly the ticked cards |
+| R2 | Unpin Kitchen's tiles until one is left; then a member's Visibility, Pin this card, Confirm | the window closes, "Optimizing page view...", Kitchen is a group again |
+| R3 | Office: GROUP, Header options | GROUP folds as the view opens |
+| R4 | Indoor Temp's Members: tap the title "Indoor Temp" | the group view; tap its name: Members |
+| R5 | Any card's Visibility, Add to dashboard | Copy and Move: the unlit one is satin |
+| R6 | Kitchen's Overhead (1060): Visibility, Add to dashboard, Move; then the page card's Visibility | Overhead is a page card again; its Restore (if offered) gives back its card label, never deletes it |
+| R7 | Look at Indoor Temp, and Kitchen shown as a solo card | a small two-squares glyph after the card label's words; no other card has it |
+| R8 | Right after a reboot, watch Indoor Temp | its entity id for up to a minute, then "Front Room Temperature" by itself (it no longer waits for the page to be rebuilt) |
+
+## To confirm (words Claude chose; the owner's are in K191)
+
+- Step prompts: "Show this group as:" (Solo card, Group), "Select tap action:", "Select cards to pin:"
+  - and the pins lines: "The group will be shown on the page with its pinned cards." / "Fewer than
+  two cards are pinned, so the group will still be shown as a solo card."
+- The dialogs: titles **"Show group as solo card?"** and **"Show group as group?"** (the second reads
+  oddly - a better one?); lines "The group X will be shown on the page as a solo card." / "The card
+  X will be shown as the face." (or "The face will show all of the group's lights." / "...members.")
+  / "Tapping the card will turn the group on or off." (or "...will open the 'Group view'.", "'Members
+  view'", "'History view'") / "Pinned cards are kept and will be shown again if the group is shown
+  as a group." / "The pinned cards will be: ...".
+- New group's solo dialog: title **"Create group"**, the owner's line, buttons Cancel and Next.
+- The view's title "Kitchen > Show as".
+
+## Open (to settle at sign-off or after) - each with a way to see it
+
+1. **Which members make a group "mixed" (no Toggle)?** Now: any member that is not a light or switch,
+   pinned or not, except header sensors. *See it:* the 1060's Kitchen (Thermo is an unpinned member):
+   Show as..., Solo card, Next, Next - no Toggle. *Choose:* (a) as now; (b) only pinned members count;
+   (c) the face decides - a light or switch face offers Toggle.
+2. **What a solo card's Toggle switches.** Now: its face (Face = Sink: Sink alone; "All lights": every
+   light). *See it:* a light group as a solo card with one light as its face, Toggle as the tap, tap
+   it. Claude's recommendation (11-06): the whole group, whatever the face shows.
+3. **Unpin this card keeps the window open** (K160), while Pin now closes it (F14). *See it:* a
+   member's Visibility, Unpin, Confirm. Close on Unpin too?
+4. **Deleting a group.** Now there is no Delete: removing the last member hides the group (owner's
+   15: "An empty group will be hidden automatically but can be used again"); its record stays (the
+   1060 holds two empty "New group" groups from your F18-F20 tests). *Proposal (words to agree):* a
+   **Delete group** button in the group's Visibility, after Hide from this page; a dialog "Delete
+   group?" - "The group X and its N cards will be deleted. Cards moved into it go back where they
+   came from." - Cancel, Delete. And: should an empty group be deleted instead of hidden?
+5. **A card moved out of a group onto the page has no way back.** Since K171 every card is made, and
+   a made card moving out of a group relocates: nothing records its group, so Restore cannot return
+   it (K137 says Restore is the one way back). *See it:* Office's Desk: Visibility, Add to dashboard,
+   Move; its Visibility has no Restore. *Proposal:* the move remembers the group, and Restore sends
+   it back as a tile.
+6. **Found by Claude, not fixed:** while a group made by New group from an HA area that already has a
+   group is on the page (a "New group" from Office), Office's cards made from HA open titled
+   "New group > Eric" instead of "Office > Eric". Gone once that group is gone. **Cause (11-07):**
+   those cards' group is HA's Office area (`group`: `ha_office`), and an HA area's group takes its
+   name from a page area whose cards all sit in that HA area (`CardGroups::baseName()` via
+   `linkOf()`). The board's own Office holds a bedroom sensor and a bedroom light, so it does not
+   qualify; a New group of Office lamps carries the card label "New group" and does, so it names HA's
+   Office. *Fix proposed:* a group made on the board never names an HA area.
+7. A group made on the board whose group card was hidden: Restore of a card moved out of it still
+   makes a copy (the hidden group is not read back). Rare; not fixed.
+8. K191's "Face greyed for an HA group entity" waits for K170: no HA group entity is a board group yet.
+
+**Settled 11-07:** the solo card's marker - a small group glyph after its card label's words
+(owner: "I like the small group glyph beside the card label"); built, R7.
+
+**Retests, 11-07:** R1-R5, R7, R8 PASS. **R6 partial**: Overhead (originally the Living page card,
+moved into Kitchen) moved out to the page; its Restore offers to give back the card label "Living" -
+the place before last, where the owner's answer 5 below wants the place it just left (Kitchen).
+
+**Owner's answers, 11-07** (nothing built yet):
+
+- Words: the step prompts, the pins lines, the solo dialog, "Create group" and "Kitchen > Show as"
+  are agreed. **"Show group as group?" becomes "Show as group?"**
+- 1: **Mixed = lights or switches AND any member that cannot be toggled or switched.** Pinned or not
+  (F3/F8 are right: Kitchen has the Thermostat). Still open: is a header sensor exempt, as now?
+- 2: **Toggle on a solo card with a toggleable face switches every light and switch in the group.**
+  Changes K191's face-only Toggle.
+- 3: **Unpin closes the window too**, as Pin does (changes K160).
+- 4: **Delete offered inside "Hide from this page"**, before its confirmation; **an empty group is
+  deleted**, not hidden (changes owner's 15). Or delete lives only in the web app, where undo is
+  easier - not chosen yet.
+- 5: Restore matters less now that cards are easy to add, move and group. If kept, **Restore goes
+  one level back**: each card keeps a history of where it lived and with what settings (replaces
+  K111, K112, K137's rules). Not chosen yet: in 2.13, or later.
+- 6: cause found 11-07 - see the item. 7: folded into 5.
+
+**Settled 11-07, later:** header sensors stay exempt (K194); no Delete on the board, it goes to the
+web app (K197); Restore tabled (K198); item 6 fixed as proposed (K199). Built with K195, K196 and
+"Show as group?". Retest:
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | A light group as a solo card, one light as its face, Toggle as the tap; tap it | every light and switch in the group follows the face, pinned or not |
+| T2 | A member's Visibility, Unpin this card, Confirm | the window closes and the page arranges |
+| T3 | Show as..., Group, through to the dialog | its title reads "Show as group?" |
+| T4 | New group from the Office HA area with only Office lamps; open an Office card from HA (Eric) | its title is "Office > Eric", never "New group > Eric" |
+
+**Results 11-07:** T1-T3 PASS. **T4 FAIL**: Eric's long press still said "New group > Eric" (its
+Members row said "Office > Eric", which reads the cluster's name). Cause: a member removed this boot
+(the earlier New group's Office Overhead) is dropped from the file but its record stays in RAM until
+the next boot, and it still voted HA's Office for "New group". After a reboot the 1060 read "Office"
+- the fix worked for what the file holds. **Fixed**: deleted and hidden records no longer count.
+
+| # | Do this | PASS if |
+|---|---|---|
+| T4b | Without rebooting: New group from Office with two lamps, remove one member, then long-press Office's Eric | "Office > Eric" |
+
+**Results 11-07, later:** T4b PASS. Every test on this sheet now passes; the all-nine gate is next.
+What 2.13 set aside, with its reasoning, is `design/carried-from-2.13.md`.
+
+# Round 5
+
+**Branch** `feat/2.13-add-from-ha` at `5c03eaa` (four commits: `4966cb0`, `65d6f28`, `4c977d6`,
+`5c03eaa`). **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run it (app only, flashed unattended on
+11-05 with the owner's leave; settings saved first in `bench/settings/<board>/20261105-0310.json`).
+**After the flash each board's only settings difference is its page's `layout` key**, v4 to v5: the
+arranger's kept answer now records the height it was made for (K167), so each page arranged once -
+to the same arrangement on all three. WS_S3_4B compiles (#69). **Decisions** K165-K178. Checked by
+Claude over `/popup` and screenshots on the P4_5: Desk's SETTINGS live inside Office (K166); Office's
+Visibility with Show as and Rename group, the GROUP panel beside it (K174, K175). **Everything else
+is untried on the glass.**
+
+**Added later on 11-05, after the owner's answers** (`835b870`): **K171** - the compiled cards
+retired, each board's settings file converted and put back before the flash (0 differences after);
+Pin/Unpin names in the accent; New group's dialog says 'Visibility'. Seen on the P4_5's House page
+(screenshot): every group and card as before, the area groups' colors and card labels kept.
+**The Fleet page is unseen** (no way to change page from the PC). **Not in this round:** K170
+(`PLAN_2.13.md` §7.1).
+
+## What changed on screen
+
+- **The pin is the accent color** in Members and Edit cards (K178).
+- **On/off cards have no corner icon** - lights, doors, occupancy, switches; value cards keep theirs
+  (K172).
+- **The group view in Cards mode stands on the page's ground**, its cards the page's card color; a
+  cut corner cuts to the ground (K173, 1.2). **A group's own Card state reaches its group view**
+  (1.17).
+- **The header sensors' drop-down slides** open and shut; **a tap anywhere else folds it first** (1.3,
+  1.7). **A long press on a group view tile presses it in** as on the page (1.4).
+- **A member opened from the group view or Members** has Tap action, Long press opens, Card UI,
+  Units and Active state live, saved on its own card (K166). One of Desk's lamps (no card of its
+  own) keeps them greyed.
+- **History opened directly** (a header sensor's row, Long press opens: History) goes back where it
+  was opened from (K169).
+- **The GROUP panel** is on every view of a group except History and Scenes; **none under a group's
+  Edit cards**, which now reaches the screen's foot (K175, 1.6).
+- **Show as and Rename group are in Visibility** (K174); GROUP keeps Header options, Edit cards,
+  Face, Area.
+- **Pin this card / Unpin this card ask first**, in the owner's words (K165). **Edit cards' Save
+  always asks**, a line per kind of change; **Restore asks** too, from a group or the page.
+- **Edit cards**: an HA area's rows for cards already here take the square and the tap cycle (1.5);
+  **no check mark** on a chosen row (K168); **a sensor being added: third tap, the header** - its
+  glyph in the square - fourth, off (K168).
+- **Visibility's Add to group joins unpinned** (1.7).
+- **New group** (K168): full size; "Model this group after an existing HA area?" with HA's areas and
+  Create new; Edit cards with "Office (new)" (or "New group") first; "Create group N"; the name step
+  ("The group will be named 'Office'. Do you want to enter a different name?", Office / Change name,
+  Next); "Create new group?".
+- **The arranger** keeps its arrangement when the system header is shown or hidden - the height
+  goes to the space round the cards, which keep their size - and when unpinned members join or a
+  header's sensors change (K167).
+- **Card margins**: UI Tweaks' Card margins (Small, Medium, Large, X-large) for the page and group
+  views; a group's Card UI ends in a **Group view** section - Card appearance (Inherit, Tiles,
+  Cards) and Card margins (Inherit, Small ... X-large) (K167).
+- **128 cards** made on the board; within 25% of it Edit cards opens with "Approaching limit of 128
+  cards: XX currently", which stays until tapped; at the limit nothing can be chosen to add (K176).
+- **Scenes for a light added from HA** (Eric Bedroom) - asked of HA at boot (1.12).
+
+## Tests
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | Members or Edit cards of Office | the pins in the accent color |
+| T2 | Look at a light, a door and occupancy card; a temperature card | no corner icon on the first three; the temperature keeps its corner icon |
+| T3 | UI Tweaks, Group view: Cards; Linen; tap Office | the window's ground is the page's, cards the page's card color, cut corners the ground's color |
+| T4 | Office's Card UI: Card state Fill; open its group view | its members use Fill there too |
+| T5 | Group view: tap the header sensors; tap a tile while the panel is down | it slides down; the tile tap only folds it (sliding up) |
+| T6 | Long-press a group view tile | it presses in as on the page, then opens the member |
+| T7 | In the group view long-press Desk; SETTINGS | Tap action, Long press opens, Card UI live; change Tap action, close; on the page Desk's tap does the new thing |
+| T8 | Group view: a header sensor's row, then back | back to the group view (not the sensor's Details) |
+| T9 | A card whose Long press opens is History: long-press, then back | the window closes |
+| T10 | Office's Visibility | Show as (Cluster, Solo card), Rename group, Hide from this page; the GROUP panel beside it |
+| T11 | Office: Members, Card UI, Properties | the GROUP panel on each; on History, CHART or ACTIVITY instead |
+| T12 | Office's Edit cards | no panels under it; it reaches the screen's foot |
+| T13 | A member's Visibility: Unpin this card; then Pin this card | each asks first, in the owner's words; Confirm does it |
+| T14 | Edit cards: tap two cards to add, one twice; Save | "Save 3 changes?" naming them - added, pinned; Save does it |
+| T15 | Edit cards: an HA area with Office's cards in it | Office's members there show the square and take the tap cycle |
+| T16 | Edit cards: tap a temperature sensor not yet in Office three times | its square shows the header glyph; Save: it is in Office's header |
+| T17 | Edit cards: choose a row | no check mark; nothing in the row moves |
+| T18 | A page card's Visibility: Add to group, into Office | it joins Office unpinned (not on the page; in the group view) |
+| T19 | Page panel, CARDS, New group: Office; add two cards; Create group 2; Next; Create | the steps as above; Office's name taken, so "New group" is offered; the new group on the page |
+| T20 | Hide the system header; show it | no "arranging" pause; the cards keep their size, the spare height spread round them |
+| T21 | UI Tweaks: Card margins Large | the page re-arranges with wider gaps; a group view's gaps wider too |
+| T22 | Office's Card UI, Group view section: Card margins Small | only Office's group view changes |
+| T23 | Eric Bedroom's light card | a Scenes button, its Hue scenes listed |
+| T24 | The House page | as before: Doors, Outside, Kitchen, Office, Thermo, Eric, the rest; each card's own settings (Desk's tap, the spans) kept |
+| T25 | Kitchen's Edit cards: tap Sink three times | it cycles pin, remove (red), back - a card made on the board now (K171) |
+| T26 | The Fleet page | the Panel group (Free Heap, Uptime, IP Address, Signal) and the MQTT group (the deck's temperature, light level, occupancy); nothing else |
+| T27 | Panel's Visibility; the page's Edit cards | no Hide from this page; Panel's row marked "Built in" with nothing to tick |
+
+## To confirm (words and looks Claude chose)
+
+- *Settled 11-05:* New group's dialog says "from the 'Visibility' menu"; names in dialogs are in the
+  accent. The owner accepted the rest of this list as written.
+- **"Built in"** on Panel's row in Edit cards (K171), and Panel's tiles all one size (Free Heap,
+  Uptime and IP Address were wide page cards).
+- Save's dialog lines: "The cards X will be added to the group G." / "...will be pinned, and visible
+  from the page in the group G." / "...will be unpinned: still members of G, shown in its 'Group
+  view' and 'Members view'." / "...will be shown in the header of G." / "...will be removed from
+  this device. Nothing will be removed from Home Assistant."; title "Save N changes?", button Save.
+- Restore's dialog: "Restore this card?", "The card X will be restored to its original
+  configuration.", Restore.
+- Pin and Unpin name the card and group in quotes; the owner's lines had none.
+- New group's area buttons show names only (round 1's had a count); New group offers HA's areas
+  only, not the page's cards (§3.6 is that).
+- The Card margins steps: 50, 100, 150 and 200% of today's gap.
+- The card limit's toast has no "tap to dismiss" words; a later ordinary toast replaces it.
+
+## Not built yet
+
+- **K170** (HA groups as board groups) and the rest of `PLAN_2.13.md` §7.
+
+## Found on the glass before the tests (owner, 2026-11-05 evening; T1-T27 not run yet)
+
+Fixed on the branch 2026-11-06, compiled on the three dev boards, **not flashed or seen yet**:
+
+1. **Header options left the GROUP panel open.** It now folds as the view opens, as Visibility
+   and Card UI do.
+2. **Indoor temp (the 1060) could not be a cluster, and came up as a Solo card.** Both had one
+   cause: a cluster with no pinned member had no tiles, so the page fell back to its one card
+   (a made group's default is Cluster). It now stands as a cluster with its header alone, in
+   the room one tile would take.
+3. **Card UI's GROUP VIEW split the list in two**, each part scrolling on its own. It is one list
+   again, with **GROUP VIEW** as a centred section title between the panels' rules, as the
+   system panel's section titles.
+4. **Active state on a group of temperatures.** Shown now only where a member can be on (K183).
+5. **No sign while the page arranges.** "Optimizing page view..." is held while the arranger
+   works, after a quarter second so a quick run does not flash it (K183).
+
+Answered: Indoor temp's face on **All members** shows its **first** member's reading - the card
+takes its type and value from its first entity. Not changed; see the summary question in
+`PLAN_2.13.md` §8.
+
+# Round 4
+
+**Branch** `feat/2.13-add-from-ha` at `5fbc9ee`. **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run it
+(app only, settings saved first in `bench/settings/<board>/20261104-01*.json`, 0 differences after).
+**Decisions** K159-K164. Driven by Claude over `/popup` with screenshots: the group view's spacing,
+the header drop-down, Members' squares, Edit cards' cycle (taps only, never saved), Cards mode on
+the 4B (its settings put back after). **Swipes and taps on the glass are untried.**
+
+## What changed on screen
+
+- **Group view tiles have a maximum size**, 25 x 20 mm, never more than twice as wide as tall, all
+  one size; the window keeps its own size and place unless its tiles would be smaller there than on
+  the page; **the spare room is spread evenly** between and around them (K159, K162).
+- **Its frame has the window's corners**: switching to Members does not jump. **A drag down from
+  its header closes it.**
+- **A tap on its header sensors** drops a panel of them - glyph, full name, state; a row opens that
+  sensor's History; a second tap folds it. A tap on the name opens Members (K163).
+- **Pin** (K160): the page shows a group's pinned members. Members and Edit cards end each member's
+  row in a square - its header glyph, or a pin for a tile - and nothing for one not on the page. A
+  tile's Visibility says **Pin this card** / **Unpin this card**, with no dialog. The group view draws
+  every member alike, the pinned first. New members join unpinned.
+- **Edit cards for a group** (K161): a tap on a member flips its pin (lit); a second marks a card
+  made on the board for removal (red); a third puts it back. A card not in the group: added, then
+  added and pinned. **Save N** does it all; "Saved N changes to Kitchen"; a dialog only for removals.
+- **Table** (moved out of Kitchen on 10/31) is under On the page again, not In this group; adding it
+  sends it home - the page card goes, Kitchen's member comes back.
+- **Group view: Tiles or Cards** (K162) in UI Tweaks; a group's own in Card UI (Inherit, Tiles,
+  Cards), greyed while it is shown as a solo card.
+- The system panel's Grid line says **fixed** for a held column or row count (K164).
+
+## Tests
+
+| # | Do this | PASS if |
+|---|---|---|
+| T1 | Tap Office (4B or 1060) | the window the normal size; three tiles one size, the third centred under two, even space round them |
+| T2 | Tap Office's header sensors, then a row | the panel drops under the header on the right; the row opens that sensor's History; the back arrow returns |
+| T3 | Tap the sensors again; tap the name | the panel folds; the name opens Members |
+| T4 | Drag down from the group view's header | it closes |
+| T5 | In the group view, tap a light tile; long-press a tile | the light switches; the tile opens its member here |
+| T6 | Office's Members | a pin beside each tile on the page, the header's glyphs beside its sensors |
+| T7 | Long-press a tile, Visibility, **Unpin this card** | no dialog; the window closes and the tile leaves the page; it is still in the group view |
+| T8 | That member's Visibility from Members: **Pin this card** | it is back on the page when the window closes |
+| T9 | Kitchen's Edit cards, On the page: tap Table twice, **Save 1** | Table back in Kitchen as a tile; its page card gone; "Saved 1 change to Kitchen" |
+| T10 | Edit cards: tap a member once, twice, three times | lit with its square gone (or a pin come); a made card red at two, a built-in one back at two; as it was at three |
+| T11 | Edit cards: add a card from Home Assistant once, Save | it joins Kitchen but not the page; the group view shows it |
+| T12 | UI Tweaks, Group view: Cards; tap Office | members drawn as cards, bordered, even spacing |
+| T13 | A cluster's Card UI: Group view; a solo group card's | Inherit / Tiles / Cards; greyed on the solo card |
+
+## Results (owner, on the glass, 2026-11-04)
+
+| # | Result | Notes |
+|---|---|---|
+| T1 | PASS | |
+| T2 | PARTIAL | The panel drops and a row opens that sensor's History, but the back arrow goes to the sensor's Details, not the group view. Open question: back returns to the previous window, or History's back always goes to Details? |
+| T3 | PASS | |
+| T4 | PASS | |
+| T5 | PASS | |
+| T6 | PASS | The pins are black; they should be colored (PLAN 1.1) |
+| T7 | PASS | Wants a confirmation dialog (wording in PLAN 1.11) |
+| T8 | PASS | Wants a confirmation dialog, as T7 |
+| T9 | PARTIAL | Kitchen's members (at least on the 1060) are compiled into the dashboard, so they cannot be removed: each tap only flips the pin, over and over. The owner wants the compiled cards retired soon (PLAN 3.3); until then, a note that the card cannot be removed |
+| T10 | PASS | Only for cards made on the board; compiled ones only flip, as T9 |
+| T11 | PASS | |
+| T12 | PASS | |
+| T13 | PASS | |
+
+Found besides the sheet: listed in `PLAN_2.13.md` §1 (1.11-1.16) and §2 (2.8-2.10).
+
+## Not built yet
+
+- Moving a page card into a group from its Visibility (Add to group) still pins it; only Edit cards
+  adds unpinned.
+- A tap outside the header panel but on a tile acts on the tile instead of folding the panel.
+
+# Round 3
+
+**Branch** `feat/2.13-add-from-ha` at `1edb552`. **Boards** WS_P4_5 and WS_P4_4B run it (app only,
+each board's settings saved first in `bench/settings/<board>/20261103-182*.json`, 0 differences
+after). **CYD_P4_1060 is not flashed**: its USB link dropped as the flash began (esptool could not
+open COM9 at any rate) and it stopped answering - replug it holding BOOT (LESSONS, "A dark screen
+after a good flash"); its app was not written, so it still has round 2. CYD_P4_4880 runs round 2;
+WS_S3_4B compiles (#69; RAM 47.0%, flash 37.3%). **Decisions** K154-K158.
+
+The P4_5 tests marked *(run)* were driven by Claude over `/popup` with screenshots, then the P4_5's
+settings put back (0 differences). **Taps and long presses on the glass are untried** - `/popup` has
+no way to tap a tile.
+
+## What changed on screen
+
+- **The group view is the cluster** (K154): Office drawn as on the page - its header and its tiles,
+  the hidden ones last, dimmed, "Hidden" - with no title bar and no X, sized to fit its tiles at the
+  page's tile size, a gap above the panels. A tap outside closes it.
+- **Its tiles act as on the page**: a light's tap switches it, a sensor's opens its History; a long
+  press opens that member - in this window. A tap on its header opens Members.
+- **A group keeps its GROUP panel in every presentation** (K155): Rename group, Header options,
+  Edit cards, Show as, Face, Area - Header options greyed as a solo card, Face greyed as a cluster.
+  SETTINGS no longer has Show as or Face.
+- **Tap action and Long press per presentation** (K156): a solo card's choices and the cluster's are
+  kept apart. A cluster ignores a tap it does not offer: P4_5's Office, which had kept a solo card's
+  Toggle, opens its group view again.
+- **Members of a solo group card list every member**, the header's sensors with their glyphs (K157).
+- **Desk in Office** (K157): Members > Office Desk opens "Office > Desk" with Desk's Members tab;
+  its lamps open "Desk > lamp". The back arrow steps back one level at a time.
+- **Members past the sixth** open: the rows come from the group, not the window's six entities.
+- **Edit cards**: a row ticked to add or restore looks like a lit chip; the list showing in the
+  column is glass, not lit.
+- **Label words** (K158): adding cards to the page asks "Select label for these cards:" (Area, the
+  page's labels, New label, None); its dialog says "The cards will be labeled Garage."; Change label
+  says "This card's label will change from A to B."; Properties says Card label.
+
+## Tests
+
+**T1 - The group view.** Tap Office. *PASS:* a window that is Office's cluster - swatch, Office,
+occupancy and temperature, Desk and Overhead tiles the size they are on the page - centred, no title
+bar, no X, a gap above the GROUP and SETTINGS tabs. Tap outside: it closes. *(run, opened by
+/popup)*
+
+**T2 - Its tiles.** In the group view tap Overhead: it switches, as on the page (Office lights only;
+switch it back). Long-press Desk: "Office > Desk". Back arrow: the group view again.
+
+**T3 - Its header.** In the group view tap Office's header: Members. Tap Office in the title: the
+group view.
+
+**T4 - Hidden members.** Hide one of Kitchen's tiles (Edit cards, Hide). Tap Kitchen. *PASS:* the
+hidden one is a tile, last, dimmed, "Hidden"; the window is wide enough for both. Restore it. *(run:
+Sink hidden through /settings)*
+
+**T5 - Desk in Office.** Office > Members > Office Desk. *PASS:* "Office > Desk", with the Members
+tab beside History. Tap it: Desk's three lamps. Tap one: "Desk > " and the lamp. Back arrow twice:
+Desk, then Office's Members. *(run: the first step)*
+
+**T6 - Solo card keeps GROUP.** Office > GROUP > Show as > Solo card, close the window. Long-press
+the Office card. *PASS:* the GROUP tab is there; Rename group, Header options greyed, Edit cards,
+Show as says Solo card, Face, Area. SETTINGS has Tap action and Long press opens, no Show as or Face.
+*(run)*
+
+**T7 - Solo Members.** On the solo Office card, tap the Members tab. *PASS:* Office Desk, Office
+Overhead, Office Occupancy and Office Temperature, the last two with their header glyphs. *(run)*
+
+**T8 - Edit cards from a solo card.** GROUP > Edit cards. *PASS:* In this group lists the four, glass
+in the column. *(run)*
+
+**T9 - Tap per presentation.** As a solo card, SETTINGS > Tap action > Toggle. GROUP > Show as >
+Cluster, close. *PASS:* a tap on Office opens its group view. Back to Solo card: a tap switches the
+lights.
+
+**T10 - Chosen rows.** Edit cards from the page, tick a card in an area. *PASS:* it looks like a lit
+chip (tinted, an accent edge), not lit glass; red for a row ticked to hide is unchanged.
+
+**T11 - Label words.** Edit cards from the page, add two cards from Garage. *PASS:* "Select label for
+these cards:", New label, None, and the note; Next: "The cards will be labeled Garage." On a page
+card: Visibility > Change label, pick another: "This card's label will change from ... to ...".
+
+## Not built yet
+
+Units and precision from HA; Removed for built-in cards; the text fitter outside Edit cards; the
+two-level nesting rules; New group from the page's own cards; the thermostat's controls (with you
+there).
+
+# Round 2
+
+**Branch** `feat/2.13-add-from-ha` at `d8d3d26`. **Boards** WS_P4_5, WS_P4_4B, CYD_P4_1060 and
+CYD_P4_4880 run it (flashed 2026-11-03 04:50-05:00, app only; each board's settings saved first in
+`bench/settings/<board>/20261103-04*.json` and unchanged after - the 4880 only learnt HA's list, as round
+1 did). WS_P4_7B was not plugged in; WS_S3_4B compiled only (#69) - it builds (RAM 46.9%, flash
+37.3%). **Decisions** K146-K153; the look:
+artifact "2.13 Round 2 Mocks" (version 17).
+
+Built unattended overnight with your permission. The P4_5 tests below marked *(run)* were driven by
+Claude over `/popup` with screenshots, then the P4_5's settings put back (0 differences). **Nothing has
+been tried by hand on the glass.**
+
+## What changed on screen
+
+- **The group view keeps its panels** (GROUP, SETTINGS); its title row has no buttons; the group's
+  name in the title goes between the group view and Members (Members' own tab lit).
+- **CLUSTER is GROUP** (K146): Rename group, Edit cards, Show as, Header options, Area. A tile's
+  Visibility says Hide from the group, Change group; a page card's says Change label, Add to group.
+  The move dialogs say group.
+- **Rename group renames the group**: every card wearing it follows; its color stays.
+- **Edit cards** (K148) from a group's GROUP panel or the page panel's CARDS: one window over the
+  page, the lists in a column (In this group / On the page / Hidden, then HA's areas), the result
+  shown as you tick - dashed rows being added, red rows going.
+- **The page panel**: CARDS is Edit cards and New group; HIDDEN is gone (hidden cards are in Edit
+  cards).
+- **Show as** (Cluster, Solo card) in GROUP; a group shown as one card has **Show as** and **Face**
+  in its SETTINGS. **Long press opens** is in every card's SETTINGS.
+- **Names fitted to their room** (K152) in Edit cards: a name too long for its row steps down to the
+  tag's face before it is cut; rows keep one height.
+
+## Tests
+
+**R1 - The group view.** Tap Office. *PASS:* the window fills the page under the header, GROUP and
+SETTINGS tabs under it, no buttons beside the title, which says Office. Tap Office in the title:
+Members, its bulbs tab lit. Tap Office again: the group view. Open GROUP from the group view. *(run)*
+
+**R2 - Edit cards from a group.** Office > GROUP > Edit cards. *PASS:* the window fills the page;
+the column has In this group (4), On the page, then House's and Outside's areas; In this group lists
+Desk, Overhead, then Occupancy and Temperature flat, "In the header". Tick Desk: red, a tick, the foot
+says Hide 1 (no Remove: Desk is built in). *(run)*
+
+**R3 - One kind of tick at a time.** With Desk ticked, open On the page and tap Table. *PASS:* "Cards
+cannot be selected to add while cards are selected to hide." and the rows there are flat and dim.
+Untick Desk: they come back. *(run)*
+
+**R4 - The result as you tick.** Open Office (the area), tick Office Motion PIR Occupancy; On the
+page, tick Table; back to In this group. *PASS:* In this group says "4 +2", On the page "1", Office
+"1 / 11"; two dashed rows at the foot of the members, "From Office" and "From the page"; the foot
+has Copy / Move and Add 2. Add 2: "Add cards to group?" in the dialogs' sentences, Cancel and
+Confirm. Confirm: both are tiles in Office. *(run)*
+
+**R5 - Remove.** Office > Edit cards, tick the two cards R4 added. *PASS:* both red; the foot has
+Remove 2 and Hide 2. Remove 2: "Remove these cards?"; Remove: both gone. *(run)*
+
+**R6 - Hide and restore a member.** Edit cards, tick Overhead, Hide 1, Hide. *PASS:* Overhead is no
+tile on the page, still in the group view (dimmed, Hidden). Edit cards again: Overhead last, "Hidden";
+tick it: Restore 1 - back as a tile.
+
+**R7 - Edit cards from the page.** Tap House. *PASS:* PAGES, HEADER, CARDS (Edit cards, New group,
+"Hidden cards are viewed and restored in Edit cards"), no HIDDEN. Edit cards: On the page lists
+every card, groups marked Group; Hidden; the areas. *(run)*
+
+**R8 - Add to the page, the group step.** Garage area, tick Garage Light Attic and Garage Overhead
+Lights, Add 2. *PASS:* "House > Add to dashboard", "Select group for these cards:", Garage * lit, the
+page's groups, New group, None, the note, Next. Next: "Add cards to dashboard?", "...placed onto the
+House page." "The cards will become members of the group Garage." Add: two cards on the page. Then
+tick both under On the page: Remove 2 (made here) - gone. *(run)*
+
+**R9 - Cards from two areas.** Tick one from Garage and one from Kitchen, Add 2. *PASS:* the step
+starts with Area, lit; Next says "Each card will become a member of its Home Assistant area's group."
+
+**R10 - Hide and restore from the page.** Tick Eric under On the page, Hide 1, Hide. *PASS:* gone
+from the page; Edit cards > Hidden lists it, tick it, Restore 1: back. *(run)*
+
+**R11 - Rename group.** Office > GROUP > Rename group, type Study, Save. *PASS:* the window, the
+cluster's header and every card wearing Office say Study, in Office's purple. Rename again with the
+field empty: Office. *(run)*
+
+**R12 - Show as and Face.** Kitchen > GROUP > Show as: Solo card, close. *PASS:* Kitchen is one card
+named Kitchen. Its SETTINGS has Long press opens, Show as (Solo card), Face (All lights, then each
+member). Face: one member - the card shows that one. Show as: Cluster, close: the cluster is back.
+*(run, without Face)*
+
+**R13 - Long press opens.** Any card's SETTINGS > Long press opens: History view; close; long press
+it. *PASS:* its window opens on History. A cluster's choices are Members view, Group view, History
+view. Toggle is never offered.
+
+**R14 - The other boards.** On the 4B, the 1060 and the 4880: R1, R2 and R7. *PASS:* everything
+fits; on the 4B the rows are one column.
+
+**R15 - Names fitted.** On the 4B, Edit cards from the page, the Garage area. *PASS:* "On the page",
+"Eric Bedroom" and "Garage Motion Occupancy" are whole, in a smaller face than the names that fit
+already; every row the same height; only a name too long for either face ("Garage Overhead ...") is
+cut. *(run)*
+
+## To confirm (words and choices Claude made)
+
+- Show as's **Cluster / Solo card**, **Face** with **All lights** (All members when none switch),
+  **Long press opens** and its **Details view / Members view / Group view / History view**.
+- The step's **Area** (cards from several areas); its dialog line "Each card will become a member of
+  its Home Assistant area's group."
+- Toasts after an action: "Added N to Office", "Hid N in Office", "Removed N from Office", "Restored
+  N to Office", and on the page "Added N", "Hid N", "Removed N", "Restored N". Restore asks nothing.
+- The page's Hide dialog: "Hidden cards can always be restored from Edit cards." A hidden group's
+  Visibility note: "Hidden groups can be restored from the page's Edit cards." A member's Hide
+  dialog: "This card can be restored from the group's Edit cards".
+- Groups in the page's On the page marked **Group**; "In another group"; "From Home Assistant" for an
+  entity with no area.
+- Restore N is blue (Confirm); Remove N is a plain button beside a red Hide N.
+- Show as is in GROUP for a cluster, but in SETTINGS for a group shown as one card (it has no GROUP
+  panel).
+
+## Not built this round
+
+- The group view's header sensors in its title row, and their drop-down (mocks 2 and 3); a header
+  panel row tapping as its member (K150's second half).
+- **Removed** for a built-in card (K148): Remove is offered only for cards made on the board.
+- Units and precision from HA (K153): HA's display precision is not in what the board reads.
+- The text fitter anywhere but Edit cards (Members, the group step, the cards themselves).
+- Two levels of nesting (K147) and "one block per group": nothing new allows or stops them yet.
+- New group from the page's cards (mock 11), and the thermostat's controls (with you there).
+
+## Known
+
+- The group view and Edit cards end where the panels' tabs begin; the page shows in the strip beside
+  the tabs.
+- Edit cards from a group opens on In this group; its HA area is not brought to the top of the column.
+- A cluster renamed before tonight keeps its own words until its next rename.
+- The P4_5 once failed to join WiFi after a flash (handshake timeout, then a 45-minute wait); a reset
+  fixed it. Not from this round's code.
+
+---
+
+# Round 1
+
+**Branch** `feat/2.13-add-from-ha`. **Boards** WS_P4_5, WS_P4_4B and CYD_P4_1060 run the round-1 build
+(flashed 2026-11-02 08:40; the P4_5's settings put back as they were at 05:52 - the one difference is
+the new `system.ha.known` list). **Decisions** K138-K145; design `docs/design/ha-cards.md`; the look:
+artifact "2.13 Add Cards Mocks".
+
+Built unattended on 2026-11-02 with the owner's permission (flash the three dev boards, Office lights,
+HA's docs). Every test below was run once by Claude over `/popup` and screenshots; **none has been
+tried by hand on the glass.** Results go under each test.
+
+## What changed on screen
+
+- A **tap on a cluster opens its group view** (it opened Members before); a long press still opens
+  Members. A cluster with "Details view" saved as its Tap action opens the group view too.
+- The page panel (tap the page name) has a **CARDS** section: **Add card** and **New cluster**.
+- A cluster's **Add cards** has two sources, **On this board** and **From Home Assistant**.
+- The CLUSTER panel (on Members) has an **Area** row; **Add cards** says "N new" when its area has
+  something new.
+- UI Tweaks ends with **Show helper text** (a checkbox); a cluster's Card UI has **Card state**.
+- A **thermostat** can be added as a card.
+
+## Tests
+
+**T1 - Add cards from HA, in a cluster.** Long press Office > CLUSTER > Add cards. *PASS:* From Home
+Assistant is lit; Office's entities are listed, each with its state; Desk's lamps say "In Desk", the
+overhead "In this cluster", occupancy and temperature "In the header"; Other areas are chips below.
+Tick 3D Printer and Office Humidity: each row lights with a tick, the button says "Add 2". Add: the
+window closes, "Added 2 to Office", both are tiles. Reboot: both still there, with HA's names.
+
+**T2 - Other areas.** In T1's list, tap the Hallway chip. *PASS:* Hallway's three entities replace
+Office's, Office among the chips. Tick THERMOSTAT and Add: a tile with the room's temperature.
+
+**T3 - The thermostat's window.** Long press that tile. *PASS:* the temperature large with what it is
+doing under it ("Idle"); Mode, Heat to, Doing, Humidity, Fan beside it, each matching HA; History
+works. On a solo card: "Heat to 62°" where a sensor says "Seen:".
+
+**T4 - Add card to the page.** Tap House > CARDS > Add card. *PASS:* HA's areas in a column under
+House and Outside, No area last; Garage shows its eleven, Garage Doors' two doors "In Doors". Tick two
+and Add: two cards at the end of the page, in Garage's color.
+
+**T5 - New cluster.** House > CARDS > New cluster. *PASS:* the areas as chips with their counts. Tap
+Garage: its entities, lights ticked, one occupancy and the temperature ticked. Create: a Garage
+cluster appears with the lights as tiles, occupancy and temperature in its header. Rename cluster
+renames it.
+
+**T6 - The group view.** Tap Office. *PASS:* the window covers the page under the header, no panels;
+every member a tile, the ones hidden from the cluster last, dimmed and saying Hidden. Tap a light's
+tile: it switches. Tap a sensor's tile, or long press any: that member's own view. The tune icon goes
+to Members; on Members the bulbs icon comes back. X closes. Check on the 4B and the 1060 too.
+
+**T7 - Area.** On Office's Members open CLUSTER. *PASS:* Area says Office. Choose Kitchen, close, open
+Add cards from HA: Kitchen's entities come first. Put it back to Office. Outside's says Outside (HA's
+floor) and lists Deck first.
+
+**T8 - Something new.** In HA, add the `fleet` label to an entity in Office that does not have it.
+*PASS:* within a few seconds a notice "New in Office: <its name>" with a bar running down; Office's
+CLUSTER > Add cards says "1 new"; the entity's row says New. Open the list, close it: "Open" again.
+Remove the label afterwards. (Not tested: it needs a change in HA.)
+
+**T9 - Notices queue.** *PASS:* two notices in a row show one after the other, never one over the
+other. (Not tested on its own.)
+
+**T10 - Show helper text.** UI Tweaks, untick Show helper text. *PASS:* the notes under Members ("Tap a
+member for details"), Visibility, a cluster's views, the page panel and the hidden cards' sheet are
+gone; tick it again and they are back.
+
+**T11 - A cluster's card state.** Office's Card UI > Card state: Bracket. *PASS:* once the window has
+gone, Office's lit tiles show the bracket while solo cards keep yours; Inherit goes back.
+
+**T12 - Many entities.** *PASS:* with more than ~45 HA entities on a board every one updates (the
+subscription goes in parts now). Add ten from HA to one board and toggle a few in HA.
+
+## To confirm (words and looks Claude chose)
+
+- "Group view" in Tap action; the tune and bulbs icons for the two views (grid and list need the icon
+  font made again - your call).
+- "Added N" (the page's Add card), "Waiting for Home Assistant", the thermostat window's Mode / Heat to
+  / Doing / Humidity / Fan.
+- New cluster shows one list, not the mock's Tiles and Header sections; the occupancy ticked first is
+  the first one HA lists (Garage's motion sensor rather than Garage Occupancy).
+- Card state's place at the foot of a cluster's Card UI.
+- A thermostat's unit is taken as °F.
+
+## Known, not fixed
+
+- The card window is one size, so a cluster's Add cards shows four rows at a time and scrolls.
+- On the 4B the group view's °F sits over a sensor's number.
+- A tile from HA keeps HA's full name ("Office Humidity" wraps in a tile); rename it in Card UI.
+- A humidity added from HA shows a decimal (43.0 %).
+- An area's "1 new" counts the area's own entities, not a linked floor's areas one by one.

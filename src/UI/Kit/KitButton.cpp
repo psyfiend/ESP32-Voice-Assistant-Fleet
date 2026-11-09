@@ -1,4 +1,4 @@
-// Buttons (2.12 P3): a face, a pressed tint and the words' ink, per role.
+// Buttons: a face, a pressed tint and the words' ink, per role.
 #include "UI/Kit.h"
 
 namespace Kit {
@@ -28,7 +28,7 @@ lv_obj_t *button(lv_obj_t *parent, ButtonRole role, const char *text, int32_t w,
     lv_obj_t *l = label(b, look.ink);
     lv_label_set_text(l, text);
     lv_obj_center(l);
-    // SATIN (#99, K77): a button is pressed, never chosen. Its role keeps its
+    // SATIN (K77): a button is pressed, never chosen. Its role keeps its
     // colour - the Remove button's red, Save's accent.
     finish(b, w, h, UI::mm(UI::shape().R_CONTROL), Finish::FINISH_SATIN,
            role == ButtonRole::BTN_DESTRUCTIVE ? UI::pal().ST_BAD :

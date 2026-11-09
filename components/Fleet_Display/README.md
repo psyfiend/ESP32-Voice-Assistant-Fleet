@@ -1,10 +1,10 @@
 # Fleet_Display
 
-The board's display on raw `esp_lcd`, milestone 2.9 (#67). **How it works:
+The board's display on raw `esp_lcd` (#67). **How it works:
 `docs/display/architecture.md`; status per board: `docs/display/README.md`.** This file is only
 the library's own inventory. Built only with `-D DISPLAY_ESPLCD`; every other board keeps
 `DisplayManager` (Arduino_GFX), which this library does not touch. `include/BoardDisplay.h` picks
-one per board. Step 6 of 2.9 deletes `DisplayManager` and leaves this.
+one per board. `DisplayManager` is deleted when the last board has moved to this library.
 
 Every source file here is wholly inside `#if defined(DISPLAY_ESPLCD)` or `#if
 SOC_MIPI_DSI_SUPPORTED`: PlatformIO's library finder does not honour `#ifdef`s when it decides
@@ -15,11 +15,11 @@ what to compile, so each file has to be empty on boards that do not use it.
 | `src/Fleet_Display.{h,cpp}` | The class `SystemCore` owns: bring-up, backlight, the frame buffers, and which one the panel is showing |
 | `src/fleet_dsi_panel.{h,c}` | MIPI-DSI bring-up in C (the vendor config macros are not valid C++): one sequence for every chip, only the driver's constructor differs |
 | `src/fleet_dsi_<chip>.c` | **Ours.** One small wrapper per vendored driver: its constructor with our BSP's init sequence, and its name/version, as one `fleet_dsi_driver_<CHIP>` |
-| `src/esp_lcd_hx8394.{h,c}` | **Vendored** HX8394 driver, `WS_P4_5`'s panel (2.9 step 2) |
-| `src/esp_lcd_st7703.{h,c}` | **Vendored** ST7703 driver, `WS_P4_4B`'s panel (2.9 step 3) |
-| `src/esp_lcd_ek79007.{h,c}` | **Vendored** EK79007 driver, `WS_P4_7B`'s panel (running since 2026-09-28) |
-| `src/esp_lcd_jd9165.{h,c}` | **Vendored** JD9165 driver, `CYD_P4_1060`'s panel (running since 2026-09-28) |
-| `src/esp_lcd_st7701{,_mipi,_rgb}.c`, `esp_lcd_st7701{,_interface}.h` | **Vendored** ST7701 driver (Espressif 2.0.2): `CYD_P4_4880`'s panel over DSI and `WS_S3_4B`'s over RGB, both running. Local changes listed at the top of `esp_lcd_st7701.c` |
+| `src/esp_lcd_hx8394.{h,c}` | **Vendored** HX8394 driver, `WS_P4_5`'s panel |
+| `src/esp_lcd_st7703.{h,c}` | **Vendored** ST7703 driver, `WS_P4_4B`'s panel |
+| `src/esp_lcd_ek79007.{h,c}` | **Vendored** EK79007 driver, `WS_P4_7B`'s panel |
+| `src/esp_lcd_jd9165.{h,c}` | **Vendored** JD9165 driver, `CYD_P4_1060`'s panel |
+| `src/esp_lcd_st7701{,_mipi,_rgb}.c`, `esp_lcd_st7701{,_interface}.h` | **Vendored** ST7701 driver (Espressif 2.0.2): `CYD_P4_4880`'s panel over DSI and `WS_S3_4B`'s over RGB. Local changes listed at the top of `esp_lcd_st7701.c` |
 | `src/fleet_rgb_panel.{h,c}`, `src/fleet_rgb_st7701.c` | **Ours.** RGB bring-up, and the ST7701's 3-wire SPI init through the TCA9554 expander |
 | `src/esp_io_expander*.{h,c}`, `src/esp_lcd_panel_io_3wire_spi.c`, `esp_lcd_panel_io_additions.h` | **Vendored** (Espressif): the expander driver and the 3-wire SPI panel IO the S3_4B's init runs over |
 
@@ -42,22 +42,24 @@ saying so in the boot log and the System Doctor.
 **Driver versions live in ONE place, `src/fleet_display_versions.h`.** Each vendored driver
 includes it for the version macros IDF's component build would inject (that include IS each
 driver's version-macro local change), and the System Doctor's `[DISPLAY]` section prints the same
-numbers through each wrapper's `name`. Updating a driver = new upstream files + its line there. The DSI PHY's LDO channel
-and voltage and the lane count come from the BSP's `TEST_MIPI_DSI_PHY_PWR_LDO_*` and
-`NUM_DSI_LANES` where a board sets them (7B, CYD_P4_1060), otherwise LDO 3 / 2500 mV / 2 lanes -
-which is what every board uses today. `PHY_CLK_SRC` is **not** wired through yet: IDF picks.
+numbers through each wrapper's `name`. Updating a driver = new upstream files + its line there.
 
-**Moving a board over** is one line - `-D DISPLAY_ESPLCD` in its environment - done with the board
-on the desk. `CYD_S3_8048` and `WS_S3_5B` (ST7262, plain RGB, no init list) are the last two.
+The DSI PHY's LDO channel and voltage and the lane count come from the BSP's
+`TEST_MIPI_DSI_PHY_PWR_LDO_*` and `NUM_DSI_LANES` where a board sets them (7B, CYD_P4_1060),
+otherwise LDO 3 / 2500 mV / 2 lanes - which is what every board uses. `PHY_CLK_SRC` is **not**
+wired through: IDF picks.
+
+**Moving a board over** is one line - `-D DISPLAY_ESPLCD` in its environment. `CYD_S3_8048` and
+`WS_S3_5B` (ST7262, plain RGB, no init list) have not moved; `CYD_S3_3248` (QSPI) has not either.
 
 ## Vendored: `esp_lcd_st7701`
 
 From `espressif/esp_lcd_st7701` **2.0.2** (the registry copy in `reference/esp-registry/`),
-Apache-2.0 (`LICENSE_esp_lcd_st7701.txt`), added 2026-09-28 for the Guition JC4880P443. Upstream's
+Apache-2.0 (`LICENSE_esp_lcd_st7701.txt`), for the Guition JC4880P443 and `WS_S3_4B`. Upstream's
 `priv_include/esp_lcd_st7701_interface.h` sits beside the rest (flattened). **Two local changes**,
 listed in `FLEET LOCAL CHANGES` at the top of `esp_lcd_st7701.c`: the version macros, and the
-driver compiling on MIPI-DSI targets only (the RGB half too), so the S3 environments compile none
-of it - 2.9 step 4 lifts that for `WS_S3_4B`. Guition ships a modified 1.1.3 of this driver; we
+driver compiling only on MIPI-DSI targets and on `WS_S3_4B`'s esp_lcd RGB path, so the S3
+environments still on Arduino_GFX compile none of it. Guition ships a modified 1.1.3 of this driver; we
 take Espressif's and feed it Guition's init sequence from the BSP instead. The driver sends MADCTL
 and COLMOD itself before the BSP's list, so a BSP list must not contain 0x36 or 0x3A.
 

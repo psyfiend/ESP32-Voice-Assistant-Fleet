@@ -1,4 +1,4 @@
-// "UI Tweaks" (2.8 round 3) - see include/UI/TweaksSheet.h. A Sheet client: one
+// "UI Tweaks" - see include/UI/TweaksSheet.h. A Sheet client: one
 // view, no tabs, no panels; the X closes it, and it closes itself on the window
 // timeout as every window does.
 #include "UI/TweaksSheet.h"
@@ -40,6 +40,7 @@ static void chooseAsync(void *p) {
     if (!s_spec.rows || r >= s_spec.nRows) return;
     const Row &row = s_spec.rows[r];
     if (i == Kit::CHIP_SLIDER) { if (row.setValue && s_list) row.setValue(Kit::chipTableValue(s_list, r)); return; }
+    if (i == Kit::CHIP_CHECK) { if (row.choose && s_list) row.choose(Kit::chipTableChecked(s_list, r) ? 1 : 0); return; }   // a check row
     if (row.choose) row.choose(i);
 }
 
@@ -81,13 +82,13 @@ static void resetCb(lv_event_t *) {
         d.nButtons  = 2;
         d.width     = LV_MIN(lv_area_get_width(&S.winRect) * 3 / 4, UI::mm(UI::shape().W_DIALOG_MAX));
         d.outside   = confirmCancelCb;
-        d.countdown = true;   // it closes with the window: it says so (#23)
+        d.countdown = true;   // it closes with the window: it says so
         s_confirm = Kit::dialog(d);
     }, nullptr);
 }
 
 // --- The view -----------------------------------------------------------------
-// The kit's chip table (round 5: chips, not selectors), then the buttons.
+// The kit's chip table, then the buttons.
 static void buildList() {
     const UIShape &k = UI::shape();
     const int32_t stageW = lv_area_get_width(&S.winRect) - 2 * S.pad;

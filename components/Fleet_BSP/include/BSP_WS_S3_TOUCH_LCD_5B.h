@@ -19,7 +19,7 @@
 // -------------------------------------------------------------------------
 
 #define WS_S3_5B
-#define BSP_PANEL_DRIVER ST7262   // panel chip, a bare name: sets PANEL_MODEL; picks the esp_lcd driver from 2.9 step 4 (Fleet_BSP.h)
+#define BSP_PANEL_DRIVER ST7262   // panel chip, a bare name: sets PANEL_MODEL; the esp_lcd RGB path picks its driver from it (Fleet_BSP.h)
 
 const BoardHardware WS_S3_TOUCH_LCD_5B_HARDWARE = {
     .device_name  = "Waveshare S3-Touch-LCD-5B",
@@ -34,15 +34,10 @@ const BoardHardware WS_S3_TOUCH_LCD_5B_HARDWARE = {
 
     .BOOT_BUTTON_PIN = 0,
     // No onboard audio codec on this board - it's a display/IO dev board,
-    // not one of the fleet's voice-assistant boards. AudioManager::begin()
-    // still runs unconditionally from the shared test UI, though, and its
-    // I2S channel init unconditionally claims bsp_audio.I2S_MCLK/BCLK/LRCK/DOUT/DIN
-    // - left at their zero defaults those pins would be GPIO0, which is this
-    // board's G1 RGB data line. bsp_audio's I2S_SDA/SCL_PIN are pointed at the
-    // real (harmless) shared I2C bus rather than left at 0/0 for the same
-    // reason - see conversation notes; AudioManager likely needs a
-    // HAS_ES7210/HAS_ES8311 guard around I2S init before this board can
-    // safely run the common test app.
+    // not one of the fleet's voice-assistant boards. AudioManager is left out
+    // of its build (lib_ignore in platformio.ini) and no AudioConfig is declared,
+    // because AudioManager's I2S init would claim pins left at zero, and GPIO0 is
+    // this board's G1 RGB data line.
     .I2S_AMP_EN = -1, // No amp on this board
 };
 inline const BoardHardware& bsp_hw = WS_S3_TOUCH_LCD_5B_HARDWARE;
@@ -151,7 +146,7 @@ inline const StorageConfig& bsp_storage = WS_S3_TOUCH_LCD_5B_STORAGE;
 
 const LvglConfig WS_S3_TOUCH_LCD_5B_LVGL = {
     .DOUBLE_BUFFERING = true,
-    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
+    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override: LVGL_Flush_Gfx.cpp picks the buffer size for the bus
     .BUFFER_SIZE_PX   = 1024 * 20, // Width x 20 rows
 };
 inline const LvglConfig& bsp_lvgl = WS_S3_TOUCH_LCD_5B_LVGL;

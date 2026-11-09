@@ -6,7 +6,7 @@
 //
 // WHAT the entities are lives next door in SystemEntities.h, as a declarative
 // table shaped like a BSP header. This file contains no descriptions, only
-// polling - which is the split ROADMAP 4.1 means by "providers write".
+// polling - the split behind "providers write" (DECISIONS A3).
 // ---------------------------------------------------------------------------
 
 void SystemProvider::begin(EntityRegistry *reg, ConnectivityManager *link) {

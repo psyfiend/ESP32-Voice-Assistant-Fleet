@@ -1,26 +1,26 @@
 #pragma once
 //
 // PanelDebug - GET /panel: ask a DSI panel how it is, and send it its init
-// sequence again (2.10c round 9).
+// sequence again.
 //
-// The WS_P4_4B was seen twice with its whole picture washed out - near-white,
-// lurid colours - while /screenshot showed the frame buffer was right. So the
-// panel itself was showing a correct picture wrongly, as if its own settings
-// (gamma, power) had been lost. This is for the next time it happens, before
-// anyone resets the board:
+// For a panel whose picture is washed out (near-white, lurid colours) while
+// /screenshot shows the frame buffer is right: the panel is showing a correct
+// picture wrongly, as if its own settings (gamma, power) had been lost. Use
+// it before resetting the board:
 //
-//   http://<board>/panel            the panel's status registers, now and as
-//                                   read at boot, and whether they differ
+//   http://<board>/panel            the panel and its driver, and the underrun
+//                                   count (below)
 //   http://<board>/panel?resend=1   the same, then the BSP's init sequence sent
-//                                   again (no reset), then the registers again
+//                                   again (no reset)
 //
-// If the resend brings the picture back, the panel lost its settings and a
-// periodic check could put them back. Built only on DSI boards with the esp_lcd
+// The panel's status registers are not read: a DSI read while the panel
+// streams video stops the picture. If the resend brings the picture back, the
+// panel lost its settings and a periodic check could put them back. Built only on DSI boards with the esp_lcd
 // display (DISPLAY_ESPLCD + HAS_MIPI_PANEL) - SystemCore calls it there. No LVGL: the
 // handler runs on the HTTP server's task and talks to the panel over the DSI
 // command path, not the picture.
 //
-// UNDERRUNS (2.10d). The DSI bridge feeds the panel from the frame buffer in
+// UNDERRUNS. The DSI bridge feeds the panel from the frame buffer in
 // PSRAM; when that feed falls behind, the bridge sends filler instead of the
 // picture and the panel flashes. The bridge latches each such event in a status
 // bit. poll() - from SystemCore::loop() - reads it, counts it and logs it, so a
@@ -43,12 +43,12 @@
 //                                         scratch namespace erased afterwards
 //
 // It tests whether a flash write starves the panel: while the flash is busy the
-// CPU cache is off, and the interrupt that starts each frame's transfer was not
-// built cache-safe until A14 (CONFIG_LCD_DSI_ISR_CACHE_SAFE, the rebuilt libs).
+// CPU cache is off, and the interrupt that starts each frame's transfer needs
+// CONFIG_LCD_DSI_ISR_CACHE_SAFE (A14, in the rebuilt libs) to survive that.
 //
-// /panel?flash=N without nvs=1 is REFUSED (#98). It used to erase and write the
-// start of the "spiffs" data partition - since 2.10d the LittleFS partition
-// that holds the settings file, whose next mount then formatted it.
+// /panel?flash=N without nvs=1 is REFUSED (A16, #98): an erase mode would
+// destroy the start of the "spiffs" partition, which is the LittleFS partition
+// that holds the settings file.
 //
 class HttpServer;
 class Fleet_Display;

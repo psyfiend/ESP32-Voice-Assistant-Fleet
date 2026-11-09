@@ -8,27 +8,23 @@
 // ---------------------------------------------------------------------------
 // The card types a dashboard can actually ask for, named for what they ARE.
 //
-// This file is the layer that was missing. `ValueCard` and `StateCard` are two
-// arrangements; these are the things a person picks. The split matters because
-// only one of the two is anybody's business but ours:
+// `ValueCard` and `StateCard` are two arrangements; these are the things a
+// person picks. Only one of the two is the user's business:
 //
 //   a user says            "this is a sensor, here is its topic"
 //   the framework decides  "a sensor's hero is a number, so: value layout"
 //
-// docs/design/cards.md section 4 lists card types by Home Assistant domain and
-// ROADMAP milestone 2.7 names the first four the same way. The layout names
-// were never the spec's - they came from a paraphrase in HANDOFF.md - and
-// having them as the public surface meant a build sheet would have had to
-// record a layout decision that is not the user's to make.
+// docs/design/cards.md section 4 lists card types by Home Assistant domain, and
+// the types here are named the same way, so a layout decision is never
+// something the user has to record.
 //
-// ALL FOUR ARE THIN ON PURPOSE. A domain type answers three questions and
+// THE DOMAIN TYPES ARE THIN ON PURPOSE. A domain type answers three questions and
 // nothing else: which layout, what a tap does, and what it is called. If one
 // of these ever grows real logic, that is a sign the logic belongs in the
 // layout it derives from, where every domain sharing that layout gets it.
 //
-// Deliberately ONE header and ONE .cpp rather than a file pair per type. Four
-// twenty-line classes do not need eight files, and the file count of the card
-// layer is already something to keep an eye on.
+// Deliberately ONE header and ONE .cpp rather than a file pair per type: these
+// are small classes, and the file count of the card layer is worth keeping down.
 // ---------------------------------------------------------------------------
 
 // A read-only number. Temperature, illuminance, power, RSSI, free heap.
@@ -39,7 +35,17 @@ public:
     const char *typeName() const override { return "sensor"; }
 };
 
-// A SUMMARY (2.11 round 4, K98): a group card of members of one kind - the
+// A THERMOSTAT, READ ONLY (K144): the room's temperature as a measure
+// card's number, and what it is set to where a sensor says when it was seen -
+// "Heat to 68°" (K145). Its window lists the rest. It has no controls.
+class ClimateCard : public ValueCard {
+public:
+    const char *typeName() const override { return "climate"; }
+protected:
+    bool statusWords(const Entity &e, char *out, size_t cap) const override;
+};
+
+// A SUMMARY (K98): a group card of members of one kind - the
 // garage doors - as one card: one icon, active while any member is, and under
 // it the active ones by name - "North", "Both", "2 open"; none, its own name.
 // A tap opens its Members (CardPage gives it that, unless the owner chose).
@@ -86,12 +92,12 @@ protected:
     void onTap() override;
 };
 
-// A light. Identical to a switch today.
+// A light. Behaves as a switch.
 //
-// It is a separate type anyway rather than an alias, because brightness and
-// colour are its own (cards.md section 4: "where the light reports colour or
-// colour temperature, the card mirrors it"), and the day that lands it should
-// be a change to this class rather than a new branch inside SwitchCard.
+// It is a separate type rather than an alias, because brightness and colour
+// are its own (cards.md section 4: "where the light reports colour or colour
+// temperature, the card mirrors it"), so a light's extras belong in this class
+// and not in a branch inside SwitchCard.
 class LightCard : public StateCard {
 public:
     const char *typeName() const override { return "light"; }
@@ -116,13 +122,13 @@ protected:
 // ---------------------------------------------------------------------------
 // The factory.
 //
-// One place that maps a Home Assistant domain onto a class, so that a build
-// sheet (#20) writes `type: sensor` and never names a C++ type or a layout.
-// Every caller that creates a card should come through here.
+// One place that maps a Home Assistant domain onto a class, so that a card
+// spec says `sensor` and never names a C++ type or a layout. Every caller that
+// creates a card should come through here.
 //
-// Returns nullptr for a kind with no card yet - NUMBER, TEXT, CLIMATE and
-// WEATHER are all real EntityKinds with no implementation, and a null is a
-// more honest answer than quietly rendering one of them as something else.
+// Returns nullptr for a kind with no card - NUMBER, TEXT, CLIMATE and WEATHER
+// are real EntityKinds with no implementation, and a null is a more honest
+// answer than quietly rendering one of them as something else.
 // ---------------------------------------------------------------------------
 Card *cardForKind(EntityKind kind);
 

@@ -13,11 +13,10 @@ class EntityRegistry;
 // WHY REST AND NOT THE WEBSOCKET WE ALREADY HAVE.
 //
 // Because HA's websocket API has no per-entity state call. `get_states` is
-// all-or-nothing and on the owner's instance that is 1,662 entities and
-// 787,728 bytes - not reachable on this hardware and not worth reaching for.
-// REST's `GET /api/states/<entity_id>` returns ONE entity in 399-843 bytes in
-// 4-25 ms, measured. That gap is the entire reason both transports exist here;
-// it is not a philosophical split. See docs/design/ha-websocket.md section 7.
+// all-or-nothing and on the owner's instance that is over 1,600 entities and
+// ~780 KB - not reachable on this hardware. REST's
+// `GET /api/states/<entity_id>` returns ONE entity in 399-843 bytes in
+// 4-25 ms, measured. That gap is the entire reason both transports exist here. See docs/design/ha-websocket.md section 7.
 //
 // WHY THIS IS NEEDED AT ALL. subscribe_trigger fires on CHANGE. Without a
 // one-shot fetch, a light that nobody touches and a thermostat holding steady
@@ -29,7 +28,7 @@ class EntityRegistry;
 //
 // esp_http_client is synchronous. Eighteen sequential GETs on the loop task is
 // roughly 450 ms of frozen UI, which is exactly the shape of bug that made
-// PubSubClient's connect() freeze the panel (#49's neighbour). So this fetches
+// PubSubClient's connect() freeze the panel. So this fetches
 // AT MOST ONE ENTITY PER loop() PASS: the stall is one request, ~25 ms on the
 // measured numbers, and it happens once per session rather than continuously.
 //

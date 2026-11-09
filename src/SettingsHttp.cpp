@@ -1,8 +1,7 @@
 // SettingsHttp - the PC's addresses for the saved settings: GET /settings (the
 // file, ?stats=1, and the settings without a screen yet) and POST /settings
-// (a restore, A17). Split from Settings.cpp on 2026-10-15 when that file
-// passed 1,000 lines; the store's state stays private to Settings.cpp and is
-// reached through SettingsInternal.h. See Settings.h and HTTP_REFERENCE.md.
+// (a restore, A17). Kept apart from Settings.cpp, whose state stays private
+// to it and is reached through SettingsInternal.h. See Settings.h and HTTP_REFERENCE.md.
 //
 // Handlers run on the HTTP server's task, whose stack is in PSRAM: nothing
 // here touches the flash (a flash access from that task reboots the board,
@@ -57,7 +56,7 @@ esp_err_t handleSettings(httpd_req_t *req) {
     // A card's custom name, from a PC (K37, until the web UI): name= sets it,
     // an empty name= removes it (the Reset). Kept and written like any other
     // change; the card shows it the next time its page is built.
-    // Groups (K44), from a PC until the web UI: group=new&name=Temperature
+    // Groups (K46), from a PC until the web UI: group=new&name=Temperature
     // makes a custom group and answers its id; group=<id>&color=RRGGBB sets a
     // group's colour (empty: back to its colour-by-name). Cards already built
     // show it when their page is next built.
@@ -122,8 +121,8 @@ esp_err_t handleSettings(httpd_req_t *req) {
         return httpd_resp_send(req, out, len);
     }
 
-    // THE WINDOWS' COUNTDOWN (owner, T6, 2026-10-14), from a PC until the system
-    // settings page: window_close=60|30|10|off (60, D6's, is the default and
+    // THE WINDOWS' COUNTDOWN (K79), from a PC until the system
+    // settings page: window_close=60|30|10|off (60 is the default and
     // is stored as nothing) and window_bar=on|off, alone or together. In
     // effect from the next window.
     {
@@ -158,10 +157,10 @@ esp_err_t handleSettings(httpd_req_t *req) {
     }
 
     char id[CARD_ID_ARG], name[200];   // a cluster's slots: up to four card ids
-    // THE ARRANGER'S KNOBS (2.11, K105, K109 - Layout Playground v8's), tuned
+    // THE ARRANGER'S KNOBS (K105, K109 - the Layout Playground's weights), tuned
     // from a PC: arranger=<size|square|wide|twin|gap8|order|big|budget|off>&v=<number>
-    // (empty: the owner's tuned default; big is v9's; budget the search's steps
-    // per pass per grid, round 13). A page is arranged again when it is next built.
+    // (empty: the owner's tuned default; budget is the search's steps per pass
+    // per grid). A page is arranged again when it is next built.
     if (haveQ && httpd_query_key_value(q, "arranger", id, sizeof(id)) == ESP_OK &&
         httpd_query_key_value(q, "v", name, sizeof(name)) == ESP_OK) {
         static const char *const W[] = { "size", "square", "wide", "twin", "gap8", "order", "big", "budget", "off" };
@@ -180,7 +179,7 @@ esp_err_t handleSettings(httpd_req_t *req) {
         httpd_resp_set_type(req, "text/plain");
         return httpd_resp_send(req, out, n);
     }
-    // A PAGE'S CLUSTERS' HEADER STYLE (2.11, K102), until the glass sets it:
+    // A PAGE'S CLUSTERS' HEADER STYLE (K102), until the glass sets it:
     // page=<slug>&cl_style=swatch|bar (empty: the dashboard's).
     if (haveQ && httpd_query_key_value(q, "page", id, sizeof(id)) == ESP_OK &&
         httpd_query_key_value(q, "cl_style", name, sizeof(name)) == ESP_OK) {
@@ -198,8 +197,8 @@ esp_err_t handleSettings(httpd_req_t *req) {
     // value is not checked against the choices here; a name the firmware
     // does not know reads as "not set". An empty value removes the key.
     // group= (ha_area / own / none / a group id) and label_text= (the card
-    // label's own text, with group=own) are the card label's (K44).
-    // A group card's (2.11, until round 3 edits them on the glass): present=
+    // label's own text, with group=own) are the card label's (K46).
+    // A group card's, also set on the glass: present=
     // card|cluster, slots= (member card ids, comma-separated, highest priority
     // first), cl_style=swatch|bar, cl_icons=off; a member's hidden=yes|no.
     static const char *const KEYS[] = { "label", "tap", "tap_scene", "group", "label_text",
@@ -208,7 +207,7 @@ esp_err_t handleSettings(httpd_req_t *req) {
         if (!haveQ || httpd_query_key_value(q, "card", id, sizeof(id)) != ESP_OK ||
             httpd_query_key_value(q, key, name, sizeof(name)) != ESP_OK) continue;
         urlDecode(name);
-        // label=inherit is kept since K49 (a named card's default is Custom).
+        // label=inherit is kept as a saved choice (K49: a named card's default is Custom).
         const bool reset = !name[0] || !strcmp(name, "default") ||
                            (strcmp(key, "label") && !strcmp(name, "inherit"));
         Settings::setCard(id, key, reset ? nullptr : name);

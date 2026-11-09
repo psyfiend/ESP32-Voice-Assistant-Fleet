@@ -1,5 +1,5 @@
-// The status glyphs as data (2.8 round 3, D-24): every glyph inside its 24-unit grid and centred
-// on it - the owner's T9: the Wi-Fi fan sat low and its dot off to the left.
+// The status glyphs as data (D-24): every glyph inside its 24-unit grid and centred on it (the
+// Wi-Fi fan and its dot included).
 #include <unity.h>
 #include "UI/GlyphShapes.h"
 

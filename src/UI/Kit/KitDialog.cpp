@@ -1,13 +1,13 @@
-// The dialog (2.12 P3): a question over everything, from a spec. First made for
-// "Remove card" (K66, K69): a dialog you cannot miss, where a button that turned
-// into "Sure?" was easy to overlook. Rare, so the dim's one full-screen redraw
-// is worth it here.
+// The dialog: a question over everything, from a spec (first used for "Remove
+// card", K66, K69). A dialog is hard to miss, where a button that turned into
+// "Sure?" is easy to overlook. Rare, so the dim's one full-screen redraw is
+// worth it here.
 #include "UI/Kit.h"
 #include "UI/Sheet.h"
 
 namespace Kit {
 
-// ANYTHING THAT CLOSES ITSELF SAYS SO THE SAME WAY (owner, 2026-10-14; #23): a
+// ANYTHING THAT CLOSES ITSELF SAYS SO THE SAME WAY: a
 // dialog that goes with the sheet under it shows that sheet's countdown bar,
 // kept in step by a timer of its own that goes with the bar.
 static void barTick(lv_timer_t *t) {
@@ -18,7 +18,7 @@ static void barGone(lv_event_t *e) {
     if (lv_timer_t *t = (lv_timer_t *)lv_event_get_user_data(e)) lv_timer_delete(t);
 }
 
-// Only while the sheet shows its own (the system settings can hide it, T6).
+// Only while the sheet shows its own (the system settings can hide it, K79).
 lv_obj_t *countdownFollow(lv_obj_t *box, int32_t boxW) {
     const Sheet *S = sheetShowing();
     if (!S || !S->autoBar) return nullptr;
@@ -67,7 +67,7 @@ lv_obj_t *dialog(const DialogSpec &spec) {
     lv_obj_t *row = plain(box);
     lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
     add(row, KitStyle::KS_DIALOG_ROW);
-    // THE BUTTONS SHARE THE ROW (#96): W_DIALOG_BTN each where it fits, else an
+    // THE BUTTONS SHARE THE ROW: W_DIALOG_BTN each where it fits, else an
     // equal share of the row. The row spaces them evenly, so what is left over
     // goes into n + 1 spaces: a share leaves S7 between and beside them. The
     // row is the box less its padding and border, read from the box's role.

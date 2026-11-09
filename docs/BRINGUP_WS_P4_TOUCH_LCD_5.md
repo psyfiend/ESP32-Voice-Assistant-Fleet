@@ -1,8 +1,7 @@
 # WS_P4_5 Bring-Up — Waveshare ESP32-P4-WIFI6-Touch-LCD-5
 
-**Resolved 2026-09-06. The board is at full fleet parity.** This is the record of what was
-wrong and what the board needs — not the investigation, which is in git history. The
-transferable lessons are in `LESSONS.md`.
+**The board is at full fleet parity.** This records what was wrong and what the board needs;
+the investigation is in git history and the transferable lessons are in `LESSONS.md`.
 
 Vendor reference tree: `reference/Waveshare Official Repos/Waveshare-P4-WIFI6-Touch-LCD-5`.
 Their bundled, confirmed-working copy of the Arduino GFX library is the single most useful
@@ -25,16 +24,16 @@ It explained every symptom at once. Host-side calls all succeeded because the pa
 involved; init commands landed in the DSI command FIFO and blocked part-way through when it
 filled with nothing draining it; the backlight never lit because `gfx->begin()` never
 returned; and the factory firmware worked because IDF's `esp_lcd_hx8394` driver honours
-`flags.reset_active_high`. The other three P4 boards were unaffected because their panels are
+`flags.reset_active_high`. The other P4 boards are unaffected because their panels are
 active-LOW.
 
-**The fix.** `DisplayConfig` gained `uint8_t RST_ACTIVE_HIGH`, zero-defaulting to active-low
-so the three working P4 boards take a bit-for-bit identical path. Only this board sets it.
-`Arduino_DSI_Display` branches on it, mirroring `esp_lcd panel_hx8394_reset`.
+**The fix.** `DisplayConfig.RST_ACTIVE_HIGH` (`uint8_t`) zero-defaults to active-low, so every
+other board takes the generic path. Only this board sets it. `Arduino_DSI_Display` branches on it,
+mirroring `esp_lcd panel_hx8394_reset`, and the esp_lcd path honours it too.
 
-Waveshare had already patched their own copy of that exact file, with a comment naming the
-consequence outright. Several rounds of hypotheses were spent because only
-`Arduino_ESP32DSIPanel.cpp` had ever been compared — see `LESSONS.md`, "Method".
+Waveshare's own copy of that file already carries the patch, with a comment naming the
+consequence outright. Diff the vendor's whole tree before theorising: comparing only
+`Arduino_ESP32DSIPanel.cpp` missed it (`LESSONS.md`, "Method").
 
 ---
 
@@ -53,12 +52,12 @@ Confirmed working configuration:
 | Panel | MIPI/DSI HX8394, 720x1280 native portrait |
 | `ROTATION` | `1` (landscape) — our preference; Waveshare specify `0` |
 | `RST_ACTIVE_HIGH` | `1` — the fix above |
-| `NUM_FB` | `2`, matching Waveshare's own working library |
-| `PHY_CLK_SRC` | `0` (library default `PLL_F20M`) — an experiment, retired and confirmed irrelevant |
+| `NUM_FB` | `2` (Arduino_GFX path only; the esp_lcd path derives its frame buffer count from the present mode) |
+| `PHY_CLK_SRC` | `BSP_PHY_CLK_SRC_DEFAULT` (library default `PLL_F20M`); another source made no difference on this board |
 | Backlight | GPIO26, 5 kHz PWM |
 | Touch | GT911 at `0x5D`, INT and RST both `-1` |
 | Audio | ES8311 out at `0x18`, ES7210 in at `0x40`, amp enable GPIO53 |
-| `HIGH_DPI_DISPLAY` | enabled; suits this panel |
+| UI scale | derived from the real PPI (294 PPI, scale 1.73) |
 | Silicon | ESP32-P4 rev v1.3 (eFuse-confirmed) |
 
 ---
@@ -68,19 +67,18 @@ Confirmed working configuration:
 Display, GT911 touch (including at rotation 1, on the generic `mapCoordinates()` branch),
 ES8311 output, ES7210 codec init, WiFi STA on a real DHCP lease, AP, and `STA_PLUS_AP`.
 
-This is also the first and so far only board running the full entity pipeline: MQTT broker
-session, HA discovery, four system entities published outward, and four Zigbee2MQTT entities
-read back inward.
+It runs the full entity pipeline (MQTT broker session, HA discovery, the websocket to HA), as
+every board does.
 
-**Not yet exercised:** actual mic capture, SD card.
+**Not exercised:** actual mic capture, SD card.
 
 ---
 
-## Two follow-ups this board surfaced
+## Two open items from this board
 
 **ESP32-C6 co-processor firmware reports `0.0.0`.** `Req_GetCoprocessorFwVersion` times out
 against host `2.12.11`. WiFi works regardless, but it costs roughly a second of boot time in
-failed RPC retries. Likely fleet-wide across the P4 boards — see `HARDWARE_STATUS.md`.
+failed RPC retries. It shows on every P4 with a factory C6 - see `HARDWARE_STATUS.md`.
 
 **I2C speed is reported twice, differently.** `i2cInit()` logs `freq=100000` while
 `[TouchMgr]` logs `Speed:400000`. Both work. Probably two reporters rather than two buses,
@@ -100,10 +98,10 @@ revision is a property of the individual chip, not the board model, so a per-boa
 header cannot represent it correctly. If it is ever made load-bearing, read it at runtime and
 compare — the way `checkAudioBspSanity()` does for the ES7210 enums.
 
-**It is read at runtime now (2026-09-26):** the System Doctor's `[FIRMWARE]` section prints
-`Chip: esp32p4 rev vX.Y` from `esp_chip_info()`. The first two readings prove the point above:
-this `WS_P4_5` is **rev v1.3**, the `WS_P4_4B` beside it **rev v1.0** - two boards, two silicon
-revisions, both pre-rev3 and both correctly served by `esp32p4_es`.
+**It is read at runtime**: the System Doctor's `[FIRMWARE]` section prints
+`Chip: esp32p4 rev vX.Y` from `esp_chip_info()`. This `WS_P4_5` is **rev v1.3** and the `WS_P4_4B`
+is **rev v1.0** - two boards, two silicon revisions, both pre-rev3 and both correctly served by
+`esp32p4_es`.
 
 Fuller detail, including the rev3-only `XTAL` PHY clock source that `PHY_CLK_SRC` exists to
 reach, is in `FUTURE_IMPROVEMENTS.md`.

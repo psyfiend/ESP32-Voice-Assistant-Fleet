@@ -2,13 +2,10 @@
 //
 // SystemReport - the System Doctor.
 //
-// Was debug_dump_config() in LVGL_Test_UI.cpp, which wrote straight into
-// Panel_System and was called back from the UI through an `extern`. Both
-// directions are inverted here: the report writes to registered sinks and
-// knows nothing about LVGL, and the UI registers itself rather than being
-// reached into.
+// The report writes to registered sinks and knows nothing about LVGL; the UI
+// registers itself as a sink rather than being reached into.
 //
-// That buys three things:
+// That gives three things:
 //   - the report works with no GUI present (Serial is the default sink),
 //   - the Phase 4 Settings -> System Info page registers a sink and gets the
 //     whole report without a second copy of the formatting,
@@ -45,15 +42,14 @@ void line(const char *fmt, ...);
 // the human-readable form is a convenience in parentheses, never a
 // replacement. Values under 1 KB print as bytes alone.
 //
-// Note "KB", not "kb" - lower-case b is bits. The old output mixed "bytes",
-// "kb" and "mb" for the same quantity in three places.
+// The unit is "KB"; a lower-case b would be bits.
 //
 // Returns `out` so it can be used inline in a printf argument list.
 const char *fmtBytes(uint64_t bytes, char *out, size_t outLen);
 
 // Walk everything and emit it.
 //
-// echoSerial mirrors the old manualTrigger flag: off for the automatic boot
+// echoSerial is off for the automatic boot
 // run (whose content largely duplicates the boot-time Serial prints the
 // managers already produce), on for a manually-triggered run such as the
 // System panel's "Dump Config" button. -D DUMP_CONFIG forces it on.

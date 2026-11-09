@@ -10,9 +10,9 @@
 // Driver: ST7701 (MIPI DSI, 2 lanes)
 // Resolution: 480x800 (native portrait)
 //
-// BUILT 2026-09-28 FROM GUITION'S PACK ALONE - NEVER FLASHED.
+// Built from Guition's example pack alone (hardware status: docs/HARDWARE_STATUS.md).
 // reference/Guition Examples/Guition-P4-JC4880P433/ (the folder name says
-// P433; everything inside it is the P443). Sources, in the order they were
+// P433; everything inside it is the P443). Sources, in the order they are
 // trusted:
 //   5-Schematic/*.png                        pins (read from the drawings)
 //   1-Demo/idf_examples/ESP-IDF_5.5.4/common_components/
@@ -26,8 +26,8 @@
 // Where the two disagree, both values are kept (CLAUDE.md: a commented
 // value beside a timing field is a candidate, not clutter).
 //
-// esp_lcd ONLY (-D DISPLAY_ESPLCD is in its environment from the start):
-// there is no Arduino_GFX path for this board and there never needs to be.
+// esp_lcd ONLY (-D DISPLAY_ESPLCD is in its environment):
+// there is no Arduino_GFX path for this board.
 // -------------------------------------------------------------------------
 
 #define CYD_P4_4880
@@ -35,8 +35,8 @@
 
 // Panel init commands (ST7701), Guition's - identical in their IDF and Arduino
 // packs (vendor_specific_init_default in their modified esp_lcd_st7701_mipi.c,
-// the live block; the commented-out blocks around it there are older
-// attempts). No 0x36 (MADCTL) or 0x3A (COLMOD): the ST7701 driver sends both
+// the live block; the commented-out blocks around it there are alternatives
+// the vendor left). No 0x36 (MADCTL) or 0x3A (COLMOD): the ST7701 driver sends both
 // itself before this list, from the panel config (RGB order, 16 bpp).
 // Sleep-out and display-on carry one 0x00 parameter byte, as Guition's do.
 // NOTE: Must stay here, immediately before the structs below - see
@@ -113,7 +113,7 @@ const DisplayConfig CYD_P4_4880P443_DISPLAY = {
     .PANEL_MODEL = BSP_STR(BSP_PANEL_DRIVER),
     .WIDTH       = 480,
     .HEIGHT      = 800,
-    .ROTATION    = 0,     // native portrait (the CYD_S3_3248's job, owner 2026-09-28). 1 = landscape, benched 2026-09-29: as fast as portrait, 4x3 "a great fit"
+    .ROTATION    = 0,     // native portrait (the CYD_S3_3248 is the other portrait board). 1 = landscape: as fast as portrait, a 4x3 grid
     .AUTO_FLUSH  = true,
 
     .BL_PIN      = 23,    // LCD_PWM (schematic p.3)

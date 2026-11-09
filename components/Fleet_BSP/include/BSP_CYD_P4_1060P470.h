@@ -215,7 +215,7 @@ inline const StorageConfig& bsp_storage = CYD_P4_1060P470_STORAGE;
 
 const LvglConfig CYD_P4_1060P470_LVGL = {
     .DOUBLE_BUFFERING = true,
-    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override; was never actually wired up for this board (see GuiManager.cpp)
+    .DRAW_BUF_HEIGHT  = 0,    // 0 = no override: the esp_lcd flush uses 50 lines (LVGL_Flush_EspLcd.cpp)
     .BUFFER_SIZE_PX   = 1024 * 50,    // WIDTH * DRAW_BUF_HEIGHT
 };
 inline const LvglConfig& bsp_lvgl = CYD_P4_1060P470_LVGL;

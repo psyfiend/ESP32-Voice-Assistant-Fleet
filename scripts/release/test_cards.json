@@ -1,0 +1,15 @@
+{
+ "_about": "The Fleet page's test cards, retired from the firmware in 2.13 round 5 (K171). Add them back to a board for a test that needs them: retire_compiled.py <saved> <out> --tests, then restore_settings.ps1. All Lamps (four entities on one card) cannot be a card made on the board yet, so it is not here.",
+ "cards": {
+  "test_avail_261008_0310":    { "page": "home", "after": "mqtt_261105_0500",          "entity": "test_available", "area": "Test",    "pri": "240", "name": "Avail" },
+  "test_reading_261008_0310":  { "page": "home", "after": "test_avail_261008_0310",    "entity": "test_reading",   "area": "Test",    "pri": "240", "name": "Reading" },
+  "test_refuse_261008_0310":   { "page": "home", "after": "test_reading_261008_0310",  "entity": "test_refuse",    "area": "Test",    "pri": "240", "name": "Refuse" },
+  "panel_battery_261008_0310": { "page": "home", "after": "test_refuse_261008_0310",   "entity": "sys_batt",       "area": "Panel",   "pri": "220", "name": "Battery" },
+  "panel_battery_261008_0310b":{ "page": "home", "after": "panel_battery_261008_0310", "entity": "sys_batt_mv",    "area": "Panel",   "pri": "160", "name": "Battery" },
+  "kitchen_lamp_1_261008_0310":{ "page": "home", "after": "panel_battery_261008_0310b","entity": "test_lamp_1",    "area": "Kitchen", "pri": "100", "name": "Lamp 1" },
+  "kitchen_lamp_2_261008_0310":{ "page": "home", "after": "kitchen_lamp_1_261008_0310","entity": "test_lamp_2",    "area": "Kitchen", "pri": "100", "name": "Lamp 2" },
+  "lounge_lamp_3_261008_0310": { "page": "home", "after": "kitchen_lamp_2_261008_0310","entity": "test_lamp_3",    "area": "Lounge",  "pri": "100", "name": "Lamp 3" },
+  "office_switch_261008_0310": { "page": "home", "after": "lounge_lamp_3_261008_0310", "entity": "test_switch",    "area": "Office",  "pri": "100", "name": "Switch" },
+  "office_stuck_261008_0310":  { "page": "home", "after": "office_switch_261008_0310", "entity": "test_stuck",     "area": "Office",  "pri": "100", "name": "Stuck" }
+ }
+}

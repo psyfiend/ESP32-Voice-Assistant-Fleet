@@ -14,13 +14,13 @@
 //
 // Every number that came from a measurement says so. The measurements are in
 // docs/design/ha-websocket.md, taken against the owner's live instance
-// (HA 2026.8.1, 1,662 entities, 152 devices) on 2026-09-15/16.
+// (over 1,600 entities, about 150 devices).
 // ---------------------------------------------------------------------------
 
 struct HaDefaultsT {
     // --- Where ------------------------------------------------------------
-    // Plain ws:// on the LAN, no TLS. The owner's instance, and the one every
-    // number in ha-websocket.md was measured against.
+    // Plain ws:// on the LAN, no TLS. This is the owner's instance, the one
+    // every number in ha-websocket.md was measured against.
     const char *HOST;
     uint16_t    PORT;
     const char *PATH;
@@ -44,11 +44,11 @@ struct HaDefaultsT {
     // that look like a server bug.
     uint32_t RX_BUFFER_BYTES;
 
-    // HISTORY (2.10e) IS THE ONE DESIGNED READ THAT IS BIGGER, so a board with
-    // PSRAM takes this much there instead. Measured on the owner's HA,
-    // 2026-10-11: a day of 5-minute statistics with min and max 22.7 KB, a week
-    // of the Office group's logbook 20.5 KB, a day of the deck's light level
-    // 5.5 KB. 48 KB is twice the largest. Still a designed limit: an answer
+    // HISTORY IS THE ONE DESIGNED READ THAT IS BIGGER, so a board with
+    // PSRAM takes this much there instead. Measured on the owner's HA: a day
+    // of 5-minute statistics with min and max 22.7 KB, a week of the Office
+    // group's logbook 20.5 KB, a day of the deck's light level 5.5 KB. 48 KB is
+    // twice the largest. Still a designed limit: an answer
     // past it is dropped and counted, and HaHistory falls back or says so.
     uint32_t RX_BUFFER_PSRAM_BYTES;
 
@@ -66,10 +66,7 @@ struct HaDefaultsT {
     // THE TASK IS UNPINNED, AND THERE IS NO KNOB HERE TO CHANGE THAT.
     // esp_websocket_client.c line 1403 calls xTaskCreate, not
     // xTaskCreatePinnedToCore, and the config struct exposes only task_prio,
-    // task_stack and task_name. Checked in the vendored source rather than
-    // assumed, because the obvious thing to write here was "core 0, beside the
-    // TCP/IP task", and that would have been a comment asserting something the
-    // code does not do.
+    // task_stack and task_name (checked in the vendored source).
     //
     // What this means in practice: FreeRTOS may schedule it on core 1, beside
     // loopTask and LVGL, and at priority 5 against loopTask's 1 it will preempt
@@ -80,9 +77,8 @@ struct HaDefaultsT {
     //
     // Pinning it would mean patching the vendored component, which costs the
     // "unmodified upstream" property that makes it updatable. Not worth it
-    // unless the UI is measurably stuttering - and if that day comes, measure
-    // first, because #49 spent a week being blamed on core affinity that turned
-    // out to be innocent.
+    // unless the UI is measurably stuttering - and then measure first: core
+    // affinity was blamed for #49 and was not the cause.
     uint32_t TASK_STACK_BYTES;
     int      TASK_PRIORITY;
 
@@ -104,8 +100,8 @@ struct HaDefaultsT {
     uint32_t BACKOFF_MAX_MS;
 
     // Keepalive. HA does not require application-level pings, but a silent
-    // socket on a wall panel is indistinguishable from a dead one, and #49 is
-    // the whole reason this project no longer trusts "no news is good news".
+    // socket on a wall panel is indistinguishable from a dead one (#49), so
+    // "no news" is not taken as good news.
     uint32_t PING_INTERVAL_MS;
     uint32_t PONG_TIMEOUT_MS;
 };
